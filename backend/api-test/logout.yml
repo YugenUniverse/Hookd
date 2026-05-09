@@ -6,6 +6,12 @@ info:
 http:
   method: POST
   url: http://localhost:3000/auth/logout
+  body:
+    type: json
+    data: |-
+      {
+        "refreshToken": ""
+      }
   auth: inherit
 
 settings:

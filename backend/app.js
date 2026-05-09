@@ -5,12 +5,16 @@ var cookieParser = require('cookie-parser');
 var logger = require('morgan');
 var createError = require('http-errors');
 
+const connectDB = require("./db");
+
 var indexRouter = require('./routes/index');
 var authRouter = require('./routes/auth.routes');
 
 const errorMiddleware = require('./middleware/error.middleware');
 
 var app = express();
+
+connectDB();
 
 // view engine setup
 app.set('views', path.join(__dirname, 'views'));

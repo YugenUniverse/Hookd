@@ -1,11 +1,8 @@
-// services/auth.service.js
-
-const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
-const { ObjectId } = require('mongodb');
 
-const connectDB = require('../db');
+const User = require("../models/User");
+const RefreshToken = require("../models/RefreshToken");
 
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '1h';
 const REFRESH_TOKEN_EXPIRES_IN = process.env.REFRESH_TOKEN_EXPIRES_IN || '7d';
@@ -63,7 +60,7 @@ const generateAccessToken = (user) => {
   );
 };
 
-const createRefreshToken = async (db, user) => {
+const createRefreshToken = async (user) => {
   const tokenId = crypto.randomUUID();
 
   const refreshToken = jwt.sign(
@@ -79,48 +76,35 @@ const createRefreshToken = async (db, user) => {
     }
   );
 
-  await db.collection('refresh_tokens').insertOne({
+  await RefreshToken.create({
     tokenId,
     userId: user._id,
-    revokedAt: null,
-    createdAt: new Date(),
     expiresAt: parseExpiresInToDate(REFRESH_TOKEN_EXPIRES_IN)
   });
 
   return refreshToken;
 };
 
-exports.register = async ({ email, password }) => {
+exports.register = async ({ email, password, username}) => {
   if (!email || !password) {
     throw new Error('Missing fields');
   }
 
-  const db = await connectDB();
-
-  const existingUser = await db
-    .collection('users')
-    .findOne({ email });
-
+  const existingUser = await User.findOne({ email });
   if (existingUser) {
-    throw new Error('User already exists');
+    const error = new Error('User already exists with that email');
+    error.statusCode = 409; 
+    throw error;
   }
 
-  const hashedPassword = await bcrypt.hash(password, 10);
-
-  const user = {
+  const user = await User.create({
     email,
-    password: hashedPassword,
-    createdAt: new Date()
-  };
+    password,
+    username,
+    authMethods: ["local"]
+  });
 
-  const result = await db
-    .collection('users')
-    .insertOne(user);
-
-  return {
-    id: result.insertedId,
-    email: user.email
-  };
+  return { id: user._id, email: user.email };
 };
 
 exports.login = async ({ email, password }) => {
@@ -128,24 +112,29 @@ exports.login = async ({ email, password }) => {
     throw new Error('Missing fields');
   }
 
-  const db = await connectDB();
-
-  const user = await db
-    .collection('users')
-    .findOne({ email });
+  const user = await User.findOne({ email }).select("+password");
 
   if (!user) {
-    throw new Error('Invalid credentials');
+    const error = new Error('Invalid credentials');
+    error.statusCode = 401;
+    throw error;
   }
 
-  const isMatch = await bcrypt.compare(password, user.password);
+  if (!user.password) {
+    const error = new Error('Invalid login method for this account');
+    error.statusCode = 400;
+    throw error;
+  }
 
+  const isMatch = await user.matchPassword(password);
   if (!isMatch) {
-    throw new Error('Invalid credentials');
+    const error = new Error('Invalid credentials');
+    error.statusCode = 401;
+    throw error;
   }
 
   const accessToken = generateAccessToken(user);
-  const refreshToken = await createRefreshToken(db, user);
+  const refreshToken = await createRefreshToken(user);
 
   return {
     accessToken,
@@ -160,32 +149,14 @@ exports.refreshTokens = async ({ refreshToken }) => {
     throw error;
   }
 
-  let payload;
+  const payload = jwt.verify(refreshToken, getRefreshTokenSecret(),{issuer: ISSUER});
 
-  try {
-    payload = jwt.verify(refreshToken, getRefreshTokenSecret(), {
-      issuer: ISSUER
-    });
-  } catch (err) {
-    err.statusCode = 401;
-    err.message = 'Invalid or expired refresh token';
-    throw err;
-  }
-
-  if (payload.type !== 'refresh' || !payload.jti || !payload.sub) {
-    const error = new Error('Malformed refresh token');
-    error.statusCode = 401;
-    throw error;
-  }
-
-  const db = await connectDB();
-
-  const refreshTokenDoc = await db.collection('refresh_tokens').findOne({
+  const refreshTokenDoc = await RefreshToken.findOne({
     tokenId: payload.jti,
-    userId: new ObjectId(payload.sub),
+    userId: payload.sub,
     revokedAt: null,
     expiresAt: { $gt: new Date() }
-  });
+  }).populate("userId"); 
 
   if (!refreshTokenDoc) {
     const error = new Error('Refresh token has been revoked or expired');
@@ -193,21 +164,12 @@ exports.refreshTokens = async ({ refreshToken }) => {
     throw error;
   }
 
-  await db.collection('refresh_tokens').updateOne(
-    { _id: refreshTokenDoc._id },
-    { $set: { revokedAt: new Date() } }
-  );
+  refreshTokenDoc.revokedAt = new Date();
+  await refreshTokenDoc.save();
 
-  const user = await db.collection('users').findOne({ _id: refreshTokenDoc.userId });
-
-  if (!user) {
-    const error = new Error('User not found');
-    error.statusCode = 401;
-    throw error;
-  }
-
+  const user = refreshTokenDoc.userId;
   const accessToken = generateAccessToken(user);
-  const newRefreshToken = await createRefreshToken(db, user);
+  const newRefreshToken = await createRefreshToken(user);
 
   return {
     accessToken,
@@ -230,11 +192,9 @@ exports.logout = async ({ refreshToken }) => {
       return;
     }
 
-    const db = await connectDB();
-
-    await db.collection('refresh_tokens').updateOne(
-      { tokenId: payload.jti, revokedAt: null },
-      { $set: { revokedAt: new Date() } }
+    await RefreshToken.updateOne(
+      { tokenId: payload.jti, revokedAt: null},
+      { $set: { revokedAt: new Date() }}
     );
   } catch (err) {
     return;

@@ -6,6 +6,13 @@ info:
 http:
   method: POST
   url: http://localhost:3000/auth/login
+  body:
+    type: json
+    data: |-
+      {
+        "email":"celli@celli.it",
+        "password":"celli"
+      }
   auth: inherit
 
 settings:
