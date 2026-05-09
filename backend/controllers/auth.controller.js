@@ -59,3 +59,15 @@ exports.me = async (req, res) => {
     user: req.user
   });
 };
+
+exports.googleLogin = async (req, res, next) => {
+  try {
+    const tokens = await authService.googleLogin(req.body);
+    res.status.json({
+      message: "Google login successful",
+      ...tokens
+    })
+  } catch (err) {
+    next(err);
+  }
+}

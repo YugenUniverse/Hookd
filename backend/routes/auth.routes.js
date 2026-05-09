@@ -15,4 +15,6 @@ router.post('/logout', authController.logout);
 
 router.get('/me', authenticateJwt, authController.me);
 
+router.post('/google', authController.googleLogin);
+
 module.exports = router;

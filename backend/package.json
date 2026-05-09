@@ -11,6 +11,7 @@
     "debug": "~2.6.9",
     "dotenv": "^17.4.2",
     "express": "~4.16.1",
+    "google-auth-library": "^10.6.2",
     "http-errors": "~1.6.3",
     "jade": "~1.11.0",
     "jsonwebtoken": "^9.0.3",
