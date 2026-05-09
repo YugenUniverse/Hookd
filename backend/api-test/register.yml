@@ -1,0 +1,22 @@
+info:
+  name: register
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: http://localhost:3000/auth/register
+  body:
+    type: json
+    data: |-
+      {
+        "email":"celli@celli.it",
+        "password":"paller"
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
