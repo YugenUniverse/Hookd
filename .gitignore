@@ -196,9 +196,9 @@ coverage/
 # =========================
 # Android
 # =========================
-android/.gradle/
-android/local.properties
-android/key.properties
+**/android/.gradle/
+**/android/local.properties
+**/android/key.properties
 **/android/**/GeneratedPluginRegistrant.java
 **/android/**/gradle-wrapper.jar
 **/.cxx/
@@ -231,6 +231,7 @@ android/key.properties
 # Linux / Windows
 # =========================
 **/linux/flutter/ephemeral/
+**/flutter/generated_plugins.cmake
 **/windows/flutter/ephemeral/
 
 # =========================
