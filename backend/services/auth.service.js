@@ -89,8 +89,10 @@ const createRefreshToken = async (user) => {
 };
 
 exports.register = async ({ email, password, username }) => {
-    if (!email || !password) {
-        throw new Error("Missing fields");
+    if (!email || !password || !username) {
+        const error = new Error("Missing fields");
+        error.statusCode = 400;
+        throw error;
     }
 
     const existingUser = await User.findOne({ email });
@@ -112,7 +114,9 @@ exports.register = async ({ email, password, username }) => {
 
 exports.login = async ({ email, password }) => {
     if (!email || !password) {
-        throw new Error("Missing fields");
+        const error = new Error("Missing fields");
+        error.statusCode = 400;
+        throw error;
     }
 
     const user = await User.findOne({ email }).select("+password");
@@ -152,34 +156,45 @@ exports.refreshTokens = async ({ refreshToken }) => {
         throw error;
     }
 
-    const payload = jwt.verify(refreshToken, getRefreshTokenSecret(), {
-        issuer: ISSUER,
-    });
+    try {
+        const payload = jwt.verify(refreshToken, getRefreshTokenSecret(), {
+            issuer: ISSUER,
+        });
 
-    const refreshTokenDoc = await RefreshToken.findOne({
-        tokenId: payload.jti,
-        userId: payload.sub,
-        revokedAt: null,
-        expiresAt: { $gt: new Date() },
-    }).populate("userId");
+        const refreshTokenDoc = await RefreshToken.findOne({
+            tokenId: payload.jti,
+            userId: payload.sub,
+            revokedAt: null,
+            expiresAt: { $gt: new Date() },
+        }).populate("userId");
 
-    if (!refreshTokenDoc) {
-        const error = new Error("Refresh token has been revoked or expired");
+        if (!refreshTokenDoc) {
+            const error = new Error(
+                "Refresh token has been revoked or expired",
+            );
+            error.statusCode = 401;
+            throw error;
+        }
+
+        refreshTokenDoc.revokedAt = new Date();
+        await refreshTokenDoc.save();
+
+        const user = refreshTokenDoc.userId;
+        const accessToken = generateAccessToken(user);
+        const newRefreshToken = await createRefreshToken(user);
+
+        return {
+            accessToken,
+            refreshToken: newRefreshToken,
+        };
+    } catch (err) {
+        if (err.statusCode) {
+            throw err;
+        }
+        const error = new Error("Invalid refresh token");
         error.statusCode = 401;
         throw error;
     }
-
-    refreshTokenDoc.revokedAt = new Date();
-    await refreshTokenDoc.save();
-
-    const user = refreshTokenDoc.userId;
-    const accessToken = generateAccessToken(user);
-    const newRefreshToken = await createRefreshToken(user);
-
-    return {
-        accessToken,
-        refreshToken: newRefreshToken,
-    };
 };
 
 exports.logout = async ({ refreshToken }) => {
