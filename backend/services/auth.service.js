@@ -1,6 +1,6 @@
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
-const { OAuth2Client } = new require("google-auth-library");
+const { OAuth2Client } = require("google-auth-library");
 
 const User = require("../models/User");
 const RefreshToken = require("../models/RefreshToken");
