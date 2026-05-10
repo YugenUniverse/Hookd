@@ -6,6 +6,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+
+import '../config/firebase_env.dart';
 import '../constants/api_config.dart';
 import '../utils/error_helpers.dart';
 
@@ -324,7 +326,12 @@ class AuthService extends ChangeNotifier {
         idToken = await user.getIdToken();
       } else {
         // On mobile, use google_sign_in to obtain credentials then sign into Firebase
-        final googleSignIn = GoogleSignIn(scopes: ['email', 'profile']);
+        final googleSignIn = FirebaseEnv.webClientId.isNotEmpty
+            ? GoogleSignIn(
+                scopes: ['email', 'profile'],
+                serverClientId: FirebaseEnv.webClientId,
+              )
+            : GoogleSignIn(scopes: ['email', 'profile']);
         final account = await googleSignIn.signIn();
         if (account == null) {
           print('Google sign-in cancelled by user');
