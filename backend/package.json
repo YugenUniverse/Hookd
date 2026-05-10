@@ -10,11 +10,14 @@
     "testEnvironment": "node",
     "globalSetup": "./__tests__/setup.js",
     "globalTeardown": "./__tests__/teardown.js",
-    "testMatch": ["**/__tests__/**/*.test.js"]
+    "testMatch": [
+      "**/__tests__/**/*.test.js"
+    ]
   },
   "dependencies": {
     "bcrypt": "^6.0.0",
     "cookie-parser": "~1.4.4",
+    "cors": "^2.8.6",
     "debug": "~2.6.9",
     "dotenv": "^17.4.2",
     "express": "~4.16.1",

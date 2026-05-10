@@ -9,4 +9,5 @@ class ApiConfig {
   static const String loginPath = '/auth/login';
   static const String refreshPath = '/auth/refresh';
   static const String logoutPath = '/auth/logout';
+  static const String googlePath = '/auth/google';
 }

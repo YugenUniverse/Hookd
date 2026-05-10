@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 
+
 class LoginDialog extends StatefulWidget {
   const LoginDialog({super.key});
   @override
@@ -187,6 +188,40 @@ class _LoginDialogState extends State<LoginDialog> {
               ),
             ],
             const SizedBox(height: 16),
+            // Google sign-in button
+            SizedBox(
+              width: double.infinity,
+              child: _isLoading
+                  ? const SizedBox(
+                      height: 48,
+                      child: Center(child: CircularProgressIndicator()),
+                    )
+                  : OutlinedButton.icon(
+                      icon: const Icon(Icons.login),
+                      label: const Text('Sign in with Google'),
+                      onPressed: () async {
+                        setState(() => _isLoading = true);
+                        try {
+                          final ok = await AuthService().loginWithGoogle();
+                          if (!mounted) return;
+                          setState(() => _isLoading = false);
+                          if (ok) {
+                            Navigator.pop(context, true);
+                          } else {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Google login failed')),
+                            );
+                          }
+                        } catch (e) {
+                          if (!mounted) return;
+                          setState(() => _isLoading = false);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Google login error: $e')),
+                          );
+                        }
+                      },
+                    ),
+            ),
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [

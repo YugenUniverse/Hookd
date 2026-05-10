@@ -9,6 +9,8 @@ const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || "1h";
 const REFRESH_TOKEN_EXPIRES_IN = process.env.REFRESH_TOKEN_EXPIRES_IN || "7d";
 const ISSUER = "hookd";
 
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+
 const getJwtSecret = () => {
     if (!process.env.JWT_SECRET) {
         const error = new Error("JWT_SECRET is not configured");
@@ -230,13 +232,13 @@ exports.googleLogin = async ({ idToken }) => {
 
     let payload;
     try {
-        const ticket = await googlClient.verifyIdToken({
+        const ticket = await googleClient.verifyIdToken({
             idToken,
             audience: process.env.GOOGLE_CLIENT_ID,
         });
         payload = ticket.getPayload();
     } catch (err) {
-        const error = new Error("Invalid Google token");
+        const error = new Error("Invalid Google token: " + err.message);
         error.statusCode = 401;
         throw error;
     }

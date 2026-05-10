@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:dio/dio.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+import 'dart:js_util' as js_util;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -304,6 +306,142 @@ class AuthService extends ChangeNotifier {
         print('Register error: $e');
       }
       return false;
+    }
+  }
+
+  // Login with Google and exchange the ID token with the backend for app tokens.
+  Future<bool> loginWithGoogle() async {
+    try {
+      String? idToken;
+      
+      // On web, use the Google Identity Services Library
+      if (kIsWeb) {
+        idToken = await _getGoogleIdTokenWeb();
+      } else {
+        // On mobile, use google_sign_in package
+        final googleSignIn = GoogleSignIn(
+          scopes: ['email', 'profile'],
+        );
+        final account = await googleSignIn.signIn();
+        if (account == null) {
+          print('Google sign-in cancelled by user');
+          return false;
+        }
+        final auth = await account.authentication;
+        idToken = auth.idToken;
+      }
+      
+      if (idToken == null || idToken.isEmpty) {
+        print('Google sign-in did not return an idToken');
+        return false;
+      }
+
+      print('Successfully obtained ID token, sending to backend...');
+      final dio = Dio(BaseOptions(baseUrl: ApiConfig.apiBaseUrl));
+      final resp = await dio.post(
+        ApiConfig.googlePath,
+        data: {'idToken': idToken},
+        options: Options(validateStatus: (status) => true),
+      );
+
+      final status = resp.statusCode ?? 0;
+      final data = resp.data;
+      print('Google login status: $status');
+      print('Google login response: $data');
+
+      String? access;
+      String? refresh;
+
+      if (data is Map) {
+        access = (data['access_token'] ?? data['accessToken'])?.toString();
+        refresh = (data['refresh_token'] ?? data['refreshToken'])?.toString();
+      }
+
+      if (access != null && access.isNotEmpty && (status >= 200 && status < 300)) {
+        try {
+          await persistTokens(accessToken: access, refreshToken: refresh);
+          print('Google login successful, tokens persisted');
+        } catch (storageError) {
+          print('Google login successful but storage failed: $storageError');
+        }
+        _trySetUserFromJwt(access);
+        return true;
+      }
+
+      print('Google login failed: status=$status');
+      return false;
+    } catch (e) {
+      print('Google login error: $e');
+      return false;
+    }
+  }
+
+  // Get Google ID token on web using the Google Identity Services Library
+  Future<String?> _getGoogleIdTokenWeb() async {
+    // Prefer the page's GSI bridge (window.getGoogleIdToken / requestGoogleIdToken)
+    try {
+      if (kIsWeb) {
+        try {
+          final getFn = js_util.getProperty(js_util.globalThis, 'getGoogleIdToken');
+          if (getFn != null) {
+            var result = js_util.callMethod(js_util.globalThis, 'getGoogleIdToken', []);
+            if (result != null && js_util.hasProperty(result, 'then')) {
+              result = await js_util.promiseToFuture(result);
+            }
+            if (result is String && result.isNotEmpty) {
+              final jwtLike = RegExp(r'^[^.]+\.[^.]+\.[^.]+$');
+              if (jwtLike.hasMatch(result)) return result;
+            }
+          }
+        } catch (e) {
+          // ignore and fallback
+        }
+
+        // If bridge exists, request prompt and poll briefly
+        try {
+          final reqFn = js_util.getProperty(js_util.globalThis, 'requestGoogleIdToken');
+          if (reqFn != null) {
+            js_util.callMethod(js_util.globalThis, 'requestGoogleIdToken', []);
+            final jwtLike = RegExp(r'^[^.]+\.[^.]+\.[^.]+$');
+            final end = DateTime.now().add(const Duration(seconds: 8));
+            while (DateTime.now().isBefore(end)) {
+              await Future.delayed(const Duration(milliseconds: 400));
+              try {
+                var t = js_util.callMethod(js_util.globalThis, 'getGoogleIdToken', []);
+                if (t != null && js_util.hasProperty(t, 'then')) {
+                  t = await js_util.promiseToFuture(t);
+                }
+                if (t is String && t.isNotEmpty && jwtLike.hasMatch(t)) return t;
+              } catch (_) {}
+            }
+          }
+        } catch (e) {
+          // ignore and fallback
+        }
+      }
+
+      // Fallback to google_sign_in with explicit web clientId and openid scope
+      try {
+        final googleSignIn = GoogleSignIn(
+          clientId: '1077633030540-8n5ifbgad4fv3rmsnnenovlnunt6duas.apps.googleusercontent.com',
+          scopes: ['openid', 'email', 'profile'],
+        );
+
+        final account = await googleSignIn.signIn();
+        if (account == null) return null;
+        final auth = await account.authentication;
+        if (auth.idToken == null || auth.idToken!.isEmpty) {
+          print('No ID token returned - check OAuth config (web client id & origins)');
+          return null;
+        }
+        return auth.idToken;
+      } catch (e) {
+        print('Error getting Google ID token on web (fallback): $e');
+        return null;
+      }
+    } catch (e) {
+      print('Unexpected error in _getGoogleIdTokenWeb: $e');
+      return null;
     }
   }
 
