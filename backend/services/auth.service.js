@@ -1,6 +1,6 @@
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
-const { OAuth2Client } = require("google-auth-library");
+const admin = require('firebase-admin');
 
 const User = require("../models/User");
 const RefreshToken = require("../models/RefreshToken");
@@ -9,7 +9,38 @@ const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || "1h";
 const REFRESH_TOKEN_EXPIRES_IN = process.env.REFRESH_TOKEN_EXPIRES_IN || "7d";
 const ISSUER = "hookd";
 
-const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+// Initialize Firebase Admin SDK for verifying Firebase ID tokens.
+if (!admin.apps.length) {
+    const firebaseProjectId = process.env.FIREBASE_PROJECT_ID;
+    
+    if (process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
+        try {
+            const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
+            admin.initializeApp({
+                credential: admin.credential.cert(serviceAccount),
+            });
+        } catch (err) {
+            console.error('Failed to parse FIREBASE_SERVICE_ACCOUNT_JSON:', err.message);
+        }
+    } else if (firebaseProjectId) {
+        // For local/non-GCP environments: initialize with project ID only
+        // This requires GOOGLE_APPLICATION_CREDENTIALS to be set separately
+        try {
+            admin.initializeApp({
+                projectId: firebaseProjectId,
+            });
+        } catch (err) {
+            console.warn('Firebase initialization with projectId:', err.message);
+        }
+    } else {
+        // Last resort: try default initialization (requires GOOGLE_APPLICATION_CREDENTIALS env var)
+        try {
+            admin.initializeApp();
+        } catch (err) {
+            console.warn('firebase-admin default initialization:', err.message);
+        }
+    }
+}
 
 const getJwtSecret = () => {
     if (!process.env.JWT_SECRET) {
@@ -225,37 +256,50 @@ exports.logout = async ({ refreshToken }) => {
 
 exports.googleLogin = async ({ idToken }) => {
     if (!idToken) {
-        const error = new Error("Google ID token is  required");
+        const error = new Error("Firebase ID token is required");
         error.statusCode = 400;
         throw error;
     }
 
-    let payload;
+    let decoded;
     try {
-        const ticket = await googleClient.verifyIdToken({
-            idToken,
-            audience: process.env.GOOGLE_CLIENT_ID,
-        });
-        payload = ticket.getPayload();
+        if (!admin.apps.length) {
+            throw new Error("Firebase Admin SDK not initialized. Check FIREBASE_PROJECT_ID or FIREBASE_SERVICE_ACCOUNT_JSON env vars.");
+        }
+        decoded = await admin.auth().verifyIdToken(idToken);
     } catch (err) {
-        const error = new Error("Invalid Google token: " + err.message);
+        const errorMsg = err.message || String(err);
+        const error = new Error("Invalid Firebase ID token: " + errorMsg);
         error.statusCode = 401;
         throw error;
     }
 
-    const { sub, email, name, picture } = payload;
+    const uid = decoded.uid;
+    let email = decoded.email;
+    let name = decoded.name;
+    let picture = decoded.picture;
 
-    let user = await User.findOne({ $or: [{ googleId: sub }, { email }] });
+    try {
+        const userRecord = await admin.auth().getUser(uid);
+        email = email || userRecord.email;
+        name = name || userRecord.displayName;
+        picture = picture || userRecord.photoURL;
+    } catch (e) {
+        // ignore - profile info is optional
+    }
+
+    let user = await User.findOne({ $or: [{ googleId: uid }, { email }] });
 
     if (!user) {
         user = await User.create({
             email,
             username: name,
             avatar: picture,
+            googleId: uid,
             authMethods: ["google"],
         });
     } else if (!user.googleId) {
-        user.googleId = sub;
+        user.googleId = uid;
 
         if (!user.avatar || user.avatar === "") {
             user.avatar = picture;

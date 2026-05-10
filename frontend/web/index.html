@@ -20,14 +20,6 @@
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
   <meta name="description" content="A new Flutter project.">
 
-  <!-- Google Sign-In for Web: set your OAuth client ID here -->
-  <!-- Replace with your Web client ID from Google Cloud Console -->
-  <meta name="google-signin-client_id" content="1077633030540-8n5ifbgad4fv3rmsnnenovlnunt6duas.apps.googleusercontent.com">
-  <!-- Google platform library used by google_sign_in web implementation -->
-  <script src="https://apis.google.com/js/platform.js" async defer></script>
-  <!-- Google Identity Services Library for getting ID Token -->
-  <script src="https://accounts.google.com/gsi/client" async defer></script>
-
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
@@ -43,46 +35,7 @@
   <title>hookd</title>
   <link rel="manifest" href="manifest.json">
   
-  <script>
-    // Initialize Google Sign-In on page load
-    window.addEventListener('load', function() {
-      if (typeof google !== 'undefined' && google.accounts) {
-        google.accounts.id.initialize({
-          client_id: '1077633030540-8n5ifbgad4fv3rmsnnenovlnunt6duas.apps.googleusercontent.com',
-          callback: window.handleCredentialResponse
-        });
-      }
-    });
-
-    // Store the ID token globally
-    window.googleIdToken = null;
-
-    // Callback handler for Google Sign-In response
-    window.handleCredentialResponse = function(response) {
-      window.googleIdToken = response.credential;
-      console.log('ID token received from Google:', response.credential.substring(0, 50) + '...');
-      
-      // Notify Flutter that the token is ready
-      if (window.flutter_inappwebview) {
-        window.flutter_inappwebview.callHandler('idTokenReady', {
-          idToken: response.credential
-        });
-      }
-    };
-
-    // Function to get the ID token (called by Flutter)
-    window.getGoogleIdToken = function() {
-      return window.googleIdToken;
-    };
-
-    // Function to sign out
-    window.googleSignOut = function() {
-      if (typeof google !== 'undefined' && google.accounts) {
-        google.accounts.id.disableAutoSelect();
-      }
-      window.googleIdToken = null;
-    };
-  </script>
+  <!-- Google sign-in is handled by Firebase Auth via the Flutter app. -->
 </head>
 <body>
   <script src="flutter_bootstrap.js" async></script>

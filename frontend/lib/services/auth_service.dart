@@ -2,10 +2,10 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:google_sign_in/google_sign_in.dart';
-import 'dart:js_util' as js_util;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../constants/api_config.dart';
 import '../utils/error_helpers.dart';
 
@@ -313,30 +313,40 @@ class AuthService extends ChangeNotifier {
   Future<bool> loginWithGoogle() async {
     try {
       String? idToken;
-      
-      // On web, use the Google Identity Services Library
+      final auth = FirebaseAuth.instance;
+
       if (kIsWeb) {
-        idToken = await _getGoogleIdTokenWeb();
+        // Use Firebase Auth popup sign-in on web
+        final provider = GoogleAuthProvider();
+        final userCredential = await auth.signInWithPopup(provider);
+        final user = userCredential.user;
+        if (user == null) return false;
+        idToken = await user.getIdToken();
       } else {
-        // On mobile, use google_sign_in package
-        final googleSignIn = GoogleSignIn(
-          scopes: ['email', 'profile'],
-        );
+        // On mobile, use google_sign_in to obtain credentials then sign into Firebase
+        final googleSignIn = GoogleSignIn(scopes: ['email', 'profile']);
         final account = await googleSignIn.signIn();
         if (account == null) {
           print('Google sign-in cancelled by user');
           return false;
         }
-        final auth = await account.authentication;
-        idToken = auth.idToken;
+        final googleAuth = await account.authentication;
+        final credential = GoogleAuthProvider.credential(
+          accessToken: googleAuth.accessToken,
+          idToken: googleAuth.idToken,
+        );
+        final userCredential = await auth.signInWithCredential(credential);
+        final user = userCredential.user;
+        if (user == null) return false;
+        idToken = await user.getIdToken();
       }
-      
+
       if (idToken == null || idToken.isEmpty) {
-        print('Google sign-in did not return an idToken');
+        print('Firebase Google sign-in did not return an ID token');
         return false;
       }
 
-      print('Successfully obtained ID token, sending to backend...');
+      print('Successfully obtained Firebase ID token, sending to backend...');
       final dio = Dio(BaseOptions(baseUrl: ApiConfig.apiBaseUrl));
       final resp = await dio.post(
         ApiConfig.googlePath,
@@ -376,74 +386,7 @@ class AuthService extends ChangeNotifier {
     }
   }
 
-  // Get Google ID token on web using the Google Identity Services Library
-  Future<String?> _getGoogleIdTokenWeb() async {
-    // Prefer the page's GSI bridge (window.getGoogleIdToken / requestGoogleIdToken)
-    try {
-      if (kIsWeb) {
-        try {
-          final getFn = js_util.getProperty(js_util.globalThis, 'getGoogleIdToken');
-          if (getFn != null) {
-            var result = js_util.callMethod(js_util.globalThis, 'getGoogleIdToken', []);
-            if (result != null && js_util.hasProperty(result, 'then')) {
-              result = await js_util.promiseToFuture(result);
-            }
-            if (result is String && result.isNotEmpty) {
-              final jwtLike = RegExp(r'^[^.]+\.[^.]+\.[^.]+$');
-              if (jwtLike.hasMatch(result)) return result;
-            }
-          }
-        } catch (e) {
-          // ignore and fallback
-        }
-
-        // If bridge exists, request prompt and poll briefly
-        try {
-          final reqFn = js_util.getProperty(js_util.globalThis, 'requestGoogleIdToken');
-          if (reqFn != null) {
-            js_util.callMethod(js_util.globalThis, 'requestGoogleIdToken', []);
-            final jwtLike = RegExp(r'^[^.]+\.[^.]+\.[^.]+$');
-            final end = DateTime.now().add(const Duration(seconds: 8));
-            while (DateTime.now().isBefore(end)) {
-              await Future.delayed(const Duration(milliseconds: 400));
-              try {
-                var t = js_util.callMethod(js_util.globalThis, 'getGoogleIdToken', []);
-                if (t != null && js_util.hasProperty(t, 'then')) {
-                  t = await js_util.promiseToFuture(t);
-                }
-                if (t is String && t.isNotEmpty && jwtLike.hasMatch(t)) return t;
-              } catch (_) {}
-            }
-          }
-        } catch (e) {
-          // ignore and fallback
-        }
-      }
-
-      // Fallback to google_sign_in with explicit web clientId and openid scope
-      try {
-        final googleSignIn = GoogleSignIn(
-          clientId: '1077633030540-8n5ifbgad4fv3rmsnnenovlnunt6duas.apps.googleusercontent.com',
-          scopes: ['openid', 'email', 'profile'],
-        );
-
-        final account = await googleSignIn.signIn();
-        if (account == null) return null;
-        final auth = await account.authentication;
-        if (auth.idToken == null || auth.idToken!.isEmpty) {
-          print('No ID token returned - check OAuth config (web client id & origins)');
-          return null;
-        }
-        return auth.idToken;
-      } catch (e) {
-        print('Error getting Google ID token on web (fallback): $e');
-        return null;
-      }
-    } catch (e) {
-      print('Unexpected error in _getGoogleIdTokenWeb: $e');
-      return null;
-    }
-  }
+  
 
   // Refresh access token using refresh token. Returns true if refresh succeeded.
   Future<bool> refresh() async {
