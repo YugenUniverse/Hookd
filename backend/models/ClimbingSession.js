@@ -1,6 +1,6 @@
 const mongoose = require("mongoose");
 
-const climbSchema = new mongoose.Schema({
+const climbingSessionSchema = new mongoose.Schema({
     climber_id: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "Climber",
@@ -19,7 +19,7 @@ const climbSchema = new mongoose.Schema({
     },
 });
 
-climbSchema.methods.addReview = async function (rating, body) {
+climbingSessionSchema.methods.addReview = async function (rating, body) {
     const review = new Review({
         climb_id: this._id,
         rating,
@@ -31,7 +31,7 @@ climbSchema.methods.addReview = async function (rating, body) {
     await this.save();
 };
 
-climbSchema.methods.removeReview = async function () {
+climbingSessionSchema.methods.removeReview = async function () {
     if (!this.review_id) return;
 
     await Review.findByIdAndDelete(this.review_id);
@@ -39,4 +39,4 @@ climbSchema.methods.removeReview = async function () {
     await this.save();
 };
 
-module.exports = mongoose.model("Climb", climbSchema);
+module.exports = mongoose.model("ClimbingSession", climbingSessionSchema);

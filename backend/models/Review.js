@@ -1,9 +1,9 @@
 const mongoose = require("mongoose");
 
 const reviewSchema = new mongoose.Schema({
-    climb_id: {
+    climbing_session_id: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: "Climb",
+        ref: "ClimbingSession",
         required: true,
     },
     rating: { type: Number, required: true, min: 1, max: 5 },
