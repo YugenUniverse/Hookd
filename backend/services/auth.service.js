@@ -1,8 +1,8 @@
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
-const admin = require('firebase-admin');
+const admin = require("firebase-admin");
 
-const User = require("../models/User");
+const { User, Facility, PublicBody } = require("../models/User");
 const RefreshToken = require("../models/RefreshToken");
 
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || "1h";
@@ -12,15 +12,20 @@ const ISSUER = "hookd";
 // Initialize Firebase Admin SDK for verifying Firebase ID tokens.
 if (!admin.apps.length) {
     const firebaseProjectId = process.env.FIREBASE_PROJECT_ID;
-    
+
     if (process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
         try {
-            const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
+            const serviceAccount = JSON.parse(
+                process.env.FIREBASE_SERVICE_ACCOUNT_JSON,
+            );
             admin.initializeApp({
                 credential: admin.credential.cert(serviceAccount),
             });
         } catch (err) {
-            console.error('Failed to parse FIREBASE_SERVICE_ACCOUNT_JSON:', err.message);
+            console.error(
+                "Failed to parse FIREBASE_SERVICE_ACCOUNT_JSON:",
+                err.message,
+            );
         }
     } else if (firebaseProjectId) {
         // For local/non-GCP environments: initialize with project ID only
@@ -30,14 +35,17 @@ if (!admin.apps.length) {
                 projectId: firebaseProjectId,
             });
         } catch (err) {
-            console.warn('Firebase initialization with projectId:', err.message);
+            console.warn(
+                "Firebase initialization with projectId:",
+                err.message,
+            );
         }
     } else {
         // Last resort: try default initialization (requires GOOGLE_APPLICATION_CREDENTIALS env var)
         try {
             admin.initializeApp();
         } catch (err) {
-            console.warn('firebase-admin default initialization:', err.message);
+            console.warn("firebase-admin default initialization:", err.message);
         }
     }
 }
@@ -87,6 +95,7 @@ const generateAccessToken = (user) => {
         {
             sub: user._id.toString(),
             email: user.email,
+            userType: user.userType,
         },
         getJwtSecret(),
         {
@@ -121,7 +130,13 @@ const createRefreshToken = async (user) => {
     return refreshToken;
 };
 
-exports.register = async ({ email, password, username }) => {
+exports.register = async ({
+    email,
+    password,
+    username,
+    userType,
+    ...restData
+}) => {
     if (!email || !password || !username) {
         const error = new Error("Missing fields");
         error.statusCode = 400;
@@ -135,12 +150,22 @@ exports.register = async ({ email, password, username }) => {
         throw error;
     }
 
-    const user = await User.create({
+    let user;
+    const baseUserData = {
         email,
         password,
         username,
         authMethods: ["local"],
-    });
+        ...restData,
+    };
+
+    if (userType === "Facility") {
+        user = await Facility.create(baseUserData);
+    } else if (userType === "PublicBody") {
+        user = await PublicBody.create(baseUserData);
+    } else {
+        user = await User.create(baseUserData);
+    }
 
     return { id: user._id, email: user.email };
 };
@@ -264,7 +289,9 @@ exports.googleLogin = async ({ idToken }) => {
     let decoded;
     try {
         if (!admin.apps.length) {
-            throw new Error("Firebase Admin SDK not initialized. Check FIREBASE_PROJECT_ID or FIREBASE_SERVICE_ACCOUNT_JSON env vars.");
+            throw new Error(
+                "Firebase Admin SDK not initialized. Check FIREBASE_PROJECT_ID or FIREBASE_SERVICE_ACCOUNT_JSON env vars.",
+            );
         }
         decoded = await admin.auth().verifyIdToken(idToken);
     } catch (err) {

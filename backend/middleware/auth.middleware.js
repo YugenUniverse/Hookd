@@ -29,6 +29,7 @@ const authenticateJwt = (req, res, next) => {
         req.user = {
             id: payload.sub,
             email: payload.email,
+            userType: payload.userType,
         };
 
         next();
@@ -45,6 +46,22 @@ const authenticateJwt = (req, res, next) => {
     }
 };
 
+// NEW: The restriction middleware for role-based access
+const restrictTo = (...allowedRoles) => {
+    return (req, res, next) => {
+        if (!req.user || !allowedRoles.includes(req.user.userType)) {
+            const error = new Error(
+                "You do not have permission to perform this action.",
+            );
+            error.statusCode = 403;
+            return next(error);
+        }
+
+        next();
+    };
+};
+
 module.exports = {
     authenticateJwt,
+    restrictTo,
 };

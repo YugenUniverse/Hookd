@@ -1,0 +1,31 @@
+info:
+  name: createWall
+  type: http
+  seq: 2
+
+http:
+  method: POST
+  url: http://localhost:3000/walls/createWall
+  body:
+    type: json
+    data: |-
+      {
+          "name": "Celli Wall",
+          "description": "The big Celli Wall.",
+          "difficulty": "INTERMEDIATE",
+          "wallType": "IndoorWall",
+          "location": {
+              "type": "Point",
+              "coordinates": [11.1258, 46.0664], 
+              "address": "Via Celli,1"
+          }
+      }
+  auth:
+    type: bearer
+    token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2YTAyMDk2NGEzNjJjZWI4ZjdiZDE1ZjkiLCJlbWFpbCI6ImNlbGxpQGNlbGxpLml0IiwidXNlclR5cGUiOiJGYWNpbGl0eSIsImlhdCI6MTc3ODUxODM4NywiZXhwIjoxNzc4NTIxOTg3LCJpc3MiOiJob29rZCJ9.F1mQck-gfBjfWfNrMu0cKQTHQGflG_S128Oxpwuvatk
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
