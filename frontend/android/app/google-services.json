@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "128159806952",
+    "project_id": "celli-2354f",
+    "storage_bucket": "celli-2354f.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:128159806952:android:154eed0482689ecf43205d",
+        "android_client_info": {
+          "package_name": "com.fiatlinux.hookd"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "128159806952-4cv0h9kg41n6g9fcs9k7sb6raqml2fve.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDFEuELTQMNfK-PBmHzJcflEVG6vlt9hf4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "128159806952-4cv0h9kg41n6g9fcs9k7sb6raqml2fve.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

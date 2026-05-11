@@ -1,0 +1,6 @@
+# Local Firebase env file for build-time config
+firebase.env.json
+firebase.env.json.example
+
+# Legacy generated Firebase Android config (no longer committed)
+android/app/google-services.json

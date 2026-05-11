@@ -141,3 +141,126 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+# Flutter .gitignore
+# Do not remove or rename entries in this file, only add new ones
+# See https://github.com/flutter/flutter/issues/128635 for more context.
+
+# Miscellaneous
+*.class
+*.lock
+*.log
+*.pyc
+*.swp
+.DS_Store
+.atom/
+.buildlog/
+.history
+.svn/
+
+# As packages are no longer pinned, we use a lockfile for testing locally.
+# When unpinning packages, Using lockfiles ensures that failures in PRs are
+# actually due to those PRs, not due to a package being updated.
+!/pubspec.lock
+
+# IntelliJ related
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# Visual Studio Code related
+.classpath
+.project
+.settings/
+.vscode/*
+.ccls-cache
+
+# =========================
+# Dart / Flutter
+# =========================
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub/
+.pub-cache/
+build/
+
+# Generated files
+**/generated_plugin_registrant.dart
+
+# Coverage
+coverage/
+
+# =========================
+# Android
+# =========================
+**/android/.gradle/
+**/android/local.properties
+**/android/key.properties
+**/android/**/GeneratedPluginRegistrant.java
+**/android/**/gradle-wrapper.jar
+**/.cxx/
+
+# Keystore files
+*.jks
+*.keystore
+
+# =========================
+# iOS / macOS
+# =========================
+**/ios/Pods/
+**/ios/.symlinks/
+**/ios/Flutter/ephemeral/
+**/ios/Flutter/Flutter.framework
+**/ios/Flutter/App.framework
+**/ios/Flutter/Generated.xcconfig
+**/ios/Flutter/flutter_export_environment.sh
+**/ios/Runner/GeneratedPluginRegistrant.*
+
+**/macos/Pods/
+**/macos/Flutter/ephemeral/
+**/macos/Flutter/GeneratedPluginRegistrant.swift
+
+# Xcode
+**/xcuserdata/
+**/DerivedData/
+
+# =========================
+# Linux / Windows
+# =========================
+**/linux/flutter/ephemeral/
+**/flutter/generated_plugins.cmake
+**/windows/flutter/ephemeral/
+
+# =========================
+# IDEs
+# =========================
+.idea/
+.vscode/
+*.iml
+
+# =========================
+# Logs / temp
+# =========================
+*.log
+*.tmp
+*.swp
+.DS_Store
+
+# =========================
+# Node
+# =========================
+node_modules/
+.npm/
+.yarn/
+.pnpm-store/
+
+# Env
+.env
+.env.*
+!.env.example
+
+# Database
+db/

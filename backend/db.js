@@ -1,19 +1,18 @@
-const { MongoClient } = require('mongodb');
-const uri = 'mongodb://127.0.0.1:27017';
-const client = new MongoClient(uri);
+const mongoose = require("mongoose");
 
-let db;
-
-async function connectDB() {
-  if (db) return db;
-
-  await client.connect();
-
-  console.log('Connected to MongoDB');
-
-  db = client.db('hookd');
-
-  return db;
-}
+const connectDB = async () => {
+    try {
+        if (mongoose.connect.readyState >= 1) {
+            return;
+        }
+        await mongoose.connect(
+            process.env.MONGO_URI || "mongodb://localhost:27017/hookd",
+        );
+        console.log("DB ~ MongoDB connected via Mongoose");
+    } catch (error) {
+        console.log("DB ~ MongoDB connction error: ", error);
+        process.exit(1);
+    }
+};
 
 module.exports = connectDB;
