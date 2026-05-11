@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const Review = require("./Review");
 
 const climbingSessionSchema = new mongoose.Schema({
     climber_id: {
@@ -12,16 +13,21 @@ const climbingSessionSchema = new mongoose.Schema({
         required: true,
     },
     date: { type: Date, required: true },
-    time: { type: Number, required: true },
+    time: {
+        type: Number,
+        required: true,
+        min: 0,
+    },
     review_id: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "Review",
+        default: null,
     },
 });
 
 climbingSessionSchema.methods.addReview = async function (rating, body) {
     const review = new Review({
-        climb_id: this._id,
+        climbing_session_id: this._id,
         rating,
         body,
     });
