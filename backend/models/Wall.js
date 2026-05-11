@@ -20,6 +20,15 @@ const wallSchema = new mongoose.Schema(
         name: {
             type: String,
             required: true,
+            trim: true,
+        },
+        description: {
+            type: String,
+            trim: true,
+            maxLength: [
+                1000,
+                "Description cannot be more than 1000 characters",
+            ],
         },
         location: {
             type: {
@@ -47,6 +56,12 @@ const wallSchema = new mongoose.Schema(
             enum: STATUS_ENUM,
             default: "OPEN",
         },
+        sessions: [
+            {
+                type: mongoose.Schema.Types.ObjectId,
+                ref: "ClimbingSession",
+            },
+        ],
     },
     {
         timestamps: true,
@@ -58,71 +73,59 @@ const wallSchema = new mongoose.Schema(
 );
 
 wallSchema.index({ location: "2dsphere" });
+wallSchema.index({ name: "text" });
 
-wallSchema.methods.getWall = function () {
-    return this;
-};
+wallSchema.methods.editWall = function (updates) {};
 
-wallSchema.methods.editWall = function (updates) {
-    Object.assign(this, updates);
-    return this.save();
-};
+wallSchema.methods.computeRating = function () {};
 
-wallSchema.methods.computeRating = function () {
-    console.log("Computing rating for", this.name);
-};
-
-wallSchema.methods.getLeadboard = function () {
-    console.log("Fetching leaderboard for", this.name);
-};
+wallSchema.methods.getLeadboard = function () {};
 
 const Wall = mongoose.model("Wall", wallSchema);
 
 // --- INDOOR WALL ---
 const indoorSchema = new mongoose.Schema(
     {
-        // Add any specific Indoor properties here
-        hasAirConditioning: { type: Boolean, default: false },
+        facility: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Facility",
+            required: true,
+        },
     },
     {
         toJSON: {
             transform: function (doc, ret) {
                 baseWallTransform(doc, ret);
-
                 return ret;
             },
         },
     },
 );
 
-indoorSchema.methods.editWall = function (updates) {
-    Object.assign(this, updates);
-    return this.save();
-};
+indoorSchema.methods.editWall = function (updates) {};
 
 const IndoorWall = Wall.discriminator("IndoorWall", indoorSchema);
 
 // --- OUTDOOR WALL ---
 const outdoorSchema = new mongoose.Schema(
     {
-        // Add any specific Outdoor properties here
-        rockType: { type: String },
+        publicBody: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "PublicBody",
+            required: true,
+        },
     },
     {
         toJSON: {
             transform: function (doc, ret) {
                 baseWallTransform(doc, ret);
-
                 return ret;
             },
         },
     },
 );
 
-outdoorSchema.methods.editWall = function (updates) {
-    Object.assign(this, updates);
-    return this.save();
-};
+outdoorSchema.methods.editWall = function (updates) {};
 
 const OutdoorWall = Wall.discriminator("OutdoorWall", outdoorSchema);
 
