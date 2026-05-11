@@ -1,8 +1,15 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+
+// Conditional web geolocation helper. Uses browser API on web, stub elsewhere.
+import 'web_geo_stub.dart'
+  if (dart.library.html) 'web_geo_html.dart' as web_geo;
 
 class POIMap extends StatefulWidget {
   const POIMap({super.key});
@@ -24,35 +31,88 @@ class _POIMapState extends State<POIMap> {
   }
 
   Future<void> _initLocation() async {
-    try {
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-      }
+    // Retry up to 3 times to handle intermittent geolocation failures
+    const maxRetries = 3;
 
-      if (permission == LocationPermission.deniedForever || permission == LocationPermission.denied) {
-        // Permissions are denied, we won't be able to get the location
+    if (kIsWeb) {
+      for (int attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          print('Requesting web geolocation... (attempt $attempt/$maxRetries)');
+          final latlng = await web_geo.webGetCurrentLatLng();
+          if (latlng != null) {
+            _userLocation = latlng;
+            setState(() {
+              _locating = false;
+            });
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              try {
+                print('Moving map to user location (web)');
+                _mapController.move(_userLocation!, _defaultZoom);
+              } catch (e) {
+                print('Error moving map: $e');
+              }
+            });
+            return;
+          } else {
+            throw Exception('Web geolocation returned null');
+          }
+        } catch (e) {
+          print('Web geolocation attempt $attempt/$maxRetries failed: $e');
+          if (attempt == maxRetries) {
+            print('Web geolocation failed after $maxRetries attempts. Using default center.');
+            setState(() {
+              _locating = false;
+            });
+          } else {
+            await Future.delayed(const Duration(seconds: 1));
+          }
+        }
+      }
+      return;
+    }
+
+    for (int attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        print('Requesting geolocation... (attempt $attempt/$maxRetries)');
+        final pos = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.best,
+        );
+        print('Got location: ${pos.latitude}, ${pos.longitude}');
+        _userLocation = LatLng(pos.latitude, pos.longitude);
         setState(() {
           _locating = false;
         });
-        return;
+        // center map on user location if controller is ready
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          try {
+            print('Moving map to user location');
+            _mapController.move(_userLocation!, _defaultZoom);
+          } catch (e) {
+            print('Error moving map: $e');
+          }
+        });
+        return; // Success, exit retry loop
+      } catch (e) {
+        print('Geolocation attempt $attempt/$maxRetries failed: $e');
+        if (attempt == maxRetries) {
+          // All retries exhausted
+          print('Geolocation failed after $maxRetries attempts. Using default center.');
+          setState(() {
+            _locating = false;
+          });
+        } else {
+          // Wait before retrying
+          await Future.delayed(const Duration(seconds: 1));
+        }
       }
-
-      final pos = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.best);
-      _userLocation = LatLng(pos.latitude, pos.longitude);
-      // center map on user location if controller is ready
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        try {
-          _mapController.move(_userLocation!, _defaultZoom);
-        } catch (_) {}
-      });
-    } catch (e) {
-      // ignore and continue with default center
-    } finally {
-      setState(() {
-        _locating = false;
-      });
     }
+  }
+
+  void retryLocation() {
+    setState(() {
+      _locating = true;
+    });
+    _initLocation();
   }
 
   Marker? _buildUserMarker() {
@@ -75,7 +135,8 @@ class _POIMapState extends State<POIMap> {
 
   @override
   Widget build(BuildContext context) {
-    final center = _userLocation ?? const LatLng(51.5, -0.09);
+    // Default center: 46°04′N 11°07′E / 46.067°N 11.117°E
+    final center = _userLocation ?? const LatLng(46.067, 11.117);
     final maptilerKey = dotenv.env['MAPTILER_KEY'];
     final maptilerStyle = (dotenv.env['MAPTILER_STYLE'] ?? 'basic-v2').trim();
     final useMapTiler = maptilerKey != null && maptilerKey.isNotEmpty;
@@ -127,15 +188,13 @@ class _POIMapState extends State<POIMap> {
 
         Positioned(
           right: 16,
-          bottom: 16,
+          bottom: 100, // positioned above the nav bar (which is 70px + 16px padding)
           child: FloatingActionButton.small(
             heroTag: 'recenter-map',
-            tooltip: 'Center on my position',
-            onPressed: _userLocation == null
-                ? null
-                : () {
-                    _mapController.move(_userLocation!, _defaultZoom);
-                  },
+            tooltip: 'Center on my position / Retry location',
+            onPressed: () {
+              retryLocation();
+            },
             child: const Icon(Icons.my_location),
           ),
         ),
