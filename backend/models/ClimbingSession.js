@@ -16,7 +16,7 @@ const climbingSessionSchema = new mongoose.Schema({
     time: {
         type: Number,
         required: true,
-        min: 0,
+        min: [0, "Time must be a positive number"],
     },
     review_id: {
         type: mongoose.Schema.Types.ObjectId,
