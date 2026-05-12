@@ -3,7 +3,7 @@ import 'package:http/http.dart' as http;
 import '../models/wall.dart';
 
 class WallService {
-  static const String baseUrl = 'http://localhost:3000';
+  static const String baseUrl = 'http://127.0.0.1:3000';
 
   Future<List<Wall>> fetchAllWalls() async {
     try {
@@ -17,6 +17,24 @@ class WallService {
       }
     } catch (e) {
       throw Exception('Error fetching walls: $e');
+    }
+  }
+
+  Future<List<Wall>> searchWalls(String query) async {
+    try {
+      final uri = Uri.parse('$baseUrl/walls/search').replace(
+        queryParameters: {'q': query},
+      );
+      final response = await http.get(uri);
+
+      if (response.statusCode == 200) {
+        final jsonResponse = json.decode(response.body) as List<dynamic>;
+        return jsonResponse.map((data) => Wall.fromJson(data as Map<String, dynamic>)).toList();
+      } else {
+        throw Exception('Failed to search walls: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Error searching walls: $e');
     }
   }
 }

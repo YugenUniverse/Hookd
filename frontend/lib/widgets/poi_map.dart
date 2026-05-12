@@ -9,11 +9,29 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 import '../models/wall.dart';
 import '../services/api_service.dart';
+import '../dialogs/wall_details_dialog.dart';
 // Conditional web geolocation helper. Uses browser API on web, stub elsewhere.
 import 'web_geo_stub.dart'
   if (dart.library.html) 'web_geo_html.dart' as web_geo;
+
+class WallMapController extends ChangeNotifier {
+  LatLng? _target;
+  Wall? _selectedWall;
+
+  LatLng? get target => _target;
+  Wall? get selectedWall => _selectedWall;
+
+  void focusOnWall(Wall wall) {
+    _selectedWall = wall;
+    _target = LatLng(wall.latitude, wall.longitude);
+    notifyListeners();
+  }
+}
+
 class POIMap extends StatefulWidget {
-  const POIMap({super.key});
+  const POIMap({super.key, this.controller});
+
+  final WallMapController? controller;
 
   @override
   State<POIMap> createState() => _POIMapState();
@@ -29,12 +47,50 @@ class _POIMapState extends State<POIMap> {
   double _currentZoom = _defaultZoom;
   LatLng? _lastMapCenter;
   static const double _mapMoveThreshold = 2000; // Reload walls if map center moves >2km
+  static const double _focusZoom = 16.0;
+  bool _skipNextMoveFetch = false;
+
+  void _handleControllerCommand() {
+    final controller = widget.controller;
+    final target = controller?.target;
+    final wall = controller?.selectedWall;
+    if (controller == null || target == null) return;
+
+    _skipNextMoveFetch = true;
+    _currentZoom = _focusZoom;
+    _lastMapCenter = target;
+    _mapController.move(target, _currentZoom);
+    _fetchWallsForLocation(target.longitude, target.latitude, zoom: _currentZoom);
+    
+    // Show wall info if a wall was selected
+    if (wall != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _showWallInfo(wall);
+      });
+    }
+  }
 
   @override
   void initState() {
     super.initState();
     _initLocation();
     _setupMapListener();
+    widget.controller?.addListener(_handleControllerCommand);
+  }
+
+  @override
+  void didUpdateWidget(covariant POIMap oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.controller != widget.controller) {
+      oldWidget.controller?.removeListener(_handleControllerCommand);
+      widget.controller?.addListener(_handleControllerCommand);
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.controller?.removeListener(_handleControllerCommand);
+    super.dispose();
   }
 
   void _setupMapListener() {
@@ -47,6 +103,10 @@ class _POIMapState extends State<POIMap> {
   }
 
   void _onMapMoved() {
+    if (_skipNextMoveFetch) {
+      _skipNextMoveFetch = false;
+      return;
+    }
     final currentCenter = _mapController.camera.center;
     _currentZoom = _mapController.camera.zoom;
     print('Map moved to: ${currentCenter.latitude}, ${currentCenter.longitude}');
@@ -295,65 +355,7 @@ class _POIMapState extends State<POIMap> {
     showModalBottomSheet(
       isScrollControlled: true,
       context: context,
-      builder: (context) {
-        return SafeArea(
-          child: SizedBox(
-            height: 420,
-            width: double.infinity,
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    wall.name,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.headlineSmall,
-                  ),
-                  const SizedBox(height: 12),
-                  Expanded(
-                    child: SingleChildScrollView(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (wall.description != null) ...[
-                            Text(
-                              wall.description!,
-                              style: Theme.of(context).textTheme.bodyLarge,
-                            ),
-                            const SizedBox(height: 16),
-                          ],
-                          if (wall.type != null) ...[
-                            Text(
-                              'Type: ${wall.type}',
-                              style: Theme.of(context).textTheme.bodyMedium,
-                            ),
-                            const SizedBox(height: 8),
-                          ],
-                          if (wall.difficulty != null) ...[
-                            Text(
-                              'Difficulty: ${wall.difficulty}',
-                              style: Theme.of(context).textTheme.bodyMedium,
-                            ),
-                            const SizedBox(height: 8),
-                          ],
-                          Text(
-                            'Coordinates: ${wall.latitude.toStringAsFixed(4)}, ${wall.longitude.toStringAsFixed(4)}',
-                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                  color: Colors.grey,
-                                ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
+      builder: (context) => WallDetailsDialog(wall: wall),
     );
   }
 

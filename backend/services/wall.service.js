@@ -49,7 +49,11 @@ exports.getWallById = async (id) => {
 };
 
 exports.searchWalls = async (searchQuery) => {
-    return await Wall.find({ $text: { $search: searchQuery } })
+    const escaped = searchQuery.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+    return await Wall.find({
+        name: { $regex: `.*${escaped}.*`, $options: "i" },
+    })
         .populate("facility", "username email avatar")
         .populate("publicBody", "username email avatar");
 };

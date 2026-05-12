@@ -27,4 +27,15 @@ class ClimbingSession {
       notes: json['notes'],
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'userId': userId,
+      'date': date,
+      'durationInMinutes': durationInMinutes,
+      'rating': rating,
+      'notes': notes,
+    };
+  }
 }

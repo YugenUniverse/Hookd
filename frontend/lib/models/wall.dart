@@ -10,13 +10,12 @@ class Wall {
   final String wallType;
   final String? ownerName;
   final List<ClimbingSession> sessions;
-}
 
   Wall({
     required this.id,
     required this.name,
-    required this.latitude;
-    required this.longitude;
+    required this.latitude,
+    required this.longitude,
     required this.description,
     required this.difficulty,
     required this.wallType,
@@ -24,47 +23,50 @@ class Wall {
     required this.sessions,
   });
 
+  // Compatibility with older UI code that expects `type`.
+  String get type => wallType;
+
   factory Wall.fromJson(Map<String, dynamic> json) {
-    try {
-      // Try to parse from GeoJSON location format
-      if (json['location'] != null && json['location']['coordinates'] != null) {
-        final coords = json['location']['coordinates'] as List;
-        if (coords.length >= 2) {
-          longitude = _parseDouble(coords[0]);
-          latitude = _parseDouble(coords[1]);
-        }
-      } else {
-        // Fallback to direct latitude/longitude fields
-        latitude = _parseDouble(json['latitude']);
-        longitude = _parseDouble(json['longitude']);
-      }
-    } catch (e) {
-      print('Error parsing coordinates for wall: $e');
-    }
-    
-    String? owner;
-    if (json['wallType'] == 'IndoorWall' && json['facility'] != null) {
-      owner = json['facility']['username'];
-    } else if (json['wallType'] == 'OutdoorWall' &&
-        json['publicBody'] != null) {
-      owner = json['publicBody']['username'];
+    final coordinates = json['location']?['coordinates'];
+    double latitude = _parseDouble(json['latitude']);
+    double longitude = _parseDouble(json['longitude']);
+
+    if (coordinates is List && coordinates.length >= 2) {
+      longitude = _parseDouble(coordinates[0]);
+      latitude = _parseDouble(coordinates[1]);
     }
 
-    var sessionsList = json['sessions'] as List? ?? [];
-    List<ClimbingSession> parsedSessions = sessionsList
-        .map((sessionJson) => ClimbingSession.fromJson(sessionJson))
-        .toList();
+    final wallType = (json['wallType'] ?? json['type'] ?? 'Wall').toString();
+
+    String? owner;
+    if (json['facility'] is Map) {
+      owner = json['facility']['username']?.toString();
+    } else if (json['publicBody'] is Map) {
+      owner = json['publicBody']['username']?.toString();
+    }
+
+    final sessionsRaw = json['sessions'];
+    final sessions = <ClimbingSession>[];
+    if (sessionsRaw is List) {
+      for (final item in sessionsRaw) {
+        if (item is Map<String, dynamic>) {
+          sessions.add(ClimbingSession.fromJson(item));
+        } else if (item is Map) {
+          sessions.add(ClimbingSession.fromJson(Map<String, dynamic>.from(item)));
+        }
+      }
+    }
 
     return Wall(
-      id: json['id'] ?? '',
-      name: json['name'] ?? 'Unknown Wall',
+      id: (json['id'] ?? json['_id'] ?? '').toString(),
+      name: (json['name'] ?? 'Unknown Wall').toString(),
       latitude: latitude,
       longitude: longitude,
-      description: json['description'] ?? 'No description available.',
-      difficulty: json['difficulty'] ?? 'BEGINNER',
-      wallType: json['wallType'] ?? 'Wall',
-      ownerName: owner ?? 'Unknown Owner',
-      sessions: parsedSessions,
+      description: (json['description'] ?? 'No description available.').toString(),
+      difficulty: (json['difficulty'] ?? 'UNKNOWN').toString(),
+      wallType: wallType,
+      ownerName: owner,
+      sessions: sessions,
     );
   }
 
@@ -78,14 +80,15 @@ class Wall {
 
   Map<String, dynamic> toJson() {
     return {
-      '_id': id,
+      'id': id,
       'name': name,
       'latitude': latitude,
       'longitude': longitude,
       'description': description,
+      'difficulty': difficulty,
       'wallType': wallType,
       'ownerName': ownerName,
-      'difficulty': difficulty,
+      'sessions': sessions.map((session) => session.toJson()).toList(),
     };
   }
 }

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 
 import '../dialogs/profile_dialog.dart';
 import '../services/auth_service.dart';
-import 'wall_page.dart';
+import '../services/wall_service.dart';
+import '../models/wall.dart';
 import '../widgets/poi_map.dart';
 
 class MyHomePage extends StatefulWidget {
@@ -13,6 +15,9 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
+  final WallService _wallService = WallService();
+  final WallMapController _mapController = WallMapController();
+
   @override
   void initState() {
     super.initState();
@@ -29,25 +34,23 @@ class _MyHomePageState extends State<MyHomePage> {
     super.dispose();
   }
 
+  Future<void> _openWallSearch() async {
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      showDragHandle: true,
+      builder: (_) => _WallSearchSheet(
+        wallService: _wallService,
+        mapController: _mapController,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Home'),
-        actions: [
-          IconButton(
-            tooltip: 'Account',
-            icon: const Icon(Icons.person_outline),
-            onPressed: () async {
-              await showDialog(
-                context: context,
-                builder: (_) => const ProfileDialog(),
-              );
-            },
-          ),
-        ],
-      ),
-      body: const POIMap(),
+      body: POIMap(controller: _mapController),
       bottomNavigationBar: SafeArea(
         minimum: const EdgeInsets.fromLTRB(16, 0, 16, 16),
         child: Material(
@@ -63,6 +66,12 @@ class _MyHomePageState extends State<MyHomePage> {
                   label: 'Map',
                   selected: true,
                   onTap: () {},
+                ),
+                _NavItem(
+                  tooltip: 'Search walls',
+                  icon: Icons.search,
+                  label: 'Search',
+                  onTap: _openWallSearch,
                 ),
                 _NavItem(
                   tooltip: 'Account',
@@ -83,6 +92,150 @@ class _MyHomePageState extends State<MyHomePage> {
       extendBody: true,
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
       floatingActionButton: const SizedBox.shrink(),
+    );
+  }
+}
+
+class _WallSearchSheet extends StatefulWidget {
+  const _WallSearchSheet({
+    required this.wallService,
+    required this.mapController,
+  });
+
+  final WallService wallService;
+  final WallMapController mapController;
+
+  @override
+  State<_WallSearchSheet> createState() => _WallSearchSheetState();
+}
+
+class _WallSearchSheetState extends State<_WallSearchSheet> {
+  final TextEditingController _controller = TextEditingController();
+  List<Wall> _results = [];
+  bool _loading = false;
+  String? _error;
+  Timer? _debounce;
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _onQueryChanged(String value) {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 300), _search);
+  }
+
+  Future<void> _search() async {
+    final query = _controller.text.trim();
+    if (query.isEmpty) {
+      setState(() {
+        _results = [];
+        _error = null;
+      });
+      return;
+    }
+
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
+    try {
+      final results = await widget.wallService.searchWalls(query);
+      setState(() {
+        _results = results;
+      });
+    } catch (e) {
+      setState(() {
+        _error = e.toString();
+        _results = [];
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: MediaQuery.of(context).size.height * 0.85,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Search climbing walls',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _controller,
+              autofocus: true,
+              textInputAction: TextInputAction.search,
+              onChanged: _onQueryChanged,
+              onSubmitted: (_) => _search(),
+              decoration: InputDecoration(
+                hintText: 'Search by name',
+                prefixIcon: const Icon(Icons.search),
+                suffixIcon: IconButton(
+                  tooltip: 'Search',
+                  icon: const Icon(Icons.arrow_forward),
+                  onPressed: _search,
+                ),
+                border: const OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 16),
+            if (_loading)
+              const Center(child: CircularProgressIndicator())
+            else if (_error != null)
+              Text(
+                _error!,
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              )
+            else if (_results.isEmpty)
+              const Padding(
+                padding: EdgeInsets.only(top: 12),
+                child: Text('Type a name and search for walls.'),
+              )
+            else
+              Expanded(
+                child: ListView.separated(
+                  itemCount: _results.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 8),
+                  itemBuilder: (context, index) {
+                    final wall = _results[index];
+                    return Card(
+                      child: ListTile(
+                        leading: CircleAvatar(
+                          child: Icon(
+                            wall.wallType == 'IndoorWall'
+                                ? Icons.domain
+                                : Icons.landscape,
+                          ),
+                        ),
+                        title: Text(wall.name),
+                        subtitle: Text('${wall.difficulty} • ${wall.type}'),
+                        onTap: () {
+                          Navigator.of(context).pop();
+                          widget.mapController.focusOnWall(wall);
+                        },
+                      ),
+                    );
+                  },
+                ),
+              ),
+          ],
+        ),
+      ),
     );
   }
 }

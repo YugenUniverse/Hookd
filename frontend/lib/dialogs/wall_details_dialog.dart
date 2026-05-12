@@ -13,85 +13,99 @@ class WallDetailsDialog extends StatelessWidget {
     final IconData typeIcon = isIndoor ? Icons.domain : Icons.landscape;
     final Color typeColor = isIndoor ? Colors.blueGrey : Colors.green;
 
-    return AlertDialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      title: Row(
-        children: [
-          Icon(typeIcon, color: typeColor, size: 28),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              wall.name,
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
-          ),
-        ],
-      ),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Wall Type Chip
-            Chip(
-              label: Text(
-                isIndoor ? 'Indoor Facility' : 'Outdoor Crag',
-                style: const TextStyle(color: Colors.white, fontSize: 12),
+    return SafeArea(
+      child: SizedBox(
+        height: 500,
+        width: double.infinity,
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(typeIcon, color: typeColor, size: 28),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      wall.name,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
               ),
-              backgroundColor: typeColor,
-            ),
-            const SizedBox(height: 16),
+              const SizedBox(height: 16),
+              Expanded(
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Wall Type Chip
+                      Chip(
+                        label: Text(
+                          isIndoor ? 'Indoor Facility' : 'Outdoor Crag',
+                          style: const TextStyle(color: Colors.white, fontSize: 12),
+                        ),
+                        backgroundColor: typeColor,
+                      ),
+                      const SizedBox(height: 16),
 
-            // Difficulty Info
-            _buildInfoRow(Icons.fitness_center, 'Difficulty', wall.difficulty),
-            const SizedBox(height: 12),
+                      // Difficulty Info
+                      _buildInfoRow(context, Icons.fitness_center, 'Difficulty', wall.difficulty),
+                      const SizedBox(height: 12),
 
-            // Owner Info
-            _buildInfoRow(
-              isIndoor ? Icons.business : Icons.account_balance,
-              'Managed By',
-              wall.ownerName ?? 'Unknown',
-            ),
-            const SizedBox(height: 12),
+                      // Owner Info
+                      _buildInfoRow(
+                        context,
+                        isIndoor ? Icons.business : Icons.account_balance,
+                        'Managed By',
+                        wall.ownerName ?? 'Unknown',
+                      ),
+                      const SizedBox(height: 12),
 
-            // Session Count Info
-            _buildInfoRow(
-              Icons.history,
-              'Total Climbs',
-              '${wall.sessions.length} sessions logged',
-            ),
-            const SizedBox(height: 16),
+                      // Session Count Info
+                      _buildInfoRow(
+                        context,
+                        Icons.history,
+                        'Total Climbs',
+                        '${wall.sessions.length} sessions logged',
+                      ),
+                      const SizedBox(height: 16),
 
-            // Description section
-            const Text(
-              'Description',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-            ),
-            const SizedBox(height: 4),
-            Text(wall.description, style: const TextStyle(height: 1.4)),
-          ],
+                      // Description section
+                      const Text(
+                        'Description',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(wall.description, style: Theme.of(context).textTheme.bodyMedium?.copyWith(height: 1.4)),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(), // Closes the dialog
-          child: const Text('Close'),
-        ),
-      ],
     );
   }
 
   // A helper widget to keep the code clean for rows with icons and text
-  Widget _buildInfoRow(IconData icon, String label, String value) {
+  Widget _buildInfoRow(BuildContext context, IconData icon, String label, String value) {
+    final textColor = Theme.of(context).textTheme.bodyMedium?.color ?? Colors.black87;
+    final iconColor = Theme.of(context).iconTheme.color ?? Colors.grey;
+    
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, size: 20, color: Colors.grey.shade700),
+        Icon(icon, size: 20, color: iconColor),
         const SizedBox(width: 8),
         Expanded(
           child: RichText(
             text: TextSpan(
-              style: const TextStyle(color: Colors.black87, fontSize: 14),
+              style: TextStyle(color: textColor, fontSize: 14),
               children: [
                 TextSpan(
                   text: '$label: ',
