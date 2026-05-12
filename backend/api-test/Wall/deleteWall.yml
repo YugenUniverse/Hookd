@@ -1,0 +1,21 @@
+info:
+  name: deleteWall
+  type: http
+  seq: 3
+
+http:
+  method: DELETE
+  url: http://localhost:3000/walls/:id
+  params:
+    - name: id
+      value: 6a020a30a362ceb8f7bd15fc
+      type: path
+  auth:
+    type: bearer
+    token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2YTAyMDk2NGEzNjJjZWI4ZjdiZDE1ZjkiLCJlbWFpbCI6ImNlbGxpQGNlbGxpLml0IiwidXNlclR5cGUiOiJGYWNpbGl0eSIsImlhdCI6MTc3ODUxODM4NywiZXhwIjoxNzc4NTIxOTg3LCJpc3MiOiJob29rZCJ9.F1mQck-gfBjfWfNrMu0cKQTHQGflG_S128Oxpwuvatk
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
