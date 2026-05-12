@@ -114,6 +114,12 @@ const facilitySchema = new mongoose.Schema(
             },
             address: String,
         },
+        walls: [
+            {
+                type: mongoose.Schema.Types.ObjectId,
+                ref: "IndoorWall",
+            },
+        ],
     },
     {
         toJSON: {
@@ -157,6 +163,12 @@ const publicBodySchema = new mongoose.Schema(
             },
             address: String,
         },
+        walls: [
+            {
+                type: mongoose.Schema.Types.ObjectId,
+                ref: "OutdoorWall",
+            },
+        ],
     },
     {
         toJSON: {
