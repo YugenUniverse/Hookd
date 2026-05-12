@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../dialogs/profile_dialog.dart';
 import '../services/auth_service.dart';
+import 'wall_page.dart';
 
 class MyHomePage extends StatefulWidget {
   const MyHomePage({super.key});
@@ -17,7 +18,9 @@ class _MyHomePageState extends State<MyHomePage> {
     AuthService().addListener(_onAuthChanged);
   }
 
-  void _onAuthChanged() {}
+  void _onAuthChanged() {
+    setState(() {});
+  }
 
   @override
   void dispose() {
@@ -40,11 +43,39 @@ class _MyHomePageState extends State<MyHomePage> {
                 builder: (_) => const ProfileDialog(),
               );
             },
-          )
+          ),
         ],
       ),
-      body: const Center(
-        child: Text('Welcome'),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Text(
+              'Welcome to Hookd!',
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 30),
+
+            ElevatedButton.icon(
+              icon: const Icon(Icons.terrain),
+              label: const Text('Find Climbing Walls'),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 12,
+                ),
+                textStyle: const TextStyle(fontSize: 18),
+              ),
+              onPressed: () {
+                // This tells Flutter to slide the new page over the current one
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => WallsPage()),
+                );
+              },
+            ),
+          ],
+        ),
       ),
     );
   }
