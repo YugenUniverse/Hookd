@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'dart:async';
 
 import '../models/user.dart';
+import '../models/wall.dart';
 import '../constants/api_config.dart';
 import 'auth_service.dart';
 
@@ -143,6 +144,64 @@ class ApiService {
         'statusCode': null,
         'message': 'Unknown error: ${e.toString()}',
       };
+    }
+  }
+
+  // Wall endpoints
+  Future<List<Wall>> getAllWalls() async {
+    try {
+      final response = await _dio.get('/walls/getAll');
+      final data = response.data;
+      print('getAllWalls response type: ${data.runtimeType}, data: $data');
+
+      List<Wall> walls = [];
+      if (data is List) {
+        print('Response is a List with ${data.length} items');
+        walls = data.map((wall) => Wall.fromJson(wall as Map<String, dynamic>)).toList();
+      } else if (data is Map && data.containsKey('walls')) {
+        final wallsList = data['walls'] as List;
+        print('Response is a Map with walls key, containing ${wallsList.length} items');
+        walls = wallsList.map((wall) => Wall.fromJson(wall as Map<String, dynamic>)).toList();
+      }
+      print('Parsed ${walls.length} walls');
+      for (var wall in walls) {
+        print('Wall: ${wall.name} at (${wall.latitude}, ${wall.longitude})');
+      }
+      return walls;
+    } catch (e) {
+      print('Error fetching all walls: $e');
+      return [];
+    }
+  }
+
+  Future<List<Wall>> getNearbyWalls(double lng, double lat, {double radius = 30000}) async {
+    try {
+      print('Fetching nearby walls for lng: $lng, lat: $lat, radius: $radius');
+      final response = await _dio.get('/walls/nearby', queryParameters: {
+        'lng': lng,
+        'lat': lat,
+        'radius': radius.toInt(),
+      });
+      final data = response.data;
+      print('getNearbyWalls response type: ${data.runtimeType}, data: $data');
+
+      List<Wall> walls = [];
+      if (data is List) {
+        print('Response is a List with ${data.length} items');
+        walls = data.map((wall) => Wall.fromJson(wall as Map<String, dynamic>)).toList();
+      } else if (data is Map && data.containsKey('walls')) {
+        final wallsList = data['walls'] as List;
+        print('Response is a Map with walls key, containing ${wallsList.length} items');
+        walls = wallsList.map((wall) => Wall.fromJson(wall as Map<String, dynamic>)).toList();
+      }
+      print('Parsed ${walls.length} nearby walls');
+      for (var wall in walls) {
+        print('Wall: ${wall.name} at (${wall.latitude}, ${wall.longitude})');
+      }
+      return walls;
+    } catch (e) {
+      print('Error fetching nearby walls: $e');
+      return [];
     }
   }
 

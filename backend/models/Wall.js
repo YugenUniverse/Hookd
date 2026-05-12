@@ -6,7 +6,7 @@ const STATUS_ENUM = [
     "UNDER_MAINTAINANCE",
     "PERMANENTLY_CLOSED",
 ];
-const DIFFICULTY_ENUM = ["BEGINNER", "INTERMEDIATE", "ADVANCED", "EXPERT"];
+const DIFFICULTY_ENUM = ["UNKNOWN", "BEGINNER", "INTERMEDIATE", "ADVANCED", "EXPERT"];
 
 const baseWallTransform = (doc, ret) => {
     ret.id = ret._id;
