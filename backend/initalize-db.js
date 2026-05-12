@@ -29,7 +29,7 @@ out center tags;
 const pickDifficulty = (tags) => {
   if (tags?.["climbing:bouldering"] === "yes") return "BEGINNER";
   if (tags?.["climbing:indoor"] === "yes") return "INTERMEDIATE";
-  if (tags?.sport === "climbing") return "ADVANCED";
+  if (tags?.sport === "climbing") return "UNKNOWN";
   return "INTERMEDIATE";
 };
 
