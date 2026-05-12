@@ -1,0 +1,29 @@
+info:
+    name: create-session-with-review
+    type: http
+    seq: 5
+
+http:
+    method: POST
+    url: http://localhost:3000/sessions
+    body:
+        type: json
+        data: |-
+            {
+              "wall_id": "000000000000000000000000",
+              "date": "2026-05-12",
+              "time": 90,
+              "review": {
+                "rating": 5,
+                "body": "Amazing session!"
+              }
+            }
+    auth:
+        type: bearer
+        token:
+
+settings:
+    encodeUrl: true
+    timeout: 0
+    followRedirects: true
+    maxRedirects: 5
