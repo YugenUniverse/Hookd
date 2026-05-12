@@ -1,29 +1,43 @@
 const mongoose = require("mongoose");
 const Review = require("./Review");
 
-const climbingSessionSchema = new mongoose.Schema({
-    climber_id: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "Climber",
-        required: true,
+const baseTransform = (doc, ret) => {
+    ret.id = ret._id;
+    delete ret._id;
+    delete ret.__v;
+    return ret;
+};
+
+const climbingSessionSchema = new mongoose.Schema(
+    {
+        climber_id: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Climber",
+            required: true,
+        },
+        wall_id: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Wall",
+            required: true,
+        },
+        date: { type: Date, required: true },
+        time: {
+            type: Number,
+            required: true,
+            min: [0, "Time must be a positive number"],
+        },
+        review_id: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Review",
+            default: null,
+        },
     },
-    wall_id: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "Wall",
-        required: true,
+    {
+        toJSON: {
+            transform: baseTransform,
+        },
     },
-    date: { type: Date, required: true },
-    time: {
-        type: Number,
-        required: true,
-        min: [0, "Time must be a positive number"],
-    },
-    review_id: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "Review",
-        default: null,
-    },
-});
+);
 
 climbingSessionSchema.methods.addReview = async function (rating, body) {
     const review = new Review({
@@ -35,6 +49,8 @@ climbingSessionSchema.methods.addReview = async function (rating, body) {
 
     this.review_id = review._id;
     await this.save();
+
+    return review;
 };
 
 climbingSessionSchema.methods.removeReview = async function () {
