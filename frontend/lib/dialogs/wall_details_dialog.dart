@@ -52,6 +52,14 @@ class WallDetailsDialog extends StatelessWidget {
               'Managed By',
               wall.ownerName ?? 'Unknown',
             ),
+            const SizedBox(height: 12),
+
+            // Session Count Info
+            _buildInfoRow(
+              Icons.history,
+              'Total Climbs',
+              '${wall.sessions.length} sessions logged',
+            ),
             const SizedBox(height: 16),
 
             // Description section

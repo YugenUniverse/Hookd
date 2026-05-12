@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/wall_service.dart';
-import '../models/wall_model.dart';
+import '../models/wall.dart';
 import '../dialogs/wall_details_dialog.dart';
 
 class WallsPage extends StatefulWidget {

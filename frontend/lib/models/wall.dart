@@ -1,3 +1,5 @@
+import 'climbing_session.dart';
+
 class Wall {
   final String id;
   final String name;
@@ -5,6 +7,7 @@ class Wall {
   final String difficulty;
   final String wallType;
   final String? ownerName;
+  final List<ClimbingSession> sessions;
 
   Wall({
     required this.id,
@@ -13,6 +16,7 @@ class Wall {
     required this.difficulty,
     required this.wallType,
     this.ownerName,
+    required this.sessions,
   });
 
   factory Wall.fromJson(Map<String, dynamic> json) {
@@ -24,6 +28,11 @@ class Wall {
       owner = json['publicBody']['username'];
     }
 
+    var sessionsList = json['sessions'] as List? ?? [];
+    List<ClimbingSession> parsedSessions = sessionsList
+        .map((sessionJson) => ClimbingSession.fromJson(sessionJson))
+        .toList();
+
     return Wall(
       id: json['id'] ?? '',
       name: json['name'] ?? 'Unknown Wall',
@@ -31,6 +40,7 @@ class Wall {
       difficulty: json['difficulty'] ?? 'BEGINNER',
       wallType: json['wallType'] ?? 'Wall',
       ownerName: owner ?? 'Unknown Owner',
+      sessions: parsedSessions,
     );
   }
 }
