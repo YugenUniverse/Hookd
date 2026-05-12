@@ -1,0 +1,17 @@
+info:
+    name: get-session-by-id
+    type: http
+    seq: 7
+
+http:
+    method: GET
+    url: http://localhost:3000/sessions/<SESSION_ID>
+    auth:
+        type: bearer
+        token:
+
+settings:
+    encodeUrl: true
+    timeout: 0
+    followRedirects: true
+    maxRedirects: 5

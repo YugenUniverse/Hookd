@@ -48,6 +48,38 @@ userSchema.methods.editUser = function (updates) {};
 
 const User = mongoose.model("User", userSchema);
 
+// --- CLIMBER ---
+const climberSchema = new mongoose.Schema(
+    {
+        name: { type: String, required: true, trim: true },
+        surname: { type: String, required: true, trim: true },
+        birthdate: { type: Date, required: true },
+        bio: {
+            type: String,
+            default: "",
+            trim: true,
+            maxlength: [200, "Bio cannot exceed 200 characters"],
+        },
+        wallet: {
+            type: Number,
+            default: 0,
+            min: [0, "Wallet balance cannot be negative"],
+        },
+    },
+    {
+        toJSON: {
+            transform: function (doc, ret) {
+                baseUserTransform(doc, ret);
+                return ret;
+            },
+        },
+    },
+);
+
+climberSchema.methods.editUser = function (updates) {};
+
+const Climber = User.discriminator("Climber", climberSchema);
+
 // --- FACILITY ---
 const facilitySchema = new mongoose.Schema(
     {
@@ -136,6 +168,7 @@ const PublicBody = User.discriminator("PublicBody", publicBodySchema);
 
 module.exports = {
     User,
+    Climber,
     Facility,
     PublicBody,
 };
