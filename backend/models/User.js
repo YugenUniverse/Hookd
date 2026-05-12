@@ -65,6 +65,12 @@ const climberSchema = new mongoose.Schema(
             default: 0,
             min: [0, "Wallet balance cannot be negative"],
         },
+        sessions: [
+            {
+                type: mongoose.Schema.Types.ObjectId,
+                ref: "ClimbingSession",
+            },
+        ],
     },
     {
         toJSON: {

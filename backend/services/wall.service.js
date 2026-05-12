@@ -14,15 +14,15 @@ exports.createWall = async (wallData, userId, userType) => {
 exports.getAllWalls = async () => {
     return await Wall.find()
         .populate("facility", "username email avatar")
-        .populate("publicBody", "username email avatar");
-    //.populate("sessions");
+        .populate("publicBody", "username email avatar")
+        .populate("sessions");
 };
 
 exports.getWallById = async (id) => {
     const wall = await Wall.findById(id)
         .populate("facility", "username email avatar")
-        .populate("publicBody", "username email avatar");
-    //.populate("sessions");
+        .populate("publicBody", "username email avatar")
+        .populate("sessions");
 
     if (!wall) {
         const error = new Error("Wall not found");
