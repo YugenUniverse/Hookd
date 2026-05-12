@@ -1,26 +1,30 @@
+import 'climbing_session.dart';
+
 class Wall {
   final String id;
   final String name;
   final double latitude;
   final double longitude;
-  final String? description;
-  final String? type;
-  final String? difficulty;
+  final String description;
+  final String difficulty;
+  final String wallType;
+  final String? ownerName;
+  final List<ClimbingSession> sessions;
+}
 
   Wall({
     required this.id,
     required this.name,
-    required this.latitude,
-    required this.longitude,
-    this.description,
-    this.type,
-    this.difficulty,
+    required this.latitude;
+    required this.longitude;
+    required this.description,
+    required this.difficulty,
+    required this.wallType,
+    this.ownerName,
+    required this.sessions,
   });
 
   factory Wall.fromJson(Map<String, dynamic> json) {
-    double latitude = 0;
-    double longitude = 0;
-    
     try {
       // Try to parse from GeoJSON location format
       if (json['location'] != null && json['location']['coordinates'] != null) {
@@ -38,17 +42,32 @@ class Wall {
       print('Error parsing coordinates for wall: $e');
     }
     
+    String? owner;
+    if (json['wallType'] == 'IndoorWall' && json['facility'] != null) {
+      owner = json['facility']['username'];
+    } else if (json['wallType'] == 'OutdoorWall' &&
+        json['publicBody'] != null) {
+      owner = json['publicBody']['username'];
+    }
+
+    var sessionsList = json['sessions'] as List? ?? [];
+    List<ClimbingSession> parsedSessions = sessionsList
+        .map((sessionJson) => ClimbingSession.fromJson(sessionJson))
+        .toList();
+
     return Wall(
-      id: json['_id'] ?? json['id'] ?? '',
-      name: json['name'] ?? '',
+      id: json['id'] ?? '',
+      name: json['name'] ?? 'Unknown Wall',
       latitude: latitude,
       longitude: longitude,
-      description: json['description'],
-      type: json['type'],
-      difficulty: json['difficulty'],
+      description: json['description'] ?? 'No description available.',
+      difficulty: json['difficulty'] ?? 'BEGINNER',
+      wallType: json['wallType'] ?? 'Wall',
+      ownerName: owner ?? 'Unknown Owner',
+      sessions: parsedSessions,
     );
   }
-  
+
   static double _parseDouble(dynamic value) {
     if (value == null) return 0.0;
     if (value is double) return value;
@@ -64,7 +83,8 @@ class Wall {
       'latitude': latitude,
       'longitude': longitude,
       'description': description,
-      'type': type,
+      'wallType': wallType,
+      'ownerName': ownerName,
       'difficulty': difficulty,
     };
   }

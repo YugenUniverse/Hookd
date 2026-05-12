@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../dialogs/profile_dialog.dart';
 import '../services/auth_service.dart';
+import 'wall_page.dart';
 import '../widgets/poi_map.dart';
 
 class MyHomePage extends StatefulWidget {
@@ -18,7 +19,9 @@ class _MyHomePageState extends State<MyHomePage> {
     AuthService().addListener(_onAuthChanged);
   }
 
-  void _onAuthChanged() {}
+  void _onAuthChanged() {
+    setState(() {});
+  }
 
   @override
   void dispose() {
@@ -29,6 +32,21 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(
+        title: const Text('Home'),
+        actions: [
+          IconButton(
+            tooltip: 'Account',
+            icon: const Icon(Icons.person_outline),
+            onPressed: () async {
+              await showDialog(
+                context: context,
+                builder: (_) => const ProfileDialog(),
+              );
+            },
+          ),
+        ],
+      ),
       body: const POIMap(),
       bottomNavigationBar: SafeArea(
         minimum: const EdgeInsets.fromLTRB(16, 0, 16, 16),

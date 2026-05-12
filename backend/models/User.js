@@ -48,6 +48,44 @@ userSchema.methods.editUser = function (updates) {};
 
 const User = mongoose.model("User", userSchema);
 
+// --- CLIMBER ---
+const climberSchema = new mongoose.Schema(
+    {
+        name: { type: String, required: true, trim: true },
+        surname: { type: String, required: true, trim: true },
+        birthdate: { type: Date, required: true },
+        bio: {
+            type: String,
+            default: "",
+            trim: true,
+            maxlength: [200, "Bio cannot exceed 200 characters"],
+        },
+        wallet: {
+            type: Number,
+            default: 0,
+            min: [0, "Wallet balance cannot be negative"],
+        },
+        sessions: [
+            {
+                type: mongoose.Schema.Types.ObjectId,
+                ref: "ClimbingSession",
+            },
+        ],
+    },
+    {
+        toJSON: {
+            transform: function (doc, ret) {
+                baseUserTransform(doc, ret);
+                return ret;
+            },
+        },
+    },
+);
+
+climberSchema.methods.editUser = function (updates) {};
+
+const Climber = User.discriminator("Climber", climberSchema);
+
 // --- FACILITY ---
 const facilitySchema = new mongoose.Schema(
     {
@@ -76,6 +114,12 @@ const facilitySchema = new mongoose.Schema(
             },
             address: String,
         },
+        walls: [
+            {
+                type: mongoose.Schema.Types.ObjectId,
+                ref: "IndoorWall",
+            },
+        ],
     },
     {
         toJSON: {
@@ -119,6 +163,12 @@ const publicBodySchema = new mongoose.Schema(
             },
             address: String,
         },
+        walls: [
+            {
+                type: mongoose.Schema.Types.ObjectId,
+                ref: "OutdoorWall",
+            },
+        ],
     },
     {
         toJSON: {
@@ -136,6 +186,7 @@ const PublicBody = User.discriminator("PublicBody", publicBodySchema);
 
 module.exports = {
     User,
+    Climber,
     Facility,
     PublicBody,
 };

@@ -1,21 +1,21 @@
 info:
-  name: logout
-  type: http
-  seq: 1
+    name: logout
+    type: http
+    seq: 3
 
 http:
-  method: POST
-  url: http://localhost:3000/auth/logout
-  body:
-    type: json
-    data: |-
-      {
-        "refreshToken": ""
-      }
-  auth: inherit
+    method: POST
+    url: http://localhost:3000/auth/logout
+    body:
+        type: json
+        data: |-
+            {
+              "refreshToken": ""
+            }
+    auth: inherit
 
 settings:
-  encodeUrl: true
-  timeout: 0
-  followRedirects: true
-  maxRedirects: 5
+    encodeUrl: true
+    timeout: 0
+    followRedirects: true
+    maxRedirects: 5

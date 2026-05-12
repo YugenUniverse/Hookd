@@ -1,0 +1,17 @@
+info:
+    name: delete-session
+    type: http
+    seq: 9
+
+http:
+    method: DELETE
+    url: http://localhost:3000/sessions/<SESSION_ID>
+    auth:
+        type: bearer
+        token:
+
+settings:
+    encodeUrl: true
+    timeout: 0
+    followRedirects: true
+    maxRedirects: 5
