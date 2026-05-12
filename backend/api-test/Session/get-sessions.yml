@@ -5,7 +5,7 @@ info:
 
 http:
     method: GET
-    url: http://localhost:3000/sessions
+    url: http://localhost:3000/session
     auth:
         type: bearer
         token:
