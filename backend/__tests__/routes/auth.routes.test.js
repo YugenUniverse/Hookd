@@ -5,7 +5,7 @@ const mongoose = require("mongoose");
 
 const authRoutes = require("../../routes/auth.routes");
 const errorMiddleware = require("../../middleware/error.middleware");
-const User = require("../../models/User");
+const { User } = require("../../models/User");
 const RefreshToken = require("../../models/RefreshToken");
 
 process.env.JWT_SECRET = process.env.JWT_SECRET || "test-jwt-secret";

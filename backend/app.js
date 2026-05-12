@@ -11,7 +11,7 @@ const connectDB = require("./db");
 var indexRouter = require("./routes/index");
 var authRouter = require("./routes/auth.routes");
 var wallRouter = require("./routes/wall.routes");
-var sessionsRouter = require("./routes/sessions.routes");
+var sessionRouter = require("./routes/session.routes");
 
 const errorMiddleware = require("./middleware/error.middleware");
 
@@ -62,7 +62,7 @@ app.use(
 app.use("/", indexRouter);
 app.use("/auth", authRouter);
 app.use("/walls", wallRouter);
-app.use("/sessions", sessionsRouter);
+app.use("/session", sessionRouter);
 // catch 404 and forward to error handler
 app.use(function (req, res, next) {
     next(createError(404));
