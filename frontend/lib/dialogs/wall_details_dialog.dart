@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../models/wall_model.dart';
+import '../models/wall.dart';
 
 class WallDetailsDialog extends StatelessWidget {
   final Wall wall;

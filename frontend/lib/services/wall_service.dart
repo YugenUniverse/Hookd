@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import '../models/wall_model.dart';
+import '../models/wall.dart';
 
 class WallService {
   static const String baseUrl = 'http://localhost:3000';
