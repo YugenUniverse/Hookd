@@ -7,7 +7,7 @@ class WallService {
 
   Future<List<Wall>> fetchAllWalls() async {
     try {
-      final response = await http.get(Uri.parse('$baseUrl/walls/getAll'));
+      final response = await http.get(Uri.parse('$baseUrl/walls'));
 
       if (response.statusCode == 200) {
         List<dynamic> jsonResponse = json.decode(response.body);

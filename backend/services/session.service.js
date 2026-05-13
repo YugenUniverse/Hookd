@@ -19,7 +19,17 @@ const ensureSessionOwnership = (session, userId) => {
     }
 };
 
-exports.createSession = async (userId, { wall_id, date, time, review }) => {
+exports.createSession = async (
+    userId,
+    userType,
+    { wall_id, date, time, review },
+) => {
+    if (userType !== "Climber") {
+        const error = new Error("Only climbers can create climbing sessions");
+        error.statusCode = 403;
+        throw error;
+    }
+
     if (!wall_id || !date || time === undefined) {
         const error = new Error("wall_id, date, and time are required");
         error.statusCode = 400;
@@ -77,11 +87,23 @@ exports.createSession = async (userId, { wall_id, date, time, review }) => {
     return { session: climbingSession, review: addedReview };
 };
 
-exports.getSessionsByUser = async (userId) => {
+exports.getSessionsByUser = async (userId, userType) => {
+    if (userType !== "Climber") {
+        const error = new Error("Only climbers can view climbing sessions");
+        error.statusCode = 403;
+        throw error;
+    }
+
     return await ClimbingSession.find({ climber_id: userId });
 };
 
-exports.getSessionById = async (sessionId, userId) => {
+exports.getSessionById = async (sessionId, userId, userType) => {
+    if (userType !== "Climber") {
+        const error = new Error("Only climbers can view climbing sessions");
+        error.statusCode = 403;
+        throw error;
+    }
+
     if (!isValidObjectId(sessionId)) {
         const error = new Error("Invalid session id");
         error.statusCode = 400;
@@ -94,7 +116,18 @@ exports.getSessionById = async (sessionId, userId) => {
     return session;
 };
 
-exports.updateSession = async (sessionId, userId, { wall_id, date, time }) => {
+exports.updateSession = async (
+    sessionId,
+    userId,
+    userType,
+    { wall_id, date, time },
+) => {
+    if (userType !== "Climber") {
+        const error = new Error("Only climbers can update climbing sessions");
+        error.statusCode = 403;
+        throw error;
+    }
+
     if (!isValidObjectId(sessionId)) {
         const error = new Error("Invalid session id");
         error.statusCode = 400;
@@ -139,7 +172,13 @@ exports.updateSession = async (sessionId, userId, { wall_id, date, time }) => {
     return await session.save();
 };
 
-exports.deleteSession = async (sessionId, userId) => {
+exports.deleteSession = async (sessionId, userId, userType) => {
+    if (userType !== "Climber") {
+        const error = new Error("Only climbers can delete climbing sessions");
+        error.statusCode = 403;
+        throw error;
+    }
+
     if (!isValidObjectId(sessionId)) {
         const error = new Error("Invalid session id");
         error.statusCode = 400;
@@ -161,7 +200,20 @@ exports.deleteSession = async (sessionId, userId) => {
     await session.deleteOne();
 };
 
-exports.addReviewToSession = async (sessionId, userId, { rating, body }) => {
+exports.addReviewToSession = async (
+    sessionId,
+    userId,
+    userType,
+    { rating, body },
+) => {
+    if (userType !== "Climber") {
+        const error = new Error(
+            "Only climbers can add reviews to climbing sessions",
+        );
+        error.statusCode = 403;
+        throw error;
+    }
+
     if (!isValidObjectId(sessionId)) {
         const error = new Error("Invalid session id");
         error.statusCode = 400;

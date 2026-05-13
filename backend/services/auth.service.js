@@ -2,7 +2,7 @@ const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
 const admin = require("firebase-admin");
 
-const { User, Facility, PublicBody } = require("../models/User");
+const { User, Climber, Facility, PublicBody } = require("../models/User");
 const RefreshToken = require("../models/RefreshToken");
 
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || "1h";
@@ -151,20 +151,32 @@ exports.register = async ({
     }
 
     let user;
+    const normalizedUserType = (userType || "Climber").trim();
     const baseUserData = {
         email,
         password,
         username,
         authMethods: ["local"],
+        userType: "Climber",
         ...restData,
     };
 
-    if (userType === "Facility") {
+    if (normalizedUserType === "Climber") {
+        const { name, surname, birthdate } = restData;
+        if (!name || !surname || !birthdate) {
+            const error = new Error(
+                "name, surname, and birthdate are required for Climber",
+            );
+            error.statusCode = 400;
+            throw error;
+        }
+        user = await Climber.create(baseUserData);
+    } else if (normalizedUserType === "Facility") {
         user = await Facility.create(baseUserData);
-    } else if (userType === "PublicBody") {
+    } else if (normalizedUserType === "PublicBody") {
         user = await PublicBody.create(baseUserData);
     } else {
-        user = await User.create(baseUserData);
+        user = await Climber.create(baseUserData);
     }
 
     return { id: user._id, email: user.email };
@@ -315,16 +327,46 @@ exports.googleLogin = async ({ idToken }) => {
         // ignore - profile info is optional
     }
 
+    const parsedName = (name || email || "Climber").trim();
+    const nameParts = parsedName.split(/\s+/);
+    const climberName = nameParts[0] || "Climber";
+    const climberSurname =
+        nameParts.length > 1 ? nameParts.slice(1).join(" ") : "User";
+
     let user = await User.findOne({ $or: [{ googleId: uid }, { email }] });
 
     if (!user) {
-        user = await User.create({
+        user = await Climber.create({
             email,
-            username: name,
+            username: name || email.split("@")[0],
             avatar: picture,
             googleId: uid,
             authMethods: ["google"],
+            userType: "Climber",
+            name: climberName,
+            surname: climberSurname,
+            birthdate: new Date("1970-01-01"),
         });
+    } else if (user.userType !== "Climber") {
+        user = await Climber.findByIdAndUpdate(
+            user._id,
+            {
+                userType: "Climber",
+                avatar: user.avatar || picture,
+                googleId: uid,
+                authMethods: Array.from(
+                    new Set([...(user.authMethods || []), "google"]),
+                ),
+                name: climberName,
+                surname: climberSurname,
+                birthdate: new Date("1970-01-01"),
+            },
+            {
+                new: true,
+                runValidators: true,
+                overwriteDiscriminatorKey: true,
+            },
+        );
     } else if (!user.googleId) {
         user.googleId = uid;
 

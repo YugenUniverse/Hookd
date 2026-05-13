@@ -150,7 +150,7 @@ class ApiService {
   // Wall endpoints
   Future<List<Wall>> getAllWalls() async {
     try {
-      final response = await _dio.get('/walls/getAll');
+      final response = await _dio.get('/walls');
       final data = response.data;
       print('getAllWalls response type: ${data.runtimeType}, data: $data');
 
@@ -203,6 +203,46 @@ class ApiService {
       print('Error fetching nearby walls: $e');
       return [];
     }
+  }
+
+  Future<Map<String, dynamic>> createSession({
+    required String wallId,
+    required DateTime date,
+    required int time,
+    int? rating,
+    String? reviewBody,
+  }) async {
+    final payload = <String, dynamic>{
+      'wall_id': wallId,
+      'date': _formatDate(date),
+      'time': time,
+    };
+
+    if (rating != null) {
+      payload['review'] = {
+        'rating': rating,
+        if (reviewBody != null && reviewBody.trim().isNotEmpty)
+          'body': reviewBody.trim(),
+      };
+    }
+
+    final response = await _dio.post('/sessions', data: payload);
+    final data = response.data;
+
+    if (data is Map<String, dynamic>) {
+      return data;
+    }
+    if (data is Map) {
+      return Map<String, dynamic>.from(data);
+    }
+    throw Exception('Unexpected response while creating session');
+  }
+
+  String _formatDate(DateTime date) {
+    final y = date.year.toString().padLeft(4, '0');
+    final m = date.month.toString().padLeft(2, '0');
+    final d = date.day.toString().padLeft(2, '0');
+    return '$y-$m-$d';
   }
 
 }

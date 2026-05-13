@@ -13,6 +13,9 @@ class _LoginDialogState extends State<LoginDialog> {
   final _emailCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
   final _confirmPassCtrl = TextEditingController();
+  final _nameCtrl = TextEditingController();
+  final _surnameCtrl = TextEditingController();
+  final _birthdateCtrl = TextEditingController();
   bool _isLoading = false;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
@@ -24,6 +27,9 @@ class _LoginDialogState extends State<LoginDialog> {
     _emailCtrl.dispose();
     _passCtrl.dispose();
     _confirmPassCtrl.dispose();
+    _nameCtrl.dispose();
+    _surnameCtrl.dispose();
+    _birthdateCtrl.dispose();
     super.dispose();
   }
 
@@ -66,8 +72,11 @@ class _LoginDialogState extends State<LoginDialog> {
     final username = _userCtrl.text.trim();
     final password = _passCtrl.text;
     final confirmPass = _confirmPassCtrl.text;
+    final name = _nameCtrl.text.trim();
+    final surname = _surnameCtrl.text.trim();
+    final birthdate = _birthdateCtrl.text.trim();
     
-    if (email.isEmpty || username.isEmpty || password.isEmpty) {
+    if (email.isEmpty || username.isEmpty || password.isEmpty || name.isEmpty || surname.isEmpty || birthdate.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please fill in all fields')),
       );
@@ -90,7 +99,14 @@ class _LoginDialogState extends State<LoginDialog> {
     
     setState(() => _isLoading = true);
     try {
-      final ok = await AuthService().register(email, username, password);
+      final ok = await AuthService().register(
+        email,
+        username,
+        password,
+        name: name,
+        surname: surname,
+        birthdate: birthdate,
+      );
       if (!mounted) return;
       setState(() => _isLoading = false);
       if (ok) {
@@ -103,6 +119,9 @@ class _LoginDialogState extends State<LoginDialog> {
           _userCtrl.clear();
           _passCtrl.clear();
           _confirmPassCtrl.clear();
+          _nameCtrl.clear();
+          _surnameCtrl.clear();
+          _birthdateCtrl.clear();
         });
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -134,6 +153,34 @@ class _LoginDialogState extends State<LoginDialog> {
                 enabled: !_isLoading,
                 decoration: const InputDecoration(
                   labelText: 'Email',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _nameCtrl,
+                enabled: !_isLoading,
+                decoration: const InputDecoration(
+                  labelText: 'Name',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _surnameCtrl,
+                enabled: !_isLoading,
+                decoration: const InputDecoration(
+                  labelText: 'Surname',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _birthdateCtrl,
+                enabled: !_isLoading,
+                keyboardType: TextInputType.datetime,
+                decoration: const InputDecoration(
+                  labelText: 'Birthdate (YYYY-MM-DD)',
                   border: OutlineInputBorder(),
                 ),
               ),
