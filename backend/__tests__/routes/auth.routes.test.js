@@ -21,6 +21,10 @@ const registerPayload = {
     email: "celli@example.com",
     username: "celli",
     password: "Celli123!",
+    userType: "Climber",
+    name: "Celli",
+    surname: "User",
+    birthdate: "1995-01-01",
 };
 
 describe("auth.routes", () => {
