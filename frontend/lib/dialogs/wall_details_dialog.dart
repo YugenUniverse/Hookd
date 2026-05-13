@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/wall.dart';
+import '../pages/log_session_page.dart';
 
 class WallDetailsDialog extends StatelessWidget {
   final Wall wall;
@@ -33,6 +34,23 @@ class WallDetailsDialog extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
                     ),
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton(
+                    tooltip: 'Log session',
+                    onPressed: () {
+                      final rootContext = Navigator.of(context, rootNavigator: true).context;
+                      Navigator.of(context).pop();
+                      showModalBottomSheet(
+                        context: rootContext,
+                        isScrollControlled: true,
+                        useSafeArea: true,
+                        showDragHandle: true,
+                        builder: (_) => LogSessionPage(initialWall: wall),
+                      );
+                    },
+                    icon: const Icon(Icons.edit_calendar_outlined),
+                    color: Theme.of(context).colorScheme.primary,
                   ),
                 ],
               ),

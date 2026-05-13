@@ -44,6 +44,7 @@ class _MyHomePageState extends State<MyHomePage> {
       builder: (_) => _WallSearchSheet(
         wallService: _wallService,
         mapController: _mapController,
+        onLogWall: _openLogSessionSheetWithWall,
       ),
     );
   }
@@ -55,6 +56,16 @@ class _MyHomePageState extends State<MyHomePage> {
       useSafeArea: true,
       showDragHandle: true,
       builder: (_) => const LogSessionPage(),
+    );
+  }
+
+  Future<void> _openLogSessionSheetWithWall(Wall wall) async {
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      showDragHandle: true,
+      builder: (_) => LogSessionPage(initialWall: wall),
     );
   }
 
@@ -117,10 +128,12 @@ class _WallSearchSheet extends StatefulWidget {
   const _WallSearchSheet({
     required this.wallService,
     required this.mapController,
+    required this.onLogWall,
   });
 
   final WallService wallService;
   final WallMapController mapController;
+  final Future<void> Function(Wall wall) onLogWall;
 
   @override
   State<_WallSearchSheet> createState() => _WallSearchSheetState();
@@ -241,6 +254,14 @@ class _WallSearchSheetState extends State<_WallSearchSheet> {
                         ),
                         title: Text(wall.name),
                         subtitle: Text('${wall.difficulty} • ${wall.type}'),
+                        trailing: IconButton(
+                          tooltip: 'Log session',
+                          icon: const Icon(Icons.edit_calendar_outlined),
+                          onPressed: () {
+                            Navigator.of(context).pop();
+                            widget.onLogWall(wall);
+                          },
+                        ),
                         onTap: () {
                           Navigator.of(context).pop();
                           widget.mapController.focusOnWall(wall);

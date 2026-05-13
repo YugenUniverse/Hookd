@@ -5,7 +5,9 @@ import '../services/api_service.dart';
 import '../services/wall_service.dart';
 
 class LogSessionPage extends StatefulWidget {
-  const LogSessionPage({super.key});
+  const LogSessionPage({super.key, this.initialWall});
+
+  final Wall? initialWall;
 
   @override
   State<LogSessionPage> createState() => _LogSessionPageState();
@@ -27,6 +29,16 @@ class _LogSessionPageState extends State<LogSessionPage> {
   int? _selectedRating;
   bool _loadingWalls = false;
   bool _submitting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final initialWall = widget.initialWall;
+    if (initialWall != null) {
+      _selectedWall = initialWall;
+      _wallQueryController.text = initialWall.name;
+    }
+  }
 
   @override
   void dispose() {
@@ -165,6 +177,7 @@ class _LogSessionPageState extends State<LogSessionPage> {
               TextField(
                 controller: _wallQueryController,
                 textInputAction: TextInputAction.search,
+                enabled: _selectedWall == null,
                 decoration: InputDecoration(
                   hintText: 'Search wall by name',
                   prefixIcon: const Icon(Icons.search),
@@ -175,7 +188,7 @@ class _LogSessionPageState extends State<LogSessionPage> {
                   ),
                   border: const OutlineInputBorder(),
                 ),
-                onSubmitted: (_) => _searchWalls(),
+                onSubmitted: (_) => _selectedWall == null ? _searchWalls() : null,
               ),
               const SizedBox(height: 8),
               if (_selectedWall != null)
