@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 
 import '../dialogs/profile_dialog.dart';
+import '../pages/log_session_page.dart';
 import '../services/auth_service.dart';
 import '../services/wall_service.dart';
 import '../models/wall.dart';
@@ -47,6 +48,16 @@ class _MyHomePageState extends State<MyHomePage> {
     );
   }
 
+  Future<void> _openLogSessionSheet() async {
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      showDragHandle: true,
+      builder: (_) => const LogSessionPage(),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -72,6 +83,12 @@ class _MyHomePageState extends State<MyHomePage> {
                   icon: Icons.search,
                   label: 'Search',
                   onTap: _openWallSearch,
+                ),
+                _NavItem(
+                  tooltip: 'Log session',
+                  icon: Icons.edit_calendar_outlined,
+                  label: 'Log',
+                  onTap: _openLogSessionSheet,
                 ),
                 _NavItem(
                   tooltip: 'Account',
