@@ -5,7 +5,7 @@ info:
 
 http:
     method: POST
-    url: http://localhost:3000/session/<SESSION_ID>/review
+    url: http://localhost:3000/sessions/<SESSION_ID>/reviews
     body:
         type: json
         data: |-

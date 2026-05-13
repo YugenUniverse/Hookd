@@ -9,7 +9,7 @@ const {
 } = require("../middleware/auth.middleware");
 
 // Get all walls
-router.get("/getAll", wallController.getAllWalls);
+router.get("/", wallController.getAllWalls);
 
 // Search walls by name (?q=keyword)
 router.get("/search", wallController.searchWalls);
@@ -24,7 +24,7 @@ router.get("/:id", wallController.getWallById);
 
 // Create a new wall
 router.post(
-    "/createWall",
+    "/",
     authenticateJwt,
     restrictTo("Facility", "PublicBody"),
     wallController.createWall,

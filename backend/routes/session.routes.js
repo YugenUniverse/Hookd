@@ -117,7 +117,7 @@ router.use(authenticateJwt);
 
 router.post("/", validateCreateSessionInput, sessionController.createSession);
 router.post(
-    "/:sessionId/review",
+    "/:sessionId/reviews",
     validateAddReviewInput,
     sessionController.addReviewToSession,
 );

@@ -13,7 +13,7 @@ process.env.JWT_SECRET = process.env.JWT_SECRET || "test-jwt-secret";
 
 const app = express();
 app.use(express.json());
-app.use("/session", sessionRoutes);
+app.use("/sessions", sessionRoutes);
 app.use(errorMiddleware);
 
 const createAuthToken = (user) => {
@@ -31,7 +31,7 @@ const createAuthToken = (user) => {
     );
 };
 
-describe("session.routes", () => {
+describe("sessions.routes", () => {
     beforeAll(async () => {
         jest.spyOn(console, "error").mockImplementation(() => {});
         await mongoose.connect(process.env.MONGO_URI, {
@@ -50,7 +50,7 @@ describe("session.routes", () => {
         await mongoose.disconnect();
     });
 
-    it("POST /session creates a new climber session for the authenticated user", async () => {
+    it("POST /sessions creates a new climber session for the authenticated user", async () => {
         const user = await User.create({
             email: "session@example.com",
             username: "sessionuser",
@@ -65,7 +65,7 @@ describe("session.routes", () => {
         const wallId = new mongoose.Types.ObjectId();
 
         const response = await request(app)
-            .post("/session")
+            .post("/sessions")
             .set("Authorization", `Bearer ${accessToken}`)
             .send({
                 wall_id: wallId.toString(),
@@ -88,7 +88,7 @@ describe("session.routes", () => {
         expect(stored.climber_id.toString()).toBe(user._id.toString());
     });
 
-    it("POST /session creates a new climber session with a review when review payload is provided", async () => {
+    it("POST /sessions creates a new climber session with a review when review payload is provided", async () => {
         const user = await User.create({
             email: "sessionreview@example.com",
             username: "sessionreview",
@@ -103,7 +103,7 @@ describe("session.routes", () => {
         const wallId = new mongoose.Types.ObjectId();
 
         const response = await request(app)
-            .post("/session")
+            .post("/sessions")
             .set("Authorization", `Bearer ${accessToken}`)
             .send({
                 wall_id: wallId.toString(),
@@ -138,7 +138,7 @@ describe("session.routes", () => {
         );
     });
 
-    it("POST /session/:sessionId/review adds a review to an existing session", async () => {
+    it("POST /sessions/:sessionId/reviews adds a review to an existing session", async () => {
         const user = await User.create({
             email: "addreview@example.com",
             username: "addreview",
@@ -159,7 +159,7 @@ describe("session.routes", () => {
         const accessToken = createAuthToken(user);
 
         const response = await request(app)
-            .post(`/session/${session._id.toString()}/review`)
+            .post(`/sessions/${session._id.toString()}/reviews`)
             .set("Authorization", `Bearer ${accessToken}`)
             .send({ rating: 4, body: "Solid climb" });
 
@@ -180,7 +180,7 @@ describe("session.routes", () => {
         expect(updatedSession.review_id).not.toBeNull();
     });
 
-    it("POST /session/:sessionId/review returns 409 when the session already has a review", async () => {
+    it("POST /sessions/:sessionId/reviews returns 409 when the session already has a review", async () => {
         const user = await User.create({
             email: "conflict@example.com",
             username: "conflicter",
@@ -201,12 +201,12 @@ describe("session.routes", () => {
         const accessToken = createAuthToken(user);
 
         await request(app)
-            .post(`/session/${session._id.toString()}/review`)
+            .post(`/sessions/${session._id.toString()}/reviews`)
             .set("Authorization", `Bearer ${accessToken}`)
             .send({ rating: 4, body: "First review" });
 
         const conflictResponse = await request(app)
-            .post(`/session/${session._id.toString()}/review`)
+            .post(`/sessions/${session._id.toString()}/reviews`)
             .set("Authorization", `Bearer ${accessToken}`)
             .send({ rating: 3, body: "Second review" });
 
@@ -216,7 +216,7 @@ describe("session.routes", () => {
         });
     });
 
-    it("GET /session returns only sessions belonging to the authenticated user", async () => {
+    it("GET /sessions returns only sessions belonging to the authenticated user", async () => {
         const user = await User.create({
             email: "owner@example.com",
             username: "owner",
@@ -255,7 +255,7 @@ describe("session.routes", () => {
         const accessToken = createAuthToken(user);
 
         const response = await request(app)
-            .get("/session")
+            .get("/sessions")
             .set("Authorization", `Bearer ${accessToken}`);
 
         expect(response.status).toBe(200);
@@ -263,7 +263,7 @@ describe("session.routes", () => {
         expect(response.body.sessions[0].id).toBe(userSession._id.toString());
     });
 
-    it("GET /session/:sessionId returns a specific session for the authenticated user", async () => {
+    it("GET /sessions/:sessionId returns a specific session for the authenticated user", async () => {
         const user = await User.create({
             email: "single@example.com",
             username: "single",
@@ -284,14 +284,14 @@ describe("session.routes", () => {
         const accessToken = createAuthToken(user);
 
         const response = await request(app)
-            .get(`/session/${session._id.toString()}`)
+            .get(`/sessions/${session._id.toString()}`)
             .set("Authorization", `Bearer ${accessToken}`);
 
         expect(response.status).toBe(200);
         expect(response.body.session.id).toBe(session._id.toString());
     });
 
-    it("GET /session/:sessionId returns 403 if the session belongs to another user", async () => {
+    it("GET /sessions/:sessionId returns 403 if the session belongs to another user", async () => {
         const user = await User.create({
             email: "viewer@example.com",
             username: "viewer",
@@ -322,14 +322,14 @@ describe("session.routes", () => {
         const accessToken = createAuthToken(user);
 
         const response = await request(app)
-            .get(`/session/${session._id.toString()}`)
+            .get(`/sessions/${session._id.toString()}`)
             .set("Authorization", `Bearer ${accessToken}`);
 
         expect(response.status).toBe(403);
         expect(response.body.error).toContain("do not own this session");
     });
 
-    it("PUT /session/:sessionId updates a session for the authenticated user", async () => {
+    it("PUT /sessions/:sessionId updates a session for the authenticated user", async () => {
         const user = await User.create({
             email: "update@example.com",
             username: "updater",
@@ -351,7 +351,7 @@ describe("session.routes", () => {
         const accessToken = createAuthToken(user);
 
         const response = await request(app)
-            .put(`/session/${session._id.toString()}`)
+            .put(`/sessions/${session._id.toString()}`)
             .set("Authorization", `Bearer ${accessToken}`)
             .send({ wall_id: newWallId.toString(), time: 75 });
 
@@ -360,7 +360,7 @@ describe("session.routes", () => {
         expect(response.body.session.time).toBe(75);
     });
 
-    it("DELETE /session/:sessionId removes a session for the authenticated user", async () => {
+    it("DELETE /sessions/:sessionId removes a session for the authenticated user", async () => {
         const user = await User.create({
             email: "delete@example.com",
             username: "deleter",
@@ -381,7 +381,7 @@ describe("session.routes", () => {
         const accessToken = createAuthToken(user);
 
         const response = await request(app)
-            .delete(`/session/${session._id.toString()}`)
+            .delete(`/sessions/${session._id.toString()}`)
             .set("Authorization", `Bearer ${accessToken}`);
 
         expect(response.status).toBe(204);
@@ -390,7 +390,7 @@ describe("session.routes", () => {
         expect(deleted).toBeNull();
     });
 
-    it("POST /session returns 403 when user type is not Climber", async () => {
+    it("POST /sessions returns 403 when user type is not Climber", async () => {
         const user = await User.create({
             email: "nonclimber@example.com",
             username: "nonclimber",
@@ -405,7 +405,7 @@ describe("session.routes", () => {
         const wallId = new mongoose.Types.ObjectId();
 
         const response = await request(app)
-            .post("/session")
+            .post("/sessions")
             .set("Authorization", `Bearer ${accessToken}`)
             .send({
                 wall_id: wallId.toString(),
@@ -419,7 +419,7 @@ describe("session.routes", () => {
         });
     });
 
-    it("POST /session returns 400 when wall_id is missing", async () => {
+    it("POST /sessions returns 400 when wall_id is missing", async () => {
         const user = await User.create({
             email: "validation@example.com",
             username: "validation",
@@ -433,7 +433,7 @@ describe("session.routes", () => {
         const accessToken = createAuthToken(user);
 
         const response = await request(app)
-            .post("/session")
+            .post("/sessions")
             .set("Authorization", `Bearer ${accessToken}`)
             .send({
                 date: "2026-05-12",
@@ -446,7 +446,7 @@ describe("session.routes", () => {
         });
     });
 
-    it("POST /session returns 400 when date is missing", async () => {
+    it("POST /sessions returns 400 when date is missing", async () => {
         const user = await User.create({
             email: "validation2@example.com",
             username: "validation2",
@@ -461,7 +461,7 @@ describe("session.routes", () => {
         const wallId = new mongoose.Types.ObjectId();
 
         const response = await request(app)
-            .post("/session")
+            .post("/sessions")
             .set("Authorization", `Bearer ${accessToken}`)
             .send({
                 wall_id: wallId.toString(),
@@ -474,7 +474,7 @@ describe("session.routes", () => {
         });
     });
 
-    it("POST /session returns 400 when time is missing", async () => {
+    it("POST /sessions returns 400 when time is missing", async () => {
         const user = await User.create({
             email: "validation3@example.com",
             username: "validation3",
@@ -489,7 +489,7 @@ describe("session.routes", () => {
         const wallId = new mongoose.Types.ObjectId();
 
         const response = await request(app)
-            .post("/session")
+            .post("/sessions")
             .set("Authorization", `Bearer ${accessToken}`)
             .send({
                 wall_id: wallId.toString(),
@@ -502,7 +502,7 @@ describe("session.routes", () => {
         });
     });
 
-    it("POST /session returns 400 when wall_id is not a valid ObjectId", async () => {
+    it("POST /sessions returns 400 when wall_id is not a valid ObjectId", async () => {
         const user = await User.create({
             email: "validation4@example.com",
             username: "validation4",
@@ -516,7 +516,7 @@ describe("session.routes", () => {
         const accessToken = createAuthToken(user);
 
         const response = await request(app)
-            .post("/session")
+            .post("/sessions")
             .set("Authorization", `Bearer ${accessToken}`)
             .send({
                 wall_id: "invalid-id",
@@ -530,7 +530,7 @@ describe("session.routes", () => {
         });
     });
 
-    it("POST /session returns 400 when date is not a valid date string", async () => {
+    it("POST /sessions returns 400 when date is not a valid date string", async () => {
         const user = await User.create({
             email: "validation5@example.com",
             username: "validation5",
@@ -545,7 +545,7 @@ describe("session.routes", () => {
         const wallId = new mongoose.Types.ObjectId();
 
         const response = await request(app)
-            .post("/session")
+            .post("/sessions")
             .set("Authorization", `Bearer ${accessToken}`)
             .send({
                 wall_id: wallId.toString(),
@@ -559,7 +559,7 @@ describe("session.routes", () => {
         });
     });
 
-    it("POST /session returns 400 when time is not a number", async () => {
+    it("POST /sessions returns 400 when time is not a number", async () => {
         const user = await User.create({
             email: "validation6@example.com",
             username: "validation6",
@@ -574,7 +574,7 @@ describe("session.routes", () => {
         const wallId = new mongoose.Types.ObjectId();
 
         const response = await request(app)
-            .post("/session")
+            .post("/sessions")
             .set("Authorization", `Bearer ${accessToken}`)
             .send({
                 wall_id: wallId.toString(),
@@ -588,7 +588,7 @@ describe("session.routes", () => {
         });
     });
 
-    it("POST /session/:sessionId/review returns 403 when user type is not Climber", async () => {
+    it("POST /sessions/:sessionId/reviews returns 403 when user type is not Climber", async () => {
         const user = await User.create({
             email: "nonclimber2@example.com",
             username: "nonclimber2",
@@ -619,7 +619,7 @@ describe("session.routes", () => {
         const accessToken = createAuthToken(user);
 
         const response = await request(app)
-            .post(`/session/${session._id.toString()}/review`)
+            .post(`/sessions/${session._id.toString()}/reviews`)
             .set("Authorization", `Bearer ${accessToken}`)
             .send({ rating: 4, body: "Solid climb" });
 
@@ -629,7 +629,7 @@ describe("session.routes", () => {
         });
     });
 
-    it("POST /session/:sessionId/review returns 400 when rating is missing", async () => {
+    it("POST /sessions/:sessionId/reviews returns 400 when rating is missing", async () => {
         const user = await User.create({
             email: "validation7@example.com",
             username: "validation7",
@@ -650,7 +650,7 @@ describe("session.routes", () => {
         const accessToken = createAuthToken(user);
 
         const response = await request(app)
-            .post(`/session/${session._id.toString()}/review`)
+            .post(`/sessions/${session._id.toString()}/reviews`)
             .set("Authorization", `Bearer ${accessToken}`)
             .send({ body: "Solid climb" });
 
@@ -660,7 +660,7 @@ describe("session.routes", () => {
         });
     });
 
-    it("POST /session/:sessionId/review returns 400 when rating is not a number", async () => {
+    it("POST /sessions/:sessionId/reviews returns 400 when rating is not a number", async () => {
         const user = await User.create({
             email: "validation8@example.com",
             username: "validation8",
@@ -681,7 +681,7 @@ describe("session.routes", () => {
         const accessToken = createAuthToken(user);
 
         const response = await request(app)
-            .post(`/session/${session._id.toString()}/review`)
+            .post(`/sessions/${session._id.toString()}/reviews`)
             .set("Authorization", `Bearer ${accessToken}`)
             .send({ rating: "five", body: "Solid climb" });
 
@@ -691,7 +691,7 @@ describe("session.routes", () => {
         });
     });
 
-    it("GET /session returns 403 when user type is not Climber", async () => {
+    it("GET /sessions returns 403 when user type is not Climber", async () => {
         const user = await User.create({
             email: "nonclimber3@example.com",
             username: "nonclimber3",
@@ -705,7 +705,7 @@ describe("session.routes", () => {
         const accessToken = createAuthToken(user);
 
         const response = await request(app)
-            .get("/session")
+            .get("/sessions")
             .set("Authorization", `Bearer ${accessToken}`);
 
         expect(response.status).toBe(403);
@@ -714,7 +714,7 @@ describe("session.routes", () => {
         });
     });
 
-    it("GET /session/:sessionId returns 403 when user type is not Climber", async () => {
+    it("GET /sessions/:sessionId returns 403 when user type is not Climber", async () => {
         const user = await User.create({
             email: "nonclimber4@example.com",
             username: "nonclimber4",
@@ -745,7 +745,7 @@ describe("session.routes", () => {
         const accessToken = createAuthToken(user);
 
         const response = await request(app)
-            .get(`/session/${session._id.toString()}`)
+            .get(`/sessions/${session._id.toString()}`)
             .set("Authorization", `Bearer ${accessToken}`);
 
         expect(response.status).toBe(403);
@@ -754,7 +754,7 @@ describe("session.routes", () => {
         });
     });
 
-    it("PUT /session/:sessionId returns 403 when user type is not Climber", async () => {
+    it("PUT /sessions/:sessionId returns 403 when user type is not Climber", async () => {
         const user = await User.create({
             email: "nonclimber5@example.com",
             username: "nonclimber5",
@@ -786,7 +786,7 @@ describe("session.routes", () => {
         const accessToken = createAuthToken(user);
 
         const response = await request(app)
-            .put(`/session/${session._id.toString()}`)
+            .put(`/sessions/${session._id.toString()}`)
             .set("Authorization", `Bearer ${accessToken}`)
             .send({ wall_id: newWallId.toString(), time: 75 });
 
@@ -796,7 +796,7 @@ describe("session.routes", () => {
         });
     });
 
-    it("PUT /session/:sessionId returns 400 when no fields are provided", async () => {
+    it("PUT /sessions/:sessionId returns 400 when no fields are provided", async () => {
         const user = await User.create({
             email: "validation9@example.com",
             username: "validation9",
@@ -817,7 +817,7 @@ describe("session.routes", () => {
         const accessToken = createAuthToken(user);
 
         const response = await request(app)
-            .put(`/session/${session._id.toString()}`)
+            .put(`/sessions/${session._id.toString()}`)
             .set("Authorization", `Bearer ${accessToken}`)
             .send({});
 
@@ -827,7 +827,7 @@ describe("session.routes", () => {
         });
     });
 
-    it("PUT /session/:sessionId returns 400 when wall_id is not a valid ObjectId", async () => {
+    it("PUT /sessions/:sessionId returns 400 when wall_id is not a valid ObjectId", async () => {
         const user = await User.create({
             email: "validation10@example.com",
             username: "validation10",
@@ -848,7 +848,7 @@ describe("session.routes", () => {
         const accessToken = createAuthToken(user);
 
         const response = await request(app)
-            .put(`/session/${session._id.toString()}`)
+            .put(`/sessions/${session._id.toString()}`)
             .set("Authorization", `Bearer ${accessToken}`)
             .send({ wall_id: "invalid-id" });
 
@@ -858,7 +858,7 @@ describe("session.routes", () => {
         });
     });
 
-    it("DELETE /session/:sessionId returns 403 when user type is not Climber", async () => {
+    it("DELETE /sessions/:sessionId returns 403 when user type is not Climber", async () => {
         const user = await User.create({
             email: "nonclimber6@example.com",
             username: "nonclimber6",
@@ -889,7 +889,7 @@ describe("session.routes", () => {
         const accessToken = createAuthToken(user);
 
         const response = await request(app)
-            .delete(`/session/${session._id.toString()}`)
+            .delete(`/sessions/${session._id.toString()}`)
             .set("Authorization", `Bearer ${accessToken}`);
 
         expect(response.status).toBe(403);
@@ -898,10 +898,10 @@ describe("session.routes", () => {
         });
     });
 
-    it("POST /session returns 401 when authentication is missing", async () => {
+    it("POST /sessions returns 401 when authentication is missing", async () => {
         const wallId = new mongoose.Types.ObjectId();
 
-        const response = await request(app).post("/session").send({
+        const response = await request(app).post("/sessions").send({
             wall_id: wallId.toString(),
             date: "2026-05-12",
             time: 90,

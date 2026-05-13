@@ -150,7 +150,7 @@ class ApiService {
   // Wall endpoints
   Future<List<Wall>> getAllWalls() async {
     try {
-      final response = await _dio.get('/walls/getAll');
+      final response = await _dio.get('/walls');
       final data = response.data;
       print('getAllWalls response type: ${data.runtimeType}, data: $data');
 
