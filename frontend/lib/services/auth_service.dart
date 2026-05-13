@@ -268,8 +268,15 @@ class AuthService extends ChangeNotifier {
     }
   }
 
-  // Register new user with email, username, and password.
-  Future<bool> register(String email, String username, String password) async {
+  // Register new user as a Climber.
+  Future<bool> register(
+    String email,
+    String username,
+    String password, {
+    required String name,
+    required String surname,
+    required String birthdate,
+  }) async {
     try {
       final dio = Dio(BaseOptions(baseUrl: ApiConfig.apiBaseUrl));
       
@@ -277,6 +284,10 @@ class AuthService extends ChangeNotifier {
         'email': email.trim(),
         'username': username.trim(),
         'password': password,
+        'userType': 'Climber',
+        'name': name.trim(),
+        'surname': surname.trim(),
+        'birthdate': birthdate.trim(),
       };
       
       print('Registering user: $username');
