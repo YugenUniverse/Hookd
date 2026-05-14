@@ -46,6 +46,45 @@ const authenticateJwt = (req, res, next) => {
     }
 };
 
+const authenticateJwtOptional = (req, res, next) => {
+    const authHeader = req.headers.authorization || "";
+
+    if (!authHeader) {
+        return next();
+    }
+
+    if (!authHeader.startsWith("Bearer ")) {
+        const error = new Error("Missing or invalid Authorization header");
+        error.statusCode = 401;
+        return next(error);
+    }
+
+    try {
+        const token = authHeader.slice("Bearer ".length);
+        const payload = jwt.verify(token, getJwtSecret(), {
+            issuer: "hookd",
+        });
+
+        req.user = {
+            id: payload.sub,
+            email: payload.email,
+            userType: payload.userType,
+        };
+
+        next();
+    } catch (err) {
+        if (
+            err.name === "JsonWebTokenError" ||
+            err.name === "TokenExpiredError"
+        ) {
+            err.statusCode = 401;
+            err.message = "Invalid or expired access token";
+        }
+
+        next(err);
+    }
+};
+
 // NEW: The restriction middleware for role-based access
 const restrictTo = (...allowedRoles) => {
     return (req, res, next) => {
@@ -63,5 +102,6 @@ const restrictTo = (...allowedRoles) => {
 
 module.exports = {
     authenticateJwt,
+    authenticateJwtOptional,
     restrictTo,
 };

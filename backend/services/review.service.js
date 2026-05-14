@@ -7,7 +7,7 @@ const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
 
 const reviewPopulateOptions = {
     path: "climbing_session_id",
-    select: "wall_id climber_id date time",
+    select: "wall_id climber_id date time is_private",
     populate: [
         {
             path: "wall_id",
@@ -20,7 +20,27 @@ const reviewPopulateOptions = {
     ],
 };
 
-exports.getReviewsByWall = async (wallId) => {
+const isVisibleToRequester = (review, requesterUserId) => {
+    const session = review.climbing_session_id;
+    if (!session) return false;
+
+    if (!session.is_private) {
+        return true;
+    }
+
+    if (!requesterUserId) {
+        return false;
+    }
+
+    const sessionOwnerId = session.climber_id?.id || session.climber_id?._id || session.climber_id;
+    return sessionOwnerId?.toString() === requesterUserId.toString();
+};
+
+const filterVisibleReviews = (reviews, requesterUserId) => {
+    return reviews.filter((review) => isVisibleToRequester(review, requesterUserId));
+};
+
+exports.getReviewsByWall = async (wallId, requesterUserId = null) => {
     if (!isValidObjectId(wallId)) {
         const error = new Error("Invalid wall id");
         error.statusCode = 400;
@@ -35,12 +55,14 @@ exports.getReviewsByWall = async (wallId) => {
         return [];
     }
 
-    return await Review.find({ climbing_session_id: { $in: sessionIds } })
+    const reviews = await Review.find({ climbing_session_id: { $in: sessionIds } })
         .sort({ _id: -1 })
         .populate(reviewPopulateOptions);
+
+    return filterVisibleReviews(reviews, requesterUserId);
 };
 
-exports.getReviewsByUser = async (userId) => {
+exports.getReviewsByUser = async (userId, requesterUserId = null) => {
     if (!isValidObjectId(userId)) {
         const error = new Error("Invalid user id");
         error.statusCode = 400;
@@ -55,7 +77,9 @@ exports.getReviewsByUser = async (userId) => {
         return [];
     }
 
-    return await Review.find({ climbing_session_id: { $in: sessionIds } })
+    const reviews = await Review.find({ climbing_session_id: { $in: sessionIds } })
         .sort({ _id: -1 })
         .populate(reviewPopulateOptions);
+
+    return filterVisibleReviews(reviews, requesterUserId);
 };
