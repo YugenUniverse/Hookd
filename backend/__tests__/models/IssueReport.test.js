@@ -1,9 +1,9 @@
 const mongoose = require("mongoose");
-const Report = require("../../models/Report");
+const IssueReport = require("../../models/IssueReport");
 
 jest.setTimeout(30000);
 
-describe("Report model", () => {
+describe("IssueReport model", () => {
     beforeAll(async () => {
         await mongoose.connect(process.env.MONGO_URI, {
             dbName: "hookd",
@@ -11,7 +11,7 @@ describe("Report model", () => {
     });
 
     afterEach(async () => {
-        await Report.deleteMany({});
+        await IssueReport.deleteMany({});
     });
 
     afterAll(async () => {
@@ -21,7 +21,7 @@ describe("Report model", () => {
     it("creates a report with valid data", async () => {
         const reportBody = "Example report body";
 
-        const report = new Report({
+        const report = new IssueReport({
             climber_id: new mongoose.Types.ObjectId(),
             wall_id: new mongoose.Types.ObjectId(),
             body: reportBody,
@@ -29,18 +29,20 @@ describe("Report model", () => {
 
         await report.save();
 
-        const foundReport = await Report.findById(report._id);
+        const foundIssueReport = await IssueReport.findById(report._id);
 
-        expect(foundReport).not.toBeNull();
-        expect(foundReport.climber_id.toString()).toBe(
+        expect(foundIssueReport).not.toBeNull();
+        expect(foundIssueReport.climber_id.toString()).toBe(
             report.climber_id.toString(),
         );
-        expect(foundReport.wall_id.toString()).toBe(report.wall_id.toString());
-        expect(foundReport.body).toBe(reportBody);
+        expect(foundIssueReport.wall_id.toString()).toBe(
+            report.wall_id.toString(),
+        );
+        expect(foundIssueReport.body).toBe(reportBody);
     });
 
     it("requires climber_id, wall_id, and body", async () => {
-        const report = new Report();
+        const report = new IssueReport();
 
         let error = null;
         try {
@@ -57,7 +59,7 @@ describe("Report model", () => {
 
     it("trims body and enforces max length", async () => {
         const longBody = "a".repeat(501);
-        const report = new Report({
+        const report = new IssueReport({
             climber_id: new mongoose.Types.ObjectId(),
             wall_id: new mongoose.Types.ObjectId(),
             body: longBody,
