@@ -7,6 +7,7 @@ var createError = require("http-errors");
 var cors = require("cors");
 
 const connectDB = require("./db");
+const { authenticateJwt } = require("./middleware/auth.middleware");
 
 var indexRouter = require("./routes/index");
 var authRouter = require("./routes/auth.routes");
@@ -59,9 +60,13 @@ app.use(
     }),
 );
 
-app.use("/", indexRouter);
 app.use("/auth", authRouter);
 app.use("/walls", wallRouter);
+
+// Everything after this point requires a valid access token.
+app.use(authenticateJwt);
+
+app.use("/", indexRouter);
 app.use("/sessions", sessionRouter);
 // catch 404 and forward to error handler
 app.use(function (req, res, next) {

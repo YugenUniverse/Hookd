@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/wall.dart';
+import '../dialogs/login_dialog.dart';
+import '../services/auth_service.dart';
 import '../pages/log_session_page.dart';
 
 class WallDetailsDialog extends StatelessWidget {
@@ -7,12 +9,37 @@ class WallDetailsDialog extends StatelessWidget {
 
   const WallDetailsDialog({super.key, required this.wall});
 
+  Future<void> _handleLogSession(BuildContext context) async {
+    final rootContext = Navigator.of(context, rootNavigator: true).context;
+
+    if (!AuthService().isAuthenticated) {
+      final loggedIn = await showLoginDialog(rootContext);
+      if (loggedIn != true || !AuthService().isAuthenticated) {
+        return;
+      }
+    }
+
+    if (!context.mounted || !rootContext.mounted) {
+      return;
+    }
+
+    Navigator.of(context).pop();
+    await showModalBottomSheet(
+      context: rootContext,
+      isScrollControlled: true,
+      useSafeArea: true,
+      showDragHandle: true,
+      builder: (_) => LogSessionPage(initialWall: wall),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     // Determine the icon and color based on the wall type
     final bool isIndoor = wall.wallType == 'IndoorWall';
     final IconData typeIcon = isIndoor ? Icons.domain : Icons.landscape;
     final Color typeColor = isIndoor ? Colors.blueGrey : Colors.green;
+    final bool isAuthenticated = AuthService().isAuthenticated;
 
     return SafeArea(
       child: SizedBox(
@@ -32,24 +59,32 @@ class WallDetailsDialog extends StatelessWidget {
                       wall.name,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+                      style: Theme.of(context).textTheme.headlineSmall
+                          ?.copyWith(fontWeight: FontWeight.bold),
                     ),
                   ),
                   const SizedBox(width: 8),
                   IconButton(
-                    tooltip: 'Log session',
-                    onPressed: () {
-                      final rootContext = Navigator.of(context, rootNavigator: true).context;
-                      Navigator.of(context).pop();
-                      showModalBottomSheet(
-                        context: rootContext,
-                        isScrollControlled: true,
-                        useSafeArea: true,
-                        showDragHandle: true,
-                        builder: (_) => LogSessionPage(initialWall: wall),
-                      );
-                    },
-                    icon: const Icon(Icons.edit_calendar_outlined),
+                    tooltip: isAuthenticated
+                        ? 'Log session'
+                        : 'Log session (login required)',
+                    onPressed: () => _handleLogSession(context),
+                    icon: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        const Icon(Icons.edit_calendar_outlined),
+                        if (!isAuthenticated)
+                          Positioned(
+                            right: -2,
+                            bottom: -2,
+                            child: Icon(
+                              Icons.lock_outline,
+                              size: 11,
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
+                          ),
+                      ],
+                    ),
                     color: Theme.of(context).colorScheme.primary,
                   ),
                 ],
@@ -64,14 +99,22 @@ class WallDetailsDialog extends StatelessWidget {
                       Chip(
                         label: Text(
                           isIndoor ? 'Indoor Facility' : 'Outdoor Crag',
-                          style: const TextStyle(color: Colors.white, fontSize: 12),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                          ),
                         ),
                         backgroundColor: typeColor,
                       ),
                       const SizedBox(height: 16),
 
                       // Difficulty Info
-                      _buildInfoRow(context, Icons.fitness_center, 'Difficulty', wall.difficulty),
+                      _buildInfoRow(
+                        context,
+                        Icons.fitness_center,
+                        'Difficulty',
+                        wall.difficulty,
+                      ),
                       const SizedBox(height: 12),
 
                       // Owner Info
@@ -95,10 +138,18 @@ class WallDetailsDialog extends StatelessWidget {
                       // Description section
                       const Text(
                         'Description',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
                       ),
                       const SizedBox(height: 4),
-                      Text(wall.description, style: Theme.of(context).textTheme.bodyMedium?.copyWith(height: 1.4)),
+                      Text(
+                        wall.description,
+                        style: Theme.of(
+                          context,
+                        ).textTheme.bodyMedium?.copyWith(height: 1.4),
+                      ),
                     ],
                   ),
                 ),
@@ -111,10 +162,16 @@ class WallDetailsDialog extends StatelessWidget {
   }
 
   // A helper widget to keep the code clean for rows with icons and text
-  Widget _buildInfoRow(BuildContext context, IconData icon, String label, String value) {
-    final textColor = Theme.of(context).textTheme.bodyMedium?.color ?? Colors.black87;
+  Widget _buildInfoRow(
+    BuildContext context,
+    IconData icon,
+    String label,
+    String value,
+  ) {
+    final textColor =
+        Theme.of(context).textTheme.bodyMedium?.color ?? Colors.black87;
     final iconColor = Theme.of(context).iconTheme.color ?? Colors.grey;
-    
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [

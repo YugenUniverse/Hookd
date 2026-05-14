@@ -19,7 +19,7 @@ class DefaultFirebaseOptions {
           'Firebase is not configured for iOS in this workspace yet.',
         );
       case TargetPlatform.macOS:
-        throw UnsupportedError(
+  throw UnsupportedError(
           'Firebase is not configured for macOS in this workspace yet.',
         );
       case TargetPlatform.windows:

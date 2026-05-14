@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 
 import '../dialogs/profile_dialog.dart';
+import '../dialogs/login_dialog.dart';
 import '../pages/log_session_page.dart';
 import '../services/auth_service.dart';
 import '../services/wall_service.dart';
@@ -29,6 +30,22 @@ class _MyHomePageState extends State<MyHomePage> {
     setState(() {});
   }
 
+  Future<bool> _ensureAuthenticated() async {
+    if (AuthService().isAuthenticated) {
+      return true;
+    }
+
+    final loggedIn = await showLoginDialog(context);
+    return loggedIn == true && AuthService().isAuthenticated;
+  }
+
+  Future<void> _runProtectedAction(Future<void> Function() action) async {
+    if (!await _ensureAuthenticated()) {
+      return;
+    }
+    await action();
+  }
+
   @override
   void dispose() {
     AuthService().removeListener(_onAuthChanged);
@@ -50,27 +67,32 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   Future<void> _openLogSessionSheet() async {
-    await showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      showDragHandle: true,
-      builder: (_) => const LogSessionPage(),
+    await _runProtectedAction(
+      () => showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        useSafeArea: true,
+        showDragHandle: true,
+        builder: (_) => const LogSessionPage(),
+      ),
     );
   }
 
   Future<void> _openLogSessionSheetWithWall(Wall wall) async {
-    await showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      showDragHandle: true,
-      builder: (_) => LogSessionPage(initialWall: wall),
+    await _runProtectedAction(
+      () => showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        useSafeArea: true,
+        showDragHandle: true,
+        builder: (_) => LogSessionPage(initialWall: wall),
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final isAuthenticated = AuthService().isAuthenticated;
     return Scaffold(
       body: POIMap(controller: _mapController),
       bottomNavigationBar: SafeArea(
@@ -99,17 +121,21 @@ class _MyHomePageState extends State<MyHomePage> {
                   tooltip: 'Log session',
                   icon: Icons.edit_calendar_outlined,
                   label: 'Log',
+                  hint: isAuthenticated ? null : 'Login',
                   onTap: _openLogSessionSheet,
                 ),
                 _NavItem(
                   tooltip: 'Account',
                   icon: Icons.person_outline,
                   label: 'Me',
-                  onPressed: () async {
-                    await showDialog(
-                      context: context,
-                      builder: (_) => const ProfileDialog(),
-                    );
+                  hint: isAuthenticated ? null : 'Login',
+                  onPressed: () {
+                    _runProtectedAction(() async {
+                      await showDialog(
+                        context: context,
+                        builder: (_) => const ProfileDialog(),
+                      );
+                    });
                   },
                 ),
               ],
@@ -145,6 +171,25 @@ class _WallSearchSheetState extends State<_WallSearchSheet> {
   bool _loading = false;
   String? _error;
   Timer? _debounce;
+
+  Future<void> _handleLogWall(Wall wall) async {
+    final rootContext = Navigator.of(context, rootNavigator: true).context;
+
+    Navigator.of(context).pop();
+
+    if (!AuthService().isAuthenticated) {
+      final loggedIn = await showLoginDialog(rootContext);
+      if (loggedIn != true || !AuthService().isAuthenticated) {
+        return;
+      }
+    }
+
+    if (!mounted || !rootContext.mounted) {
+      return;
+    }
+
+    await widget.onLogWall(wall);
+  }
 
   @override
   void dispose() {
@@ -194,6 +239,8 @@ class _WallSearchSheetState extends State<_WallSearchSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final isAuthenticated = AuthService().isAuthenticated;
+
     return SizedBox(
       height: MediaQuery.of(context).size.height * 0.85,
       child: Padding(
@@ -255,12 +302,28 @@ class _WallSearchSheetState extends State<_WallSearchSheet> {
                         title: Text(wall.name),
                         subtitle: Text('${wall.difficulty} • ${wall.type}'),
                         trailing: IconButton(
-                          tooltip: 'Log session',
-                          icon: const Icon(Icons.edit_calendar_outlined),
-                          onPressed: () {
-                            Navigator.of(context).pop();
-                            widget.onLogWall(wall);
-                          },
+                          tooltip: isAuthenticated
+                              ? 'Log session'
+                              : 'Log session (login required)',
+                          icon: Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              const Icon(Icons.edit_calendar_outlined),
+                              if (!isAuthenticated)
+                                Positioned(
+                                  right: -2,
+                                  bottom: -2,
+                                  child: Icon(
+                                    Icons.lock_outline,
+                                    size: 11,
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.primary,
+                                  ),
+                                ),
+                            ],
+                          ),
+                          onPressed: () => _handleLogWall(wall),
                         ),
                         onTap: () {
                           Navigator.of(context).pop();
@@ -282,6 +345,7 @@ class _NavItem extends StatelessWidget {
   const _NavItem({
     this.icon,
     this.label,
+    this.hint,
     this.selected = false,
     this.onTap,
     this.tooltip,
@@ -290,6 +354,7 @@ class _NavItem extends StatelessWidget {
 
   final IconData? icon;
   final String? label;
+  final String? hint;
   final bool selected;
   final VoidCallback? onTap;
   final String? tooltip;
@@ -297,7 +362,9 @@ class _NavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = selected ? Theme.of(context).colorScheme.primary : Theme.of(context).colorScheme.onSurfaceVariant;
+    final color = selected
+        ? Theme.of(context).colorScheme.primary
+        : Theme.of(context).colorScheme.onSurfaceVariant;
     return Expanded(
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
@@ -321,6 +388,28 @@ class _NavItem extends StatelessWidget {
                     fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
                     color: color,
                   ),
+                ),
+              ],
+              if (hint != null) ...[
+                const SizedBox(height: 1),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.lock_outline,
+                      size: 11,
+                      color: color.withOpacity(0.85),
+                    ),
+                    const SizedBox(width: 2),
+                    Text(
+                      hint!,
+                      style: TextStyle(
+                        fontSize: 9,
+                        color: color.withOpacity(0.85),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ],

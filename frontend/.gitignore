@@ -5,3 +5,4 @@ firebase.env.json.example
 # Legacy generated Firebase Android config (no longer committed)
 android/app/google-services.json
 android/.gradle/
+macos/Runner.xcodeproj/

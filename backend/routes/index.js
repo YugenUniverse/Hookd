@@ -1,10 +1,11 @@
 var express = require("express");
 var router = express.Router();
 
-const { User, Facility, PublicBody } = require("../models/User");
+const { User } = require("../models/User");
+const { authenticateJwt } = require("../middleware/auth.middleware");
 
 /* GET all users */
-router.get("/", async function (req, res, next) {
+router.get("/", authenticateJwt, async function (req, res, next) {
     try {
         const users = await User.find();
         res.json(users);
