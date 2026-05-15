@@ -23,6 +23,7 @@ class _WallDetailsDialogState extends State<WallDetailsDialog> {
       DraggableScrollableController();
   double _initialChildSize = 0.58;
   bool _expandingToFullScreen = false;
+  late Wall _wall;
 
   static const double _minChildSize = 0.38;
   static const double _maxChildSize = 0.96;
@@ -30,12 +31,24 @@ class _WallDetailsDialogState extends State<WallDetailsDialog> {
   @override
   void initState() {
     super.initState();
+    _wall = widget.wall;
     _reviewsFuture = ApiService().getWallReviews(widget.wall.id);
     _reviewsFuture.then((reviews) {
       if (!mounted) return;
       setState(() {
         _initialChildSize = _estimateInitialChildSize(reviews);
       });
+    });
+    // Refresh wall details (rating, totalSessions) when opening dialog
+    _fetchWallDetails();
+  }
+
+  Future<void> _fetchWallDetails() async {
+    final fresh = await ApiService().getWallById(widget.wall.id);
+    if (fresh == null) return;
+    if (!mounted) return;
+    setState(() {
+      _wall = fresh;
     });
   }
 
@@ -66,7 +79,7 @@ class _WallDetailsDialogState extends State<WallDetailsDialog> {
       isScrollControlled: true,
       useSafeArea: true,
       showDragHandle: true,
-      builder: (_) => LogSessionPage(initialWall: widget.wall),
+      builder: (_) => LogSessionPage(initialWall: _wall),
     );
   }
 
@@ -97,7 +110,7 @@ class _WallDetailsDialogState extends State<WallDetailsDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final bool isIndoor = widget.wall.wallType == 'IndoorWall';
+    final bool isIndoor = _wall.wallType == 'IndoorWall';
     final IconData typeIcon = isIndoor ? Icons.domain : Icons.landscape;
     final Color typeColor = isIndoor ? Colors.blueGrey : Colors.green;
     final bool isAuthenticated = AuthService().isAuthenticated;
@@ -125,7 +138,7 @@ class _WallDetailsDialogState extends State<WallDetailsDialog> {
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(
-                          widget.wall.name,
+                          _wall.name,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                           style: Theme.of(context).textTheme.headlineSmall
@@ -188,21 +201,30 @@ class _WallDetailsDialogState extends State<WallDetailsDialog> {
                             context,
                             Icons.fitness_center,
                             'Difficulty',
-                            widget.wall.difficulty,
+                            _wall.difficulty,
                           ),
                           const SizedBox(height: 12),
                           _buildInfoRow(
                             context,
                             isIndoor ? Icons.business : Icons.account_balance,
                             'Managed By',
-                            widget.wall.ownerName ?? 'Unknown',
+                            _wall.ownerName ?? 'Unknown',
                           ),
                           const SizedBox(height: 12),
                           _buildInfoRow(
                             context,
                             Icons.history,
                             'Total Climbs',
-                            '${widget.wall.sessions.length} sessions logged',
+                            '${_wall.totalSessions} sessions logged',
+                          ),
+                          const SizedBox(height: 12),
+                          _buildInfoRow(
+                            context,
+                            Icons.star,
+                            'Mean Rating',
+                            _wall.rating > 0
+                                ? _wall.rating.toStringAsFixed(1)
+                                : 'No rating yet',
                           ),
                           const SizedBox(height: 16),
                           const Text(
@@ -214,7 +236,7 @@ class _WallDetailsDialogState extends State<WallDetailsDialog> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            widget.wall.description,
+                            _wall.description,
                             style: Theme.of(
                               context,
                             ).textTheme.bodyMedium?.copyWith(height: 1.4),

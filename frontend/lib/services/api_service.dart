@@ -241,6 +241,20 @@ class ApiService {
     }
   }
 
+  Future<Wall?> getWallById(String wallId) async {
+    try {
+      final response = await _dio.get('/walls/$wallId');
+      final data = response.data;
+      if (data is Map || data is Map<String, dynamic>) {
+        return Wall.fromJson(Map<String, dynamic>.from(data));
+      }
+      return null;
+    } catch (e) {
+      print('Error fetching wall by id: $e');
+      return null;
+    }
+  }
+
   Future<Map<String, dynamic>> createSession({
     required String wallId,
     required DateTime date,

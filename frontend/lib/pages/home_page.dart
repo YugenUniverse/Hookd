@@ -300,7 +300,28 @@ class _WallSearchSheetState extends State<_WallSearchSheet> {
                           ),
                         ),
                         title: Text(wall.name),
-                        subtitle: Text('${wall.difficulty} • ${wall.type}'),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('${wall.difficulty} • ${wall.type}'),
+                            const SizedBox(height: 4),
+                            Row(
+                              children: [
+                                Icon(Icons.star, size: 14, color: Colors.amber[600]),
+                                const SizedBox(width: 6),
+                                Text(
+                                  wall.rating.toStringAsFixed(1),
+                                  style: const TextStyle(fontSize: 13),
+                                ),
+                                const SizedBox(width: 12),
+                                Text(
+                                  '${wall.totalSessions} sessions',
+                                  style: const TextStyle(fontSize: 13),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
                         trailing: IconButton(
                           tooltip: isAuthenticated
                               ? 'Log session'
