@@ -1,5 +1,5 @@
 const mongoose = require("mongoose");
-const { Wall, IndoorWall, OutdoorWall } = require("../models/Wall");
+const { Wall, IndoorWall, Outdoo7rWall } = require("../models/Wall");
 const { Facility, PublicBody } = require("../models/User");
 const ClimbingSession = require("../models/ClimbingSession");
 
@@ -209,15 +209,20 @@ exports.getWallLeaderboard = async (wallId, limit = 50, offset = 0) => {
         };
     }
 
-    let maxAscents = 0;
+    let wallMasterId = null;
+    let speedDemonId = null;
     let minTime = Infinity;
 
-    rawLeaderboard.forEach((climber) => {
-        if (climber.totalAscents > maxAscents)
-            maxAscents = climber.totalAscents;
-        if (climber.bestTime && climber.bestTime < minTime)
-            minTime = climber.bestTime;
-    });
+    if (rawLeaderboard.length > 0) {
+        wallMasterId = rawLeaderboard[0].id.toString();
+
+        rawLeaderboard.forEach((climber) => {
+            if (climber.bestTime && climber.bestTime < minTime) {
+                minTime = climber.bestTime;
+                speedDemonId = climber.id.toString();
+            }
+        });
+    }
 
     const leaderboard = rawLeaderboard.map((climber) => {
         const badges = [];
@@ -232,8 +237,8 @@ exports.getWallLeaderboard = async (wallId, limit = 50, offset = 0) => {
             score += outlierBonus;
         }
 
-        if (climber.totalAscents === maxAscents) badges.push("WALL_MASTER");
-        if (climber.bestTime === minTime) badges.push("SPEED_DEMON");
+        if (climber.id.toString() === wallMasterId) badges.push("WALL_MASTER");
+        if (climber.id.toString() === speedDemonId) badges.push("SPEED_DEMON");
 
         return {
             id: climber.id.toString(),

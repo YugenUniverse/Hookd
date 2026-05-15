@@ -3,6 +3,7 @@ import 'dart:async';
 
 import '../dialogs/profile_dialog.dart';
 import '../pages/log_session_page.dart';
+import '../pages/global_leaderboard_page.dart';
 import '../services/auth_service.dart';
 import '../services/wall_service.dart';
 import '../models/wall.dart';
@@ -69,6 +70,13 @@ class _MyHomePageState extends State<MyHomePage> {
     );
   }
 
+  void _openGlobalLeaderboard() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const GlobalLeaderboardPage()),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -94,6 +102,12 @@ class _MyHomePageState extends State<MyHomePage> {
                   icon: Icons.search,
                   label: 'Search',
                   onTap: _openWallSearch,
+                ),
+                _NavItem(
+                  tooltip: 'Global Rankings',
+                  icon: Icons.leaderboard_outlined, // A sleek podium icon
+                  label: 'Rank',
+                  onTap: _openGlobalLeaderboard,
                 ),
                 _NavItem(
                   tooltip: 'Log session',
@@ -297,7 +311,9 @@ class _NavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = selected ? Theme.of(context).colorScheme.primary : Theme.of(context).colorScheme.onSurfaceVariant;
+    final color = selected
+        ? Theme.of(context).colorScheme.primary
+        : Theme.of(context).colorScheme.onSurfaceVariant;
     return Expanded(
       child: InkWell(
         borderRadius: BorderRadius.circular(14),

@@ -1,7 +1,7 @@
 const { Climber } = require("../models/User");
 
 exports.getGlobalLeaderboard = async (limit = 50) => {
-    const leaderboard = await Climber.aggregate([
+    const rawLeaderboard = await Climber.aggregate([
         {
             $project: {
                 username: 1,
@@ -15,12 +15,19 @@ exports.getGlobalLeaderboard = async (limit = 50) => {
         { $limit: limit },
     ]);
 
-    return leaderboard.map((climber) => ({
-        id: climber._id,
-        username: climber.username,
-        name: climber.name,
-        surname: climber.surname,
-        avatar: climber.avatar,
-        totalSessions: climber.totalSessions,
-    }));
+    return rawLeaderboard.map((climber) => {
+        const ascents = climber.totalSessions;
+
+        const globalScore = ascents * 50;
+
+        return {
+            id: climber._id.toString(),
+            username: climber.username,
+            avatar: climber.avatar || "",
+            totalAscents: ascents,
+            bestTime: null,
+            score: globalScore,
+            badges: [],
+        };
+    });
 };
