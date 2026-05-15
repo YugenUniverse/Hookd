@@ -103,6 +103,12 @@ describe("report.routes", () => {
             const stored = await IssueReport.findById(response.body.report.id);
             expect(stored).not.toBeNull();
             expect(stored.climber_id.toString()).toBe(climber._id.toString());
+
+            const updatedWall = await IndoorWall.findById(wall._id);
+            expect(updatedWall).not.toBeNull();
+            expect(
+                updatedWall.issue_reports.map((id) => id.toString()),
+            ).toContain(response.body.report.id);
         });
 
         it("should return 400 when wall_id is missing", async () => {

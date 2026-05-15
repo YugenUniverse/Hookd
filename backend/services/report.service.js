@@ -36,6 +36,11 @@ exports.createIssueReport = async (userId, userType, { wall_id, body }) => {
         body,
     });
 
+    // Add the report to the wall's issue_reports array
+    await Wall.findByIdAndUpdate(wall_id, {
+        $push: { issue_reports: report._id },
+    });
+
     return report;
 };
 

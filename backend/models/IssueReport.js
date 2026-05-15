@@ -29,6 +29,10 @@ const issueReportSchema = new mongoose.Schema(
         },
     },
     {
+        timestamps: {
+            createdAt: "submitted_at",
+            updatedAt: false,
+        },
         toJSON: {
             transform: baseTransform,
         },

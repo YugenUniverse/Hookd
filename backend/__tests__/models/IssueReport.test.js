@@ -39,6 +39,7 @@ describe("IssueReport model", () => {
             report.wall_id.toString(),
         );
         expect(foundIssueReport.body).toBe(reportBody);
+        expect(foundIssueReport.submitted_at).toBeInstanceOf(Date);
     });
 
     it("requires climber_id, wall_id, and body", async () => {
