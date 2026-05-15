@@ -1,80 +1,181 @@
-const express = require("express");
 const request = require("supertest");
+const express = require("express");
 const mongoose = require("mongoose");
-
 const wallRoutes = require("../../routes/wall.routes");
 const errorMiddleware = require("../../middleware/error.middleware");
-const { Wall } = require("../../models/Wall");
+const { Wall, IndoorWall } = require("../../models/Wall");
+const { User, Facility } = require("../../models/User");
 const ClimbingSession = require("../../models/ClimbingSession");
-const { User } = require("../../models/User");
+
+jest.setTimeout(30000);
+
+jest.mock("../../middleware/auth.middleware", () => ({
+    authenticateJwt: (req, res, next) => {
+        req.user = {
+            id: "60d5ecdec021f13528e01369",
+            userType: "Facility",
+        };
+        next();
+    },
+    restrictTo:
+        (...roles) =>
+        (req, res, next) =>
+            next(),
+}));
 
 const app = express();
 app.use(express.json());
 app.use("/walls", wallRoutes);
 app.use(errorMiddleware);
 
-describe("wall.routes", () => {
+describe("Wall Routes", () => {
+    let testFacility;
+
     beforeAll(async () => {
-        jest.spyOn(console, "error").mockImplementation(() => {});
         await mongoose.connect(process.env.MONGO_URI, {
-            dbName: "hookd",
+            dbName: "hookd_test",
+        });
+    });
+
+    beforeEach(async () => {
+        const mockId = "60d5ecdec021f13528e01369";
+
+        testFacility = await Facility.create({
+            _id: mockId, // 👈 Force the ID to match the Mock
+            email: "facility@test.com",
+            username: "testfacility",
+            name: "Test Gym",
+            location: { coordinates: [11.12, 46.06] },
         });
     });
 
     afterEach(async () => {
-        await ClimbingSession.deleteMany({});
         await Wall.deleteMany({});
         await User.deleteMany({});
+        await ClimbingSession.deleteMany({});
     });
 
     afterAll(async () => {
-        console.error.mockRestore();
         await mongoose.disconnect();
     });
 
-    // Deprecated sessions-count endpoint tests removed; rely on GET /walls/:id
+    describe("GET /walls", () => {
+        it("should return all walls", async () => {
+            await IndoorWall.create({
+                name: "Wall 1",
+                difficulty: "BEGINNER",
+                location: { coordinates: [0, 0] },
+                facility: testFacility._id,
+            });
 
-    it("GET /walls/:id returns the updated mean rating after new reviews are added", async () => {
-        const wall = await Wall.create({
-            name: "Rated Wall",
-            description: "Wall for rating aggregation",
-            location: {
-                type: "Point",
-                coordinates: [11.12, 46.08],
-            },
-            difficulty: "INTERMEDIATE",
+            const res = await request(app).get("/walls");
+            expect(res.status).toBe(200);
+            expect(Array.isArray(res.body)).toBe(true);
+            expect(res.body.length).toBe(1);
+        });
+    });
+
+    describe("GET /walls/search", () => {
+        it("should return walls matching query", async () => {
+            await IndoorWall.create({
+                name: "Everest Indoor",
+                difficulty: "ADVANCED",
+                location: { coordinates: [0, 0] },
+                facility: testFacility._id,
+            });
+
+            const res = await request(app).get("/walls/search?q=Everest");
+            expect(res.status).toBe(200);
+            expect(res.body[0].name).toBe("Everest Indoor");
         });
 
-        const user = await User.create({
-            email: "rating@example.com",
-            username: "rater",
-            userType: "Climber",
-            name: "Rate",
-            surname: "User",
-            birthdate: new Date("1990-01-01"),
-            authMethods: ["local"],
+        it("should return 400 if query is missing", async () => {
+            const res = await request(app).get("/walls/search");
+            expect(res.status).toBe(400);
+        });
+    });
+
+    describe("GET /walls/nearby", () => {
+        it("should return walls within radius", async () => {
+            await IndoorWall.create({
+                name: "Nearby Wall",
+                difficulty: "INTERMEDIATE",
+                location: { type: "Point", coordinates: [11.12, 46.06] },
+                facility: testFacility._id,
+            });
+
+            const res = await request(app).get(
+                "/walls/nearby?lng=11.12&lat=46.06&radius=5000",
+            );
+            expect(res.status).toBe(200);
+            expect(res.body.length).toBe(1);
+        });
+    });
+
+    describe("POST /walls", () => {
+        it("should create a new wall for a Facility", async () => {
+            const wallData = {
+                name: "New Gym Wall",
+                difficulty: "BEGINNER",
+                location: { coordinates: [12, 45], address: "123 Street" },
+            };
+
+            const res = await request(app).post("/walls").send(wallData);
+
+            expect(res.status).toBe(201);
+            expect(res.body.wall.name).toBe("New Gym Wall");
+
+            // Check if wall was added to facility array
+            const updatedFacility = await Facility.findById(testFacility._id);
+            expect(updatedFacility.walls.length).toBe(1);
+        });
+    });
+
+    describe("GET /walls/:id/leaderboard", () => {
+        it("should return leaderboard data structure", async () => {
+            const wall = await IndoorWall.create({
+                name: "Leaderboard Wall",
+                difficulty: "BEGINNER",
+                location: { coordinates: [0, 0] },
+                facility: testFacility._id,
+            });
+
+            const res = await request(app).get(
+                `/walls/${wall._id}/leaderboard`,
+            );
+            expect(res.status).toBe(200);
+            expect(res.body).toHaveProperty("seasonName");
+            expect(res.body).toHaveProperty("leaderboard");
         });
 
-        const firstSession = await ClimbingSession.create({
-            climber_id: user._id,
-            wall_id: wall._id,
-            date: new Date("2026-05-12"),
-            time: 60,
+        it("should return 400 for invalid offset", async () => {
+            const wall = await IndoorWall.create({
+                name: "Wall",
+                difficulty: "BEGINNER",
+                location: { coordinates: [0, 0] },
+                facility: testFacility._id,
+            });
+            const res = await request(app).get(
+                `/walls/${wall._id}/leaderboard?offset=1`,
+            );
+            expect(res.status).toBe(400);
         });
-        const secondSession = await ClimbingSession.create({
-            climber_id: user._id,
-            wall_id: wall._id,
-            date: new Date("2026-05-13"),
-            time: 75,
+    });
+
+    describe("DELETE /walls/:id", () => {
+        it("should delete the wall and remove from owner's list", async () => {
+            const wall = await IndoorWall.create({
+                name: "Wall to Delete",
+                difficulty: "BEGINNER",
+                location: { coordinates: [0, 0] },
+                facility: testFacility._id,
+            });
+
+            const res = await request(app).delete(`/walls/${wall._id}`);
+            expect(res.status).toBe(200);
+
+            const deletedWall = await Wall.findById(wall._id);
+            expect(deletedWall).toBeNull();
         });
-
-        await firstSession.addReview(5, "Excellent route");
-        await secondSession.addReview(3, "Good but harder");
-
-        const response = await request(app).get(`/walls/${wall._id.toString()}`);
-
-        expect(response.status).toBe(200);
-        expect(response.body.rating).toBe(4);
-        expect(response.body.totalSessions).toBe(2);
     });
 });

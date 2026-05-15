@@ -3,6 +3,8 @@ const request = require("supertest");
 const jwt = require("jsonwebtoken");
 const mongoose = require("mongoose");
 
+jest.setTimeout(30000);
+
 const sessionRoutes = require("../../routes/session.routes");
 const errorMiddleware = require("../../middleware/error.middleware");
 const { User } = require("../../models/User");
@@ -446,6 +448,7 @@ describe("sessions.routes", () => {
             name: "Non",
             surname: "Climber",
             birthdate: new Date("1990-01-01"),
+            location: { coordinates: [11.12, 46.06] },
             authMethods: ["local"],
         });
 
@@ -644,6 +647,7 @@ describe("sessions.routes", () => {
             name: "Non",
             surname: "Climber",
             birthdate: new Date("1990-01-01"),
+            location: { coordinates: [11.12, 46.06] },
             authMethods: ["local"],
         });
 
@@ -747,6 +751,7 @@ describe("sessions.routes", () => {
             name: "Non",
             surname: "Climber",
             birthdate: new Date("1990-01-01"),
+            location: { coordinates: [11.12, 46.06] },
             authMethods: ["local"],
         });
 
@@ -770,6 +775,7 @@ describe("sessions.routes", () => {
             name: "Non",
             surname: "Climber",
             birthdate: new Date("1990-01-01"),
+            location: { coordinates: [11.12, 46.06] },
             authMethods: ["local"],
         });
 
@@ -810,6 +816,7 @@ describe("sessions.routes", () => {
             name: "Non",
             surname: "Climber",
             birthdate: new Date("1990-01-01"),
+            location: { coordinates: [11.12, 46.06] },
             authMethods: ["local"],
         });
 
@@ -914,6 +921,7 @@ describe("sessions.routes", () => {
             name: "Non",
             surname: "Climber",
             birthdate: new Date("1990-01-01"),
+            location: { coordinates: [11.12, 46.06] },
             authMethods: ["local"],
         });
 

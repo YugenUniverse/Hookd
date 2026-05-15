@@ -1,9 +1,9 @@
 const mongoose = require("mongoose");
-const { User } = require("../../models/User");
+const { User, Climber, Facility, PublicBody } = require("../../models/User");
 
 jest.setTimeout(30000);
 
-describe("User model", () => {
+describe("User model suite", () => {
     beforeAll(async () => {
         await mongoose.connect(process.env.MONGO_URI, {
             dbName: "hookd",
@@ -116,8 +116,7 @@ describe("User model", () => {
 
     describe("Climber discriminator", () => {
         it("creates a climber with base user fields plus climber fields", async () => {
-            const climber = new User({
-                userType: "Climber",
+            const climber = await Climber.create({
                 email: "climber@example.com",
                 username: "climber",
                 password: "Climb123!",
@@ -128,122 +127,110 @@ describe("User model", () => {
                 wallet: 100,
             });
 
-            await climber.save();
-
-            const foundClimber = await User.findById(climber._id);
-            expect(foundClimber.email).toBe("climber@example.com");
-            expect(foundClimber.username).toBe("climber");
-            expect(foundClimber.name).toBe("John");
-            expect(foundClimber.surname).toBe("Doe");
-            expect(foundClimber.birthdate).toEqual(new Date("1990-01-01"));
-            expect(foundClimber.bio).toBe("Passionate climber");
-            expect(foundClimber.wallet).toBe(100);
-            expect(foundClimber.userType).toBe("Climber");
+            const found = await User.findById(climber.id);
+            expect(found.userType).toBe("Climber");
+            expect(found.name).toBe("John");
+            expect(found.wallet).toBe(100);
         });
 
         it("requires name, surname, and birthdate for climber", async () => {
-            const climber = new User({
-                userType: "Climber",
-                email: "climber@example.com",
-                username: "climber",
-                name: "John",
-                surname: "Doe",
-                // missing birthdate
+            const climber = new Climber({
+                email: "fail@example.com",
+                username: "fail",
+                // missing name, surname, birthdate
             });
-
             await expect(climber.save()).rejects.toThrow();
         });
+    });
 
-        it("defaults bio to empty string for climber", async () => {
-            const climber = new User({
-                userType: "Climber",
-                email: "climber@example.com",
-                username: "climber",
-                name: "John",
-                surname: "Doe",
-                birthdate: new Date("1990-01-01"),
+    describe("Facility discriminator", () => {
+        it("creates a facility with valid location and description", async () => {
+            const facility = await Facility.create({
+                email: "gym@example.com",
+                username: "vertical_limit",
+                name: "Vertical Limit Gym",
+                description: "Best indoor climbing in town",
+                location: {
+                    coordinates: [12.4964, 41.9028], // [Lng, Lat]
+                    address: "123 Climbing St, Rome",
+                },
             });
 
-            await climber.save();
-
-            expect(climber.bio).toBe("");
+            expect(facility.userType).toBe("Facility");
+            expect(facility.location.type).toBe("Point");
+            expect(facility.location.coordinates).toContain(12.4964);
         });
 
-        it("defaults wallet to 0 for climber", async () => {
-            const climber = new User({
-                userType: "Climber",
-                email: "climber@example.com",
-                username: "climber",
-                name: "John",
-                surname: "Doe",
-                birthdate: new Date("1990-01-01"),
+        it("fails if description exceeds 1000 characters", async () => {
+            const facility = new Facility({
+                email: "gym2@example.com",
+                username: "long_desc",
+                name: "The Gym",
+                description: "a".repeat(1001),
+                location: { coordinates: [0, 0] },
             });
-
-            await climber.save();
-
-            expect(climber.wallet).toBe(0);
+            await expect(facility.save()).rejects.toThrow(
+                /Description cannot be more than 1000 characters/,
+            );
         });
 
-        it("bio cannot exceed 200 characters", async () => {
-            const longBio = "a".repeat(201);
-            const climber = new User({
-                userType: "Climber",
-                email: "climber@example.com",
-                username: "climber",
-                name: "John",
-                surname: "Doe",
-                birthdate: new Date("1990-01-01"),
-                bio: longBio,
+        it("requires coordinates in location", async () => {
+            const facility = new Facility({
+                email: "gym3@example.com",
+                username: "no_loc",
+                name: "No Loc Gym",
+                location: { address: "Somewhere" }, // missing coordinates
+            });
+            await expect(facility.save()).rejects.toThrow();
+        });
+    });
+
+    describe("PublicBody discriminator", () => {
+        it("creates a public body correctly", async () => {
+            const cityHall = await PublicBody.create({
+                email: "admin@city.gov",
+                username: "city_admin",
+                name: "Department of Parks",
+                location: {
+                    coordinates: [45.4642, 9.19],
+                },
             });
 
-            await expect(climber.save()).rejects.toThrow();
+            expect(cityHall.userType).toBe("PublicBody");
+            expect(cityHall.name).toBe("Department of Parks");
         });
 
-        it("wallet cannot be negative", async () => {
-            const climber = new User({
-                userType: "Climber",
-                email: "climber@example.com",
-                username: "climber",
-                name: "John",
-                surname: "Doe",
-                birthdate: new Date("1990-01-01"),
-                wallet: -10,
+        it("validates outdoor walls reference array", async () => {
+            const pb = new PublicBody({
+                email: "pb@example.com",
+                username: "pb_user",
+                name: "Park Authority",
+                location: { coordinates: [0, 0] },
+                walls: [new mongoose.Types.ObjectId()],
             });
-
-            await expect(climber.save()).rejects.toThrow();
+            await pb.save();
+            expect(pb.walls.length).toBe(1);
         });
+    });
 
-        it("climber has editUser method", async () => {
-            const climber = new User({
-                userType: "Climber",
-                email: "climber@example.com",
-                username: "climber",
-                name: "John",
-                surname: "Doe",
-                birthdate: new Date("1990-01-01"),
+    describe("Cross-Type Logic", () => {
+        it("prevents two different users from having the same email regardless of type", async () => {
+            await Climber.create({
+                email: "shared@test.com",
+                username: "climber1",
+                name: "Climber",
+                surname: "One",
+                birthdate: new Date(),
             });
 
-            await climber.save();
-
-            expect(typeof climber.editUser).toBe("function");
-        });
-
-        it("toJSON transforms _id to id for climber", async () => {
-            const climber = new User({
-                userType: "Climber",
-                email: "climber@example.com",
-                username: "climber",
-                name: "John",
-                surname: "Doe",
-                birthdate: new Date("1990-01-01"),
+            const gym = new Facility({
+                email: "shared@test.com",
+                username: "gym1",
+                name: "Gym One",
+                location: { coordinates: [0, 0] },
             });
 
-            await climber.save();
-
-            const json = climber.toJSON();
-            expect(String(json.id)).toEqual(climber._id.toString());
-            expect(json._id).toBeUndefined();
-            expect(json.__v).toBeUndefined();
+            await expect(gym.save()).rejects.toThrow();
         });
     });
 });

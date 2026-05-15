@@ -1,7 +1,9 @@
 // middleware/error.middleware.js
 
 const errorHandler = (err, req, res, next) => {
-    console.error(err);
+    if (process.env.NODE_ENV !== "test") {
+        console.error(err);
+    }
 
     const statusCode = err.statusCode || 500;
 

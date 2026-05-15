@@ -110,7 +110,11 @@ const facilitySchema = new mongoose.Schema(
             },
             coordinates: {
                 type: [Number], // [Longitude, Latitude]
-                required: true,
+                required: [true, "Coordinates are required"],
+                validate: {
+                    validator: (val) => val.length === 2,
+                    message: "Coordinates must be [longitude, latitude]",
+                },
             },
             address: String,
         },
@@ -159,7 +163,11 @@ const publicBodySchema = new mongoose.Schema(
             },
             coordinates: {
                 type: [Number], // [Longitude, Latitude]
-                required: true,
+                required: [true, "Coordinates are required"],
+                validate: {
+                    validator: (val) => val.length === 2,
+                    message: "Coordinates must be [longitude, latitude]",
+                },
             },
             address: String,
         },
