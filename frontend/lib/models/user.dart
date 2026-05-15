@@ -1,3 +1,61 @@
+import 'poi.dart' show IndoorWallSummary;
+
+class FacilityProfile {
+  final String id;
+  final String name;
+  final String description;
+  final String? address;
+  final List<double>? coordinates;
+  final List<IndoorWallSummary> walls;
+
+  const FacilityProfile({
+    required this.id,
+    required this.name,
+    required this.description,
+    required this.walls,
+    this.address,
+    this.coordinates,
+  });
+
+  factory FacilityProfile.fromJson(Map<String, dynamic> json) {
+    final location = json['location'];
+    String? address;
+    List<double>? coordinates;
+    if (location is Map) address = location['address']?.toString();
+    if (location is Map && location['coordinates'] is List) {
+      final rawCoordinates = location['coordinates'] as List;
+      if (rawCoordinates.length == 2) {
+        final lng = rawCoordinates[0];
+        final lat = rawCoordinates[1];
+        final parsedLng = lng is num ? lng.toDouble() : double.tryParse(lng.toString());
+        final parsedLat = lat is num ? lat.toDouble() : double.tryParse(lat.toString());
+        if (parsedLng != null && parsedLat != null) {
+          coordinates = [parsedLng, parsedLat];
+        }
+      }
+    }
+
+    final wallsRaw = json['walls'];
+    final walls = <IndoorWallSummary>[];
+    if (wallsRaw is List) {
+      for (final w in wallsRaw) {
+        if (w is Map) {
+          walls.add(IndoorWallSummary.fromJson(Map<String, dynamic>.from(w)));
+        }
+      }
+    }
+
+    return FacilityProfile(
+      id: (json['id'] ?? json['_id'] ?? '').toString(),
+      name: (json['name'] ?? '').toString(),
+      description: (json['description'] ?? '').toString(),
+      address: address,
+      coordinates: coordinates,
+      walls: walls,
+    );
+  }
+}
+
 class User {
   final String id;
   final String username;
@@ -6,6 +64,8 @@ class User {
   final DateTime? createdAt;
   final bool isAdmin;
   final bool originalMember;
+  final String? userType;
+  final FacilityProfile? facilityData;
 
   User({
     required this.id,
@@ -15,28 +75,28 @@ class User {
     this.createdAt,
     this.isAdmin = false,
     this.originalMember = false,
+    this.userType,
+    this.facilityData,
   });
 
   factory User.fromJson(Map<String, dynamic> json) {
     String stringize(dynamic v) => v == null ? '' : v.toString();
 
-    // id fallback: id, user_id, email (email as fallback id)
     final id = stringize(json['id'] ?? json['user_id'] ?? json['email'] ?? '');
-
     final username = stringize(json['username'] ?? json['user'] ?? '');
     final email = stringize(json['email'] ?? '');
 
     String? profilePictureUrl;
     if (json['profile_picture_url'] != null) {
       profilePictureUrl = stringize(json['profile_picture_url']);
-    } else if (json['avatar'] != null)
+    } else if (json['avatar'] != null) {
       profilePictureUrl = stringize(json['avatar']);
+    }
 
     DateTime? createdAt;
     final ca = json['created_at'] ?? json['createdAt'];
     if (ca != null) {
       if (ca is String) {
-        // try parse; some APIs return "YYYY-MM-DD HH:MM:SS"
         createdAt =
             DateTime.tryParse(ca) ??
             DateTime.tryParse(ca.replaceFirst(' ', 'T'));
@@ -60,6 +120,15 @@ class User {
       json['original_fiatlinux'] ?? json['originalMember'] ?? json['original'],
     );
 
+    final userType = json['userType']?.toString();
+
+    FacilityProfile? facilityData;
+    final facilityRaw = json['facility'];
+    if (facilityRaw is Map) {
+      facilityData =
+          FacilityProfile.fromJson(Map<String, dynamic>.from(facilityRaw));
+    }
+
     return User(
       id: id,
       username: username,
@@ -68,6 +137,8 @@ class User {
       createdAt: createdAt,
       isAdmin: isAdmin,
       originalMember: originalMember,
+      userType: userType,
+      facilityData: facilityData,
     );
   }
 

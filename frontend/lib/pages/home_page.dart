@@ -5,6 +5,7 @@ import '../dialogs/login_dialog.dart';
 import '../pages/log_session_page.dart';
 import '../pages/global_leaderboard_page.dart';
 import '../pages/user_page.dart';
+import '../pages/facility_owner_page.dart';
 import '../services/auth_service.dart';
 import '../services/wall_service.dart';
 import '../models/wall.dart';
@@ -145,10 +146,11 @@ class _MyHomePageState extends State<MyHomePage> {
                   hint: isAuthenticated ? null : 'Login',
                   onPressed: () {
                     _runProtectedAction(() async {
+                      final page = AuthService().userType == 'FacilityOwner'
+                          ? const FacilityOwnerPage()
+                          : const UserPage();
                       await Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => const UserPage(),
-                        ),
+                        MaterialPageRoute(builder: (_) => page),
                       );
                     });
                   },

@@ -3,6 +3,7 @@ import 'dart:async';
 
 import '../models/user.dart';
 import '../models/climbing_session.dart';
+import '../models/poi.dart';
 import '../models/review.dart';
 import '../models/wall.dart';
 import '../constants/api_config.dart';
@@ -276,6 +277,43 @@ class ApiService {
     }
   }
 
+  Future<List<Poi>> getAllPois() async {
+    try {
+      final response = await _dio.get('/pois');
+      final data = response.data;
+      if (data is! List) return [];
+      return data
+          .whereType<Map>()
+          .map((e) => Poi.fromJson(Map<String, dynamic>.from(e)))
+          .toList();
+    } catch (e) {
+      print('Error fetching all POIs: $e');
+      return [];
+    }
+  }
+
+  Future<List<Poi>> getNearbyPois(
+    double lng,
+    double lat, {
+    double radius = 30000,
+  }) async {
+    try {
+      final response = await _dio.get(
+        '/pois/nearby',
+        queryParameters: {'lng': lng, 'lat': lat, 'radius': radius.toInt()},
+      );
+      final data = response.data;
+      if (data is! List) return [];
+      return data
+          .whereType<Map>()
+          .map((e) => Poi.fromJson(Map<String, dynamic>.from(e)))
+          .toList();
+    } catch (e) {
+      print('Error fetching nearby POIs: $e');
+      return [];
+    }
+  }
+
   Future<Wall?> getWallById(String wallId) async {
     try {
       final response = await _dio.get('/walls/$wallId');
@@ -323,6 +361,81 @@ class ApiService {
       return Map<String, dynamic>.from(data);
     }
     throw Exception('Unexpected response while creating session');
+  }
+
+  Future<List<Map<String, dynamic>>> searchFacilities(String query) async {
+    if (query.trim().length < 2) return [];
+    try {
+      final resp = await Dio(BaseOptions(baseUrl: ApiConfig.apiBaseUrl)).get(
+        '/facilities/search',
+        queryParameters: {'q': query.trim()},
+      );
+      final data = resp.data;
+      if (data is! List) return [];
+      return data.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  Future<bool> claimFacility(String facilityId) async {
+    try {
+      await _dio.post('/facilities/$facilityId/claim');
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<bool> updateFacility(
+    String facilityId, {
+    required String name,
+    required String description,
+    required Map<String, dynamic> location,
+  }) async {
+    try {
+      await _dio.put(
+        '/facilities/$facilityId',
+        data: {
+          'name': name,
+          'description': description,
+          'location': location,
+        },
+      );
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<bool> unpairFacility(String facilityId) async {
+    try {
+      await _dio.post('/facilities/$facilityId/unpair');
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<bool> updateWall(
+    String wallId, {
+    required String name,
+    required String description,
+    required String difficulty,
+  }) async {
+    try {
+      await _dio.put(
+        '/walls/$wallId',
+        data: {
+          'name': name,
+          'description': description,
+          'difficulty': difficulty,
+        },
+      );
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 
   String _formatDate(DateTime date) {
