@@ -14,6 +14,7 @@ var authRouter = require("./routes/auth.routes");
 var wallRouter = require("./routes/wall.routes");
 var reviewRouter = require("./routes/review.routes");
 var sessionRouter = require("./routes/session.routes");
+const climberRoutes = require("./routes/climber.routes");
 
 const errorMiddleware = require("./middleware/error.middleware");
 
@@ -70,6 +71,7 @@ app.use(authenticateJwt);
 
 app.use("/", indexRouter);
 app.use("/sessions", sessionRouter);
+app.use("/climbers", climberRoutes);
 // catch 404 and forward to error handler
 app.use(function (req, res, next) {
     next(createError(404));

@@ -17,6 +17,9 @@ router.get("/search", wallController.searchWalls);
 // Get walls near a location (?lng=11.12&lat=46.06&radius=5000)
 router.get("/nearby", wallController.getWallsByLocation);
 
+// Get wall leaderboard
+router.get("/:id/leaderboard", wallController.getWallLeaderboard);
+
 // Get a single wall by ID (🚨 MUST be the last GET route!)
 router.get("/:id", wallController.getWallById);
 

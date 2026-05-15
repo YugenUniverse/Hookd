@@ -82,3 +82,32 @@ exports.deleteWall = async (req, res, next) => {
         next(err);
     }
 };
+
+exports.getWallLeaderboard = async (req, res, next) => {
+    try {
+        const limit = req.query.limit ? parseInt(req.query.limit) : 50;
+        const offset = req.query.offset ? parseInt(req.query.offset) : 0;
+
+        if (Number.isNaN(limit) || limit <= 0) {
+            return res.status(400).json({
+                message: "Limit must be a positive integer greater than 0.",
+            });
+        }
+
+        if (Number.isNaN(offset) || offset > 0) {
+            return res.status(400).json({
+                message:
+                    "Offset must be 0 (current season) or a negative integer (e.g., -1 for last season).",
+            });
+        }
+        const leaderboardData = await wallService.getWallLeaderboard(
+            req.params.id,
+            limit,
+            offset,
+        );
+
+        res.status(200).json(leaderboardData);
+    } catch (err) {
+        next(err);
+    }
+};

@@ -157,7 +157,7 @@ exports.register = async ({
         password,
         username,
         authMethods: ["local"],
-        userType: "Climber",
+        userType: normalizedUserType,
         ...restData,
     };
 
