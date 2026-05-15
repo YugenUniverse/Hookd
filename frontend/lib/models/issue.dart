@@ -1,18 +1,18 @@
-class IssueReport {
+class Issue {
   final String wall_id;
   final String body;
   final DateTime? submittedAt;
 
-  IssueReport({required this.wall_id, required this.body, this.submittedAt});
+  Issue({required this.wall_id, required this.body, this.submittedAt});
 
-  factory IssueReport.fromJson(Map<String, dynamic> json) {
+  factory Issue.fromJson(Map<String, dynamic> json) {
     final submittedAtRaw = json['submitted_at'] ?? json['submittedAt'];
     DateTime? submittedAt;
     if (submittedAtRaw != null) {
       submittedAt = DateTime.tryParse(submittedAtRaw.toString());
     }
 
-    return IssueReport(
+    return Issue(
       wall_id: (json['wall_id'] ?? 'Unknown Wall').toString(),
       body: (json['body'] ?? '').toString(),
       submittedAt: submittedAt,

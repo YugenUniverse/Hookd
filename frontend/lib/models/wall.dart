@@ -1,5 +1,5 @@
 import 'climbing_session.dart';
-import 'issue_report.dart';
+import 'issue.dart';
 
 class Wall {
   final String id;
@@ -11,7 +11,7 @@ class Wall {
   final String wallType;
   final String? ownerName;
   final List<ClimbingSession> sessions;
-  final List<IssueReport> issueReports;
+  final List<Issue> issues;
 
   Wall({
     required this.id,
@@ -23,7 +23,7 @@ class Wall {
     required this.wallType,
     this.ownerName,
     required this.sessions,
-    required this.issueReports,
+    required this.issues,
   });
 
   // Compatibility with older UI code that expects `type`.
@@ -55,19 +55,21 @@ class Wall {
         if (item is Map<String, dynamic>) {
           sessions.add(ClimbingSession.fromJson(item));
         } else if (item is Map) {
-          sessions.add(ClimbingSession.fromJson(Map<String, dynamic>.from(item)));
+          sessions.add(
+            ClimbingSession.fromJson(Map<String, dynamic>.from(item)),
+          );
         }
       }
     }
 
-    final issueReportsRaw = json['issueReports'];
-    final issueReports = <IssueReport>[];
-    if (issueReportsRaw is List) {
-      for (final item in issueReportsRaw) {
+    final issuesRaw = json['issues'];
+    final issues = <Issue>[];
+    if (issuesRaw is List) {
+      for (final item in issuesRaw) {
         if (item is Map<String, dynamic>) {
-          issueReports.add(IssueReport.fromJson(item));
+          issues.add(Issue.fromJson(item));
         } else if (item is Map) {
-          issueReports.add(IssueReport.fromJson(Map<String, dynamic>.from(item)));
+          issues.add(Issue.fromJson(Map<String, dynamic>.from(item)));
         }
       }
     }
@@ -77,12 +79,13 @@ class Wall {
       name: (json['name'] ?? 'Unknown Wall').toString(),
       latitude: latitude,
       longitude: longitude,
-      description: (json['description'] ?? 'No description available.').toString(),
+      description: (json['description'] ?? 'No description available.')
+          .toString(),
       difficulty: (json['difficulty'] ?? 'UNKNOWN').toString(),
       wallType: wallType,
       ownerName: owner,
       sessions: sessions,
-      issueReports: issueReports,
+      issues: issues,
     );
   }
 
@@ -105,7 +108,7 @@ class Wall {
       'wallType': wallType,
       'ownerName': ownerName,
       'sessions': sessions.map((session) => session.toJson()).toList(),
-      'issueReports': issueReports.map((report) => report.toJson()).toList(),
+      'issues': issues.map((issue) => issue.toJson()).toList(),
     };
   }
 }

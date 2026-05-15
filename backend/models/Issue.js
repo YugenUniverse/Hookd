@@ -9,7 +9,7 @@ const baseTransform = (doc, ret) => {
     return ret;
 };
 
-const issueReportSchema = new mongoose.Schema(
+const issueSchema = new mongoose.Schema(
     {
         climber_id: {
             type: mongoose.Schema.Types.ObjectId,
@@ -25,7 +25,7 @@ const issueReportSchema = new mongoose.Schema(
             type: String,
             required: true,
             trim: true,
-            maxlength: [500, "Issue report body cannot exceed 500 characters"],
+            maxlength: [500, "Issue body cannot exceed 500 characters"],
         },
     },
     {
@@ -39,6 +39,6 @@ const issueReportSchema = new mongoose.Schema(
     },
 );
 
-const IssueReport = mongoose.model("IssueReport", issueReportSchema);
+const Issue = mongoose.model("Issue", issueSchema);
 
-module.exports = { IssueReport };
+module.exports = { Issue };

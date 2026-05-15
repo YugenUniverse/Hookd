@@ -3,7 +3,7 @@ import 'dart:async';
 
 import '../models/user.dart';
 import '../models/wall.dart';
-import '../models/issue_report.dart';
+import '../models/issue.dart';
 import '../constants/api_config.dart';
 import 'auth_service.dart';
 
@@ -254,58 +254,54 @@ class ApiService {
     throw Exception('Unexpected response while creating session');
   }
 
-  // Report endpoints
-  Future<void> createIssueReport({
+  // Issue endpoints
+  Future<void> createIssue({
     required String wallId,
     required String body,
   }) async {
     final payload = {'wall_id': wallId, 'body': body};
-    final response = await _dio.post('/reports', data: payload);
+    final response = await _dio.post('/issues', data: payload);
     if (response.statusCode != 201) {
-      throw Exception('Failed to create report: ${response.statusCode}');
+      throw Exception('Failed to create issue: ${response.statusCode}');
     }
   }
 
-  Future<List<IssueReport>> fetchReportsForWall(String wallId) async {
-    final response = await _dio.get('/reports/walls/$wallId');
+  Future<List<Issue>> fetchIssuesForWall(String wallId) async {
+    final response = await _dio.get('/issues/walls/$wallId');
     final data = response.data;
-    final reportsList = <IssueReport>[];
-    if (data is Map && data['reports'] is List) {
-      for (final item in data['reports']) {
+    final issuesList = <Issue>[];
+    if (data is Map && data['issues'] is List) {
+      for (final item in data['issues']) {
         if (item is Map<String, dynamic>) {
-          reportsList.add(IssueReport.fromJson(item));
+          issuesList.add(Issue.fromJson(item));
         } else if (item is Map) {
-          reportsList.add(
-            IssueReport.fromJson(Map<String, dynamic>.from(item)),
-          );
+          issuesList.add(Issue.fromJson(Map<String, dynamic>.from(item)));
         }
       }
     }
-    return reportsList;
+    return issuesList;
   }
 
-  Future<List<IssueReport>> fetchReportsForUser() async {
-    final response = await _dio.get('/reports/my-reports');
+  Future<List<Issue>> fetchIssuesForUser() async {
+    final response = await _dio.get('/issues/my-issues');
     final data = response.data;
-    final reportsList = <IssueReport>[];
-    if (data is Map && data['reports'] is List) {
-      for (final item in data['reports']) {
+    final issuesList = <Issue>[];
+    if (data is Map && data['issues'] is List) {
+      for (final item in data['issues']) {
         if (item is Map<String, dynamic>) {
-          reportsList.add(IssueReport.fromJson(item));
+          issuesList.add(Issue.fromJson(item));
         } else if (item is Map) {
-          reportsList.add(
-            IssueReport.fromJson(Map<String, dynamic>.from(item)),
-          );
+          issuesList.add(Issue.fromJson(Map<String, dynamic>.from(item)));
         }
       }
     }
-    return reportsList;
+    return issuesList;
   }
 
-  Future<void> deleteReport(String reportId) async {
-    final response = await _dio.delete('/reports/$reportId');
+  Future<void> deleteIssue(String issueId) async {
+    final response = await _dio.delete('/issues/$issueId');
     if (response.statusCode != 204) {
-      throw Exception('Failed to delete report: ${response.statusCode}');
+      throw Exception('Failed to delete issue: ${response.statusCode}');
     }
   }
 

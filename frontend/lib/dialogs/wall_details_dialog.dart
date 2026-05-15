@@ -94,17 +94,17 @@ class WallDetailsDialog extends StatelessWidget {
                                   if (issueBody.isNotEmpty) {
                                     final apiService = ApiService();
                                     final navigator = Navigator.of(context);
-                                    final messenger = ScaffoldMessenger.of(context);
-                                    await apiService.createIssueReport(
+                                    final messenger = ScaffoldMessenger.of(
+                                      context,
+                                    );
+                                    await apiService.createIssue(
                                       wallId: wall.id,
                                       body: issueBody,
                                     );
                                     navigator.pop();
                                     messenger.showSnackBar(
                                       const SnackBar(
-                                        content: Text(
-                                          'Issue report submitted.',
-                                        ),
+                                        content: Text('Issue submitted.'),
                                       ),
                                     );
                                   }

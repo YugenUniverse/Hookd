@@ -1,13 +1,13 @@
 const mongoose = require("mongoose");
-const { IssueReport } = require("../models/IssueReport");
+const { Issue } = require("../models/Issue");
 const { Wall } = require("../models/Wall");
 const { User } = require("../models/User");
 
 const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
 
-exports.createIssueReport = async (userId, userType, { wall_id, body }) => {
+exports.createIssue = async (userId, userType, { wall_id, body }) => {
     if (userType !== "Climber") {
-        const error = new Error("Only climbers can create reports");
+        const error = new Error("Only climbers can create issues");
         error.statusCode = 403;
         throw error;
     }
@@ -30,21 +30,20 @@ exports.createIssueReport = async (userId, userType, { wall_id, body }) => {
         throw error;
     }
 
-    const report = await IssueReport.create({
+    const issue = await Issue.create({
         climber_id: userId,
         wall_id,
         body,
     });
 
-    // Add the report to the wall's issue_reports array
     await Wall.findByIdAndUpdate(wall_id, {
-        $push: { issue_reports: report._id },
+        $push: { issues: issue._id },
     });
 
-    return report;
+    return issue;
 };
 
-exports.getIssueReportsForWall = async (userId, userType, wallId) => {
+exports.getIssuesForWall = async (userId, userType, wallId) => {
     if (!isValidObjectId(userId)) {
         const error = new Error("userId must be a valid ObjectId");
         error.statusCode = 400;
@@ -59,7 +58,7 @@ exports.getIssueReportsForWall = async (userId, userType, wallId) => {
 
     if (userType !== "PublicBody" && userType !== "Facility") {
         const error = new Error(
-            "Only public bodies or facilities can access issue reports for a wall",
+            "Only public bodies or facilities can access issues for a wall",
         );
         error.statusCode = 403;
         throw error;
@@ -82,36 +81,31 @@ exports.getIssueReportsForWall = async (userId, userType, wallId) => {
     const wallIdStr = wallId.toString();
     const userWallsStr = (user.walls || []).map((w) => w.toString());
 
-    // Allow access if the wall is listed in the user's `walls` array
-    // or if the wall document itself references the facility/public body
-    // as its owner (e.g., `wall.facility` for IndoorWall).
     const wallFacilityId = wall.facility ? wall.facility.toString() : null;
     if (!userWallsStr.includes(wallIdStr) && wallFacilityId !== userId) {
-        const error = new Error(
-            "You can only access reports for walls you own",
-        );
+        const error = new Error("You can only access issues for walls you own");
         error.statusCode = 403;
         throw error;
     }
 
-    const reports = await IssueReport.find({ wall_id: wallId });
-    return reports;
+    const issues = await Issue.find({ wall_id: wallId });
+    return issues;
 };
 
-exports.getIssueReportsByClimber = async (userId) => {
+exports.getIssuesByClimber = async (userId) => {
     if (!isValidObjectId(userId)) {
         const error = new Error("userId must be a valid ObjectId");
         error.statusCode = 400;
         throw error;
     }
 
-    const reports = await IssueReport.find({ climber_id: userId });
-    return reports;
+    const issues = await Issue.find({ climber_id: userId });
+    return issues;
 };
 
-exports.deleteIssueReport = async (reportId, userId) => {
-    if (!isValidObjectId(reportId)) {
-        const error = new Error("reportId must be a valid ObjectId");
+exports.deleteIssue = async (issueId, userId) => {
+    if (!isValidObjectId(issueId)) {
+        const error = new Error("issueId must be a valid ObjectId");
         error.statusCode = 400;
         throw error;
     }
@@ -122,18 +116,18 @@ exports.deleteIssueReport = async (reportId, userId) => {
         throw error;
     }
 
-    const report = await IssueReport.findById(reportId);
-    if (!report) {
-        const error = new Error("IssueReport not found");
+    const issue = await Issue.findById(issueId);
+    if (!issue) {
+        const error = new Error("Issue not found");
         error.statusCode = 404;
         throw error;
     }
 
-    if (report.climber_id.toString() !== userId) {
-        const error = new Error("You can only delete your own reports");
+    if (issue.climber_id.toString() !== userId) {
+        const error = new Error("You can only delete your own issues");
         error.statusCode = 403;
         throw error;
     }
 
-    await IssueReport.findByIdAndDelete(reportId);
+    await Issue.findByIdAndDelete(issueId);
 };

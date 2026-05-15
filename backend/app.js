@@ -12,7 +12,7 @@ var indexRouter = require("./routes/index");
 var authRouter = require("./routes/auth.routes");
 var wallRouter = require("./routes/wall.routes");
 var sessionRouter = require("./routes/session.routes");
-var reportRouter = require("./routes/report.routes");
+var issueRouter = require("./routes/issue.routes");
 
 const errorMiddleware = require("./middleware/error.middleware");
 
@@ -64,7 +64,7 @@ app.use("/", indexRouter);
 app.use("/auth", authRouter);
 app.use("/walls", wallRouter);
 app.use("/sessions", sessionRouter);
-app.use("/reports", reportRouter);
+app.use("/issues", issueRouter);
 // catch 404 and forward to error handler
 app.use(function (req, res, next) {
     next(createError(404));

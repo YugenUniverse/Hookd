@@ -1,13 +1,13 @@
 info:
-    name: delete-report
+    name: delete-issue
     type: http
     seq: 4
 
 http:
     method: DELETE
-    url: http://localhost:3000/reports/:reportId
+    url: http://localhost:3000/issues/:issueId
     params:
-        - name: reportId
+        - name: issueId
           value: 6a021092a362ceb8f7bd15fd
           type: path
     auth:

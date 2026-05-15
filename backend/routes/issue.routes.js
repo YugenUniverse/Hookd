@@ -1,12 +1,12 @@
 const express = require("express");
 const mongoose = require("mongoose");
 const { authenticateJwt } = require("../middleware/auth.middleware");
-const reportController = require("../controllers/report.controllers");
+const issueController = require("../controllers/issue.controllers");
 
 const router = express.Router();
 
 // Validation middleware
-const validateCreateReportInput = (req, res, next) => {
+const validateCreateIssueInput = (req, res, next) => {
     const { wall_id, body } = req.body;
 
     // Check required fields
@@ -47,8 +47,8 @@ const validateCreateReportInput = (req, res, next) => {
 };
 
 router.use(authenticateJwt);
-router.post("/", validateCreateReportInput, reportController.createIssueReport);
-router.get("/walls/:wallId", reportController.getIssueReportsForWall);
-router.get("/my-reports", reportController.getIssueReportsByClimber);
-router.delete("/:reportId", reportController.deleteIssueReport);
+router.post("/", validateCreateIssueInput, issueController.createIssue);
+router.get("/walls/:wallId", issueController.getIssuesForWall);
+router.get("/my-issues", issueController.getIssuesByClimber);
+router.delete("/:issueId", issueController.deleteIssue);
 module.exports = router;

@@ -68,10 +68,10 @@ const wallSchema = new mongoose.Schema(
                 ref: "ClimbingSession",
             },
         ],
-        issue_reports: [
+        issues: [
             {
                 type: mongoose.Schema.Types.ObjectId,
-                ref: "IssueReport",
+                ref: "Issue",
             },
         ],
     },
