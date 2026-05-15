@@ -9,13 +9,14 @@ var cors = require("cors");
 const connectDB = require("./db");
 const { authenticateJwt } = require("./middleware/auth.middleware");
 
-var indexRouter = require("./routes/index");
-var authRouter = require("./routes/auth.routes");
-var wallRouter = require("./routes/wall.routes");
-var reviewRouter = require("./routes/review.routes");
-var sessionRouter = require("./routes/session.routes");
-var userRouter = require("./routes/user.routes");
+const indexRouter = require("./routes/index");
+const authRouter = require("./routes/auth.routes");
+const wallRouter = require("./routes/wall.routes");
+const reviewRouter = require("./routes/review.routes");
+const sessionRouter = require("./routes/session.routes");
+const userRouter = require("./routes/user.routes");
 const climberRoutes = require("./routes/climber.routes");
+const reportRouter = require("./routes/report.routes");
 
 const errorMiddleware = require("./middleware/error.middleware");
 
@@ -74,6 +75,7 @@ app.use(authenticateJwt);
 
 app.use("/", indexRouter);
 app.use("/sessions", sessionRouter);
+app.use("/reports", reportRouter);
 // catch 404 and forward to error handler
 app.use(function (req, res, next) {
     next(createError(404));
