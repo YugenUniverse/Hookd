@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'dart:async';
 
 import '../models/user.dart';
+import '../models/review.dart';
 import '../models/wall.dart';
 import '../constants/api_config.dart';
 import 'auth_service.dart';
@@ -157,11 +158,17 @@ class ApiService {
       List<Wall> walls = [];
       if (data is List) {
         print('Response is a List with ${data.length} items');
-        walls = data.map((wall) => Wall.fromJson(wall as Map<String, dynamic>)).toList();
+        walls = data
+            .map((wall) => Wall.fromJson(wall as Map<String, dynamic>))
+            .toList();
       } else if (data is Map && data.containsKey('walls')) {
         final wallsList = data['walls'] as List;
-        print('Response is a Map with walls key, containing ${wallsList.length} items');
-        walls = wallsList.map((wall) => Wall.fromJson(wall as Map<String, dynamic>)).toList();
+        print(
+          'Response is a Map with walls key, containing ${wallsList.length} items',
+        );
+        walls = wallsList
+            .map((wall) => Wall.fromJson(wall as Map<String, dynamic>))
+            .toList();
       }
       print('Parsed ${walls.length} walls');
       for (var wall in walls) {
@@ -174,25 +181,34 @@ class ApiService {
     }
   }
 
-  Future<List<Wall>> getNearbyWalls(double lng, double lat, {double radius = 30000}) async {
+  Future<List<Wall>> getNearbyWalls(
+    double lng,
+    double lat, {
+    double radius = 30000,
+  }) async {
     try {
       print('Fetching nearby walls for lng: $lng, lat: $lat, radius: $radius');
-      final response = await _dio.get('/walls/nearby', queryParameters: {
-        'lng': lng,
-        'lat': lat,
-        'radius': radius.toInt(),
-      });
+      final response = await _dio.get(
+        '/walls/nearby',
+        queryParameters: {'lng': lng, 'lat': lat, 'radius': radius.toInt()},
+      );
       final data = response.data;
       print('getNearbyWalls response type: ${data.runtimeType}, data: $data');
 
       List<Wall> walls = [];
       if (data is List) {
         print('Response is a List with ${data.length} items');
-        walls = data.map((wall) => Wall.fromJson(wall as Map<String, dynamic>)).toList();
+        walls = data
+            .map((wall) => Wall.fromJson(wall as Map<String, dynamic>))
+            .toList();
       } else if (data is Map && data.containsKey('walls')) {
         final wallsList = data['walls'] as List;
-        print('Response is a Map with walls key, containing ${wallsList.length} items');
-        walls = wallsList.map((wall) => Wall.fromJson(wall as Map<String, dynamic>)).toList();
+        print(
+          'Response is a Map with walls key, containing ${wallsList.length} items',
+        );
+        walls = wallsList
+            .map((wall) => Wall.fromJson(wall as Map<String, dynamic>))
+            .toList();
       }
       print('Parsed ${walls.length} nearby walls');
       for (var wall in walls) {
@@ -205,17 +221,53 @@ class ApiService {
     }
   }
 
+  Future<List<Review>> getWallReviews(String wallId) async {
+    try {
+      final response = await _dio.get('/reviews/wall/$wallId');
+      final data = response.data;
+
+      final reviewsRaw = data is Map ? data['reviews'] : null;
+      if (reviewsRaw is! List) {
+        return [];
+      }
+
+      return reviewsRaw
+          .whereType<Map>()
+          .map((review) => Review.fromJson(Map<String, dynamic>.from(review)))
+          .toList();
+    } catch (e) {
+      print('Error fetching wall reviews: $e');
+      return [];
+    }
+  }
+
+  Future<Wall?> getWallById(String wallId) async {
+    try {
+      final response = await _dio.get('/walls/$wallId');
+      final data = response.data;
+      if (data is Map || data is Map<String, dynamic>) {
+        return Wall.fromJson(Map<String, dynamic>.from(data));
+      }
+      return null;
+    } catch (e) {
+      print('Error fetching wall by id: $e');
+      return null;
+    }
+  }
+
   Future<Map<String, dynamic>> createSession({
     required String wallId,
     required DateTime date,
     required int time,
     int? rating,
     String? reviewBody,
+    bool isPrivate = false,
   }) async {
     final payload = <String, dynamic>{
       'wall_id': wallId,
       'date': _formatDate(date),
       'time': time,
+      'is_private': isPrivate,
     };
 
     if (rating != null) {
@@ -244,6 +296,4 @@ class ApiService {
     final d = date.day.toString().padLeft(2, '0');
     return '$y-$m-$d';
   }
-
 }
-

@@ -1,5 +1,9 @@
-const { Wall } = require("../models/Wall");
+const mongoose = require("mongoose");
+const ClimbingSession = require("../models/ClimbingSession");
+const { Wall, IndoorWall, OutdoorWall } = require("../models/Wall");
 const { Facility, PublicBody } = require("../models/User");
+
+const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
 
 exports.createWall = async (wallData, userId, userType) => {
     let wall;
@@ -23,15 +27,27 @@ exports.createWall = async (wallData, userId, userType) => {
         error.statusCode = 403;
         throw error;
     }
-
     return wall;
 };
 
 exports.getAllWalls = async () => {
-    return await Wall.find()
+    const walls = await Wall.find()
         .populate("facility", "username email avatar")
         .populate("publicBody", "username email avatar")
         .populate("sessions");
+
+    // Ensure rating and totalSessions are up-to-date for each wall
+    for (const wall of walls) {
+        try {
+            await wall.computeRating();
+        } catch (e) {
+            // ignore compute errors and continue
+        }
+        const totalSessions = await ClimbingSession.countDocuments({ wall_id: wall._id });
+        wall._totalSessions = totalSessions;
+    }
+
+    return walls;
 };
 
 exports.getWallById = async (id) => {
@@ -45,17 +61,38 @@ exports.getWallById = async (id) => {
         error.statusCode = 404;
         throw error;
     }
+    // Recompute rating before returning to ensure up-to-date mean
+    try {
+        await wall.computeRating();
+    } catch (e) {
+        // ignore
+    }
+
+    const totalSessions = await ClimbingSession.countDocuments({ wall_id: id });
+    wall._totalSessions = totalSessions;
     return wall;
 };
+
+// getWallSessionCount removed; use Wall virtual `totalSessions` instead
 
 exports.searchWalls = async (searchQuery) => {
     const escaped = searchQuery.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-    return await Wall.find({
+    const walls = await Wall.find({
         name: { $regex: `.*${escaped}.*`, $options: "i" },
     })
         .populate("facility", "username email avatar")
         .populate("publicBody", "username email avatar");
+
+    for (const wall of walls) {
+        try {
+            await wall.computeRating();
+        } catch (e) {}
+        const totalSessions = await ClimbingSession.countDocuments({ wall_id: wall._id });
+        wall._totalSessions = totalSessions;
+    }
+
+    return walls;
 };
 
 exports.getWallsByLocation = async (lng, lat, radius) => {

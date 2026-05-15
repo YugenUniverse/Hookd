@@ -12,6 +12,7 @@ const { authenticateJwt } = require("./middleware/auth.middleware");
 var indexRouter = require("./routes/index");
 var authRouter = require("./routes/auth.routes");
 var wallRouter = require("./routes/wall.routes");
+var reviewRouter = require("./routes/review.routes");
 var sessionRouter = require("./routes/session.routes");
 
 const errorMiddleware = require("./middleware/error.middleware");
@@ -62,6 +63,7 @@ app.use(
 
 app.use("/auth", authRouter);
 app.use("/walls", wallRouter);
+app.use("/reviews", reviewRouter);
 
 // Everything after this point requires a valid access token.
 app.use(authenticateJwt);

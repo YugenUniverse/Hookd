@@ -26,6 +26,10 @@ const climbingSessionSchema = new mongoose.Schema(
             required: true,
             min: [0, "Time must be a positive number"],
         },
+        is_private: {
+            type: Boolean,
+            default: false,
+        },
         review_id: {
             type: mongoose.Schema.Types.ObjectId,
             ref: "Review",
@@ -49,6 +53,12 @@ climbingSessionSchema.methods.addReview = async function (rating, body) {
 
     this.review_id = review._id;
     await this.save();
+
+    const Wall = mongoose.models.Wall || require("./Wall").Wall;
+    const wall = await Wall.findById(this.wall_id);
+    if (wall) {
+        await wall.computeRating();
+    }
 
     return review;
 };

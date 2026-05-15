@@ -8,6 +8,7 @@ const errorMiddleware = require("../../middleware/error.middleware");
 const { User } = require("../../models/User");
 const ClimbingSession = require("../../models/ClimbingSession");
 const Review = require("../../models/Review");
+const { Wall } = require("../../models/Wall");
 
 process.env.JWT_SECRET = process.env.JWT_SECRET || "test-jwt-secret";
 
@@ -136,6 +137,53 @@ describe("sessions.routes", () => {
         expect(storedReview.climbing_session_id.toString()).toBe(
             response.body.session.id,
         );
+    });
+
+    it("POST /sessions can mark a session private while still counting it on the wall", async () => {
+        const user = await User.create({
+            email: "private-session@example.com",
+            username: "privatesession",
+            userType: "Climber",
+            name: "Private",
+            surname: "Session",
+            birthdate: new Date("1990-01-01"),
+            authMethods: ["local"],
+        });
+
+        const accessToken = createAuthToken(user);
+        const wall = await Wall.create({
+            name: "Private Wall",
+            description: "Wall for private session test",
+            location: {
+                type: "Point",
+                coordinates: [11.11, 46.07],
+            },
+            difficulty: "BEGINNER",
+        });
+
+        const response = await request(app)
+            .post("/sessions")
+            .set("Authorization", `Bearer ${accessToken}`)
+            .send({
+                wall_id: wall._id.toString(),
+                date: "2026-05-12",
+                time: 80,
+                is_private: true,
+                review: {
+                    rating: 4,
+                    body: "Hidden review",
+                },
+            });
+
+        expect(response.status).toBe(201);
+        expect(response.body.session).toEqual(
+            expect.objectContaining({
+                is_private: true,
+            }),
+        );
+
+        const storedWall = await Wall.findById(wall._id);
+        expect(storedWall.sessions).toHaveLength(1);
     });
 
     it("POST /sessions/:sessionId/reviews adds a review to an existing session", async () => {

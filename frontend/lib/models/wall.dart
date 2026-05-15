@@ -10,6 +10,8 @@ class Wall {
   final String wallType;
   final String? ownerName;
   final List<ClimbingSession> sessions;
+  final double rating;
+  final int totalSessions;
 
   Wall({
     required this.id,
@@ -21,6 +23,8 @@ class Wall {
     required this.wallType,
     this.ownerName,
     required this.sessions,
+    this.rating = 0.0,
+    this.totalSessions = 0,
   });
 
   // Compatibility with older UI code that expects `type`.
@@ -57,6 +61,24 @@ class Wall {
       }
     }
 
+    double parseRating(dynamic r) {
+      if (r == null) return 0.0;
+      if (r is num) return r.toDouble();
+      if (r is String) return double.tryParse(r) ?? 0.0;
+      return 0.0;
+    }
+
+    int parseTotalSessions(dynamic s) {
+      if (s == null) return 0;
+      if (s is int) return s;
+      if (s is num) return s.toInt();
+      if (s is String) return int.tryParse(s) ?? 0;
+      return 0;
+    }
+
+    final rating = parseRating(json['rating']);
+    final totalSessions = parseTotalSessions(json['totalSessions'] ?? json['total_sessions']);
+
     return Wall(
       id: (json['id'] ?? json['_id'] ?? '').toString(),
       name: (json['name'] ?? 'Unknown Wall').toString(),
@@ -67,6 +89,8 @@ class Wall {
       wallType: wallType,
       ownerName: owner,
       sessions: sessions,
+      rating: rating,
+      totalSessions: totalSessions,
     );
   }
 
@@ -89,6 +113,8 @@ class Wall {
       'wallType': wallType,
       'ownerName': ownerName,
       'sessions': sessions.map((session) => session.toJson()).toList(),
+      'rating': rating,
+      'totalSessions': totalSessions,
     };
   }
 }

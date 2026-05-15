@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/wall.dart';
 import '../services/api_service.dart';
@@ -27,6 +28,7 @@ class _LogSessionPageState extends State<LogSessionPage> {
   Wall? _selectedWall;
   DateTime _selectedDate = DateTime.now();
   int? _selectedRating;
+  bool _isPrivate = false;
   bool _loadingWalls = false;
   bool _submitting = false;
 
@@ -37,6 +39,30 @@ class _LogSessionPageState extends State<LogSessionPage> {
     if (initialWall != null) {
       _selectedWall = initialWall;
       _wallQueryController.text = initialWall.name;
+    }
+    _loadPrivacyPreference();
+  }
+
+  Future<void> _loadPrivacyPreference() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final isPrivate = prefs.getBool('log_session_is_private') ?? false;
+      if (mounted) {
+        setState(() {
+          _isPrivate = isPrivate;
+        });
+      }
+    } catch (_) {
+      // Silently fail, use default value
+    }
+  }
+
+  Future<void> _savePrivacyPreference(bool value) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('log_session_is_private', value);
+    } catch (_) {
+      // Silently fail
     }
   }
 
@@ -99,9 +125,9 @@ class _LogSessionPageState extends State<LogSessionPage> {
 
   Future<void> _submit() async {
     if (_selectedWall == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Select a wall first.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Select a wall first.')));
       return;
     }
 
@@ -121,6 +147,7 @@ class _LogSessionPageState extends State<LogSessionPage> {
         time: time,
         rating: _selectedRating,
         reviewBody: _reviewController.text,
+        isPrivate: _isPrivate,
       );
 
       if (!mounted) return;
@@ -130,9 +157,9 @@ class _LogSessionPageState extends State<LogSessionPage> {
       Navigator.of(context).pop();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to log session: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to log session: $e')));
     } finally {
       if (mounted) {
         setState(() {
@@ -169,10 +196,7 @@ class _LogSessionPageState extends State<LogSessionPage> {
                 style: Theme.of(context).textTheme.titleLarge,
               ),
               const SizedBox(height: 16),
-              Text(
-                'Wall',
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
+              Text('Wall', style: Theme.of(context).textTheme.titleMedium),
               const SizedBox(height: 8),
               TextField(
                 controller: _wallQueryController,
@@ -188,7 +212,8 @@ class _LogSessionPageState extends State<LogSessionPage> {
                   ),
                   border: const OutlineInputBorder(),
                 ),
-                onSubmitted: (_) => _selectedWall == null ? _searchWalls() : null,
+                onSubmitted: (_) =>
+                    _selectedWall == null ? _searchWalls() : null,
               ),
               const SizedBox(height: 8),
               if (_selectedWall != null)
@@ -238,10 +263,7 @@ class _LogSessionPageState extends State<LogSessionPage> {
                   ),
                 ),
               const SizedBox(height: 16),
-              Text(
-                'Date',
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
+              Text('Date', style: Theme.of(context).textTheme.titleMedium),
               const SizedBox(height: 8),
               OutlinedButton.icon(
                 icon: const Icon(Icons.calendar_today),
@@ -296,6 +318,24 @@ class _LogSessionPageState extends State<LogSessionPage> {
                   labelText: 'Review notes (optional)',
                   border: OutlineInputBorder(),
                 ),
+              ),
+              const SizedBox(height: 12),
+              SwitchListTile.adaptive(
+                contentPadding: EdgeInsets.zero,
+                value: _isPrivate,
+                activeColor: Theme.of(context).colorScheme.primary,
+                title: const Text('Keep session private'),
+                subtitle: const Text(
+                  'Only you will see the rating and review text. The session still counts toward the wall totals.',
+                ),
+                onChanged: _submitting
+                    ? null
+                    : (value) {
+                        setState(() {
+                          _isPrivate = value;
+                        });
+                        _savePrivacyPreference(value);
+                      },
               ),
               const SizedBox(height: 20),
               FilledButton.icon(

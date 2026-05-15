@@ -8,7 +8,7 @@ const mongoose = require("mongoose");
 
 // Validation middleware
 const validateCreateSessionInput = (req, res, next) => {
-    const { wall_id, date, time, review } = req.body;
+    const { wall_id, date, time, review, is_private } = req.body;
 
     // Check required fields
     if (!wall_id || !date || time === undefined) {
@@ -39,6 +39,12 @@ const validateCreateSessionInput = (req, res, next) => {
         });
     }
 
+    if (is_private !== undefined && typeof is_private !== "boolean") {
+        return res.status(400).json({
+            error: "is_private must be a boolean",
+        });
+    }
+
     // If review is provided, validate it
     if (review) {
         if (review.rating === undefined) {
@@ -57,7 +63,7 @@ const validateCreateSessionInput = (req, res, next) => {
 };
 
 const validateUpdateSessionInput = (req, res, next) => {
-    const { wall_id, date, time } = req.body;
+    const { wall_id, date, time, is_private } = req.body;
 
     // At least one field must be provided
     if (wall_id === undefined && date === undefined && time === undefined) {
@@ -89,6 +95,12 @@ const validateUpdateSessionInput = (req, res, next) => {
     if (time !== undefined && typeof time !== "number") {
         return res.status(400).json({
             error: "time must be a number",
+        });
+    }
+
+    if (is_private !== undefined && typeof is_private !== "boolean") {
+        return res.status(400).json({
+            error: "is_private must be a boolean",
         });
     }
 

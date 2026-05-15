@@ -6,3 +6,4 @@ firebase.env.json.example
 android/app/google-services.json
 android/.gradle/
 macos/Runner.xcodeproj/
+todo.txt
