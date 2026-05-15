@@ -3,6 +3,7 @@ import 'dart:async';
 
 import '../models/user.dart';
 import '../models/wall.dart';
+import '../models/issue_report.dart';
 import '../constants/api_config.dart';
 import 'auth_service.dart';
 
@@ -157,11 +158,17 @@ class ApiService {
       List<Wall> walls = [];
       if (data is List) {
         print('Response is a List with ${data.length} items');
-        walls = data.map((wall) => Wall.fromJson(wall as Map<String, dynamic>)).toList();
+        walls = data
+            .map((wall) => Wall.fromJson(wall as Map<String, dynamic>))
+            .toList();
       } else if (data is Map && data.containsKey('walls')) {
         final wallsList = data['walls'] as List;
-        print('Response is a Map with walls key, containing ${wallsList.length} items');
-        walls = wallsList.map((wall) => Wall.fromJson(wall as Map<String, dynamic>)).toList();
+        print(
+          'Response is a Map with walls key, containing ${wallsList.length} items',
+        );
+        walls = wallsList
+            .map((wall) => Wall.fromJson(wall as Map<String, dynamic>))
+            .toList();
       }
       print('Parsed ${walls.length} walls');
       for (var wall in walls) {
@@ -174,25 +181,34 @@ class ApiService {
     }
   }
 
-  Future<List<Wall>> getNearbyWalls(double lng, double lat, {double radius = 30000}) async {
+  Future<List<Wall>> getNearbyWalls(
+    double lng,
+    double lat, {
+    double radius = 30000,
+  }) async {
     try {
       print('Fetching nearby walls for lng: $lng, lat: $lat, radius: $radius');
-      final response = await _dio.get('/walls/nearby', queryParameters: {
-        'lng': lng,
-        'lat': lat,
-        'radius': radius.toInt(),
-      });
+      final response = await _dio.get(
+        '/walls/nearby',
+        queryParameters: {'lng': lng, 'lat': lat, 'radius': radius.toInt()},
+      );
       final data = response.data;
       print('getNearbyWalls response type: ${data.runtimeType}, data: $data');
 
       List<Wall> walls = [];
       if (data is List) {
         print('Response is a List with ${data.length} items');
-        walls = data.map((wall) => Wall.fromJson(wall as Map<String, dynamic>)).toList();
+        walls = data
+            .map((wall) => Wall.fromJson(wall as Map<String, dynamic>))
+            .toList();
       } else if (data is Map && data.containsKey('walls')) {
         final wallsList = data['walls'] as List;
-        print('Response is a Map with walls key, containing ${wallsList.length} items');
-        walls = wallsList.map((wall) => Wall.fromJson(wall as Map<String, dynamic>)).toList();
+        print(
+          'Response is a Map with walls key, containing ${wallsList.length} items',
+        );
+        walls = wallsList
+            .map((wall) => Wall.fromJson(wall as Map<String, dynamic>))
+            .toList();
       }
       print('Parsed ${walls.length} nearby walls');
       for (var wall in walls) {
@@ -238,12 +254,65 @@ class ApiService {
     throw Exception('Unexpected response while creating session');
   }
 
+  // Report endpoints
+  Future<void> createIssueReport({
+    required String wallId,
+    required String body,
+  }) async {
+    final payload = {'wall_id': wallId, 'body': body};
+    final response = await _dio.post('/reports', data: payload);
+    if (response.statusCode != 201) {
+      throw Exception('Failed to create report: ${response.statusCode}');
+    }
+  }
+
+  Future<List<IssueReport>> fetchReportsForWall(String wallId) async {
+    final response = await _dio.get('/reports/walls/$wallId');
+    final data = response.data;
+    final reportsList = <IssueReport>[];
+    if (data is Map && data['reports'] is List) {
+      for (final item in data['reports']) {
+        if (item is Map<String, dynamic>) {
+          reportsList.add(IssueReport.fromJson(item));
+        } else if (item is Map) {
+          reportsList.add(
+            IssueReport.fromJson(Map<String, dynamic>.from(item)),
+          );
+        }
+      }
+    }
+    return reportsList;
+  }
+
+  Future<List<IssueReport>> fetchReportsForUser() async {
+    final response = await _dio.get('/reports/my-reports');
+    final data = response.data;
+    final reportsList = <IssueReport>[];
+    if (data is Map && data['reports'] is List) {
+      for (final item in data['reports']) {
+        if (item is Map<String, dynamic>) {
+          reportsList.add(IssueReport.fromJson(item));
+        } else if (item is Map) {
+          reportsList.add(
+            IssueReport.fromJson(Map<String, dynamic>.from(item)),
+          );
+        }
+      }
+    }
+    return reportsList;
+  }
+
+  Future<void> deleteReport(String reportId) async {
+    final response = await _dio.delete('/reports/$reportId');
+    if (response.statusCode != 204) {
+      throw Exception('Failed to delete report: ${response.statusCode}');
+    }
+  }
+
   String _formatDate(DateTime date) {
     final y = date.year.toString().padLeft(4, '0');
     final m = date.month.toString().padLeft(2, '0');
     final d = date.day.toString().padLeft(2, '0');
     return '$y-$m-$d';
   }
-
 }
-

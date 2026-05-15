@@ -1,4 +1,5 @@
 import 'climbing_session.dart';
+import 'issue_report.dart';
 
 class Wall {
   final String id;
@@ -10,6 +11,7 @@ class Wall {
   final String wallType;
   final String? ownerName;
   final List<ClimbingSession> sessions;
+  final List<IssueReport> issueReports;
 
   Wall({
     required this.id,
@@ -21,6 +23,7 @@ class Wall {
     required this.wallType,
     this.ownerName,
     required this.sessions,
+    required this.issueReports,
   });
 
   // Compatibility with older UI code that expects `type`.
@@ -57,6 +60,18 @@ class Wall {
       }
     }
 
+    final issueReportsRaw = json['issueReports'];
+    final issueReports = <IssueReport>[];
+    if (issueReportsRaw is List) {
+      for (final item in issueReportsRaw) {
+        if (item is Map<String, dynamic>) {
+          issueReports.add(IssueReport.fromJson(item));
+        } else if (item is Map) {
+          issueReports.add(IssueReport.fromJson(Map<String, dynamic>.from(item)));
+        }
+      }
+    }
+
     return Wall(
       id: (json['id'] ?? json['_id'] ?? '').toString(),
       name: (json['name'] ?? 'Unknown Wall').toString(),
@@ -67,6 +82,7 @@ class Wall {
       wallType: wallType,
       ownerName: owner,
       sessions: sessions,
+      issueReports: issueReports,
     );
   }
 
@@ -89,6 +105,7 @@ class Wall {
       'wallType': wallType,
       'ownerName': ownerName,
       'sessions': sessions.map((session) => session.toJson()).toList(),
+      'issueReports': issueReports.map((report) => report.toJson()).toList(),
     };
   }
 }

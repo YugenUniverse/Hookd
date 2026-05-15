@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/wall.dart';
 import '../pages/log_session_page.dart';
+import '../services/api_service.dart';
 
 class WallDetailsDialog extends StatelessWidget {
   final Wall wall;
@@ -32,14 +33,18 @@ class WallDetailsDialog extends StatelessWidget {
                       wall.name,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+                      style: Theme.of(context).textTheme.headlineSmall
+                          ?.copyWith(fontWeight: FontWeight.bold),
                     ),
                   ),
                   const SizedBox(width: 8),
                   IconButton(
                     tooltip: 'Log session',
                     onPressed: () {
-                      final rootContext = Navigator.of(context, rootNavigator: true).context;
+                      final rootContext = Navigator.of(
+                        context,
+                        rootNavigator: true,
+                      ).context;
                       Navigator.of(context).pop();
                       showModalBottomSheet(
                         context: rootContext,
@@ -51,6 +56,68 @@ class WallDetailsDialog extends StatelessWidget {
                     },
                     icon: const Icon(Icons.edit_calendar_outlined),
                     color: Theme.of(context).colorScheme.primary,
+                  ),
+                  IconButton(
+                    tooltip: 'Report an issue',
+                    onPressed: () {
+                      final TextEditingController issueController =
+                          TextEditingController();
+                      showDialog(
+                        context: context,
+                        builder: (context) => StatefulBuilder(
+                          builder: (context, setState) => AlertDialog(
+                            title: const Text('Report an issue'),
+                            content: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('Report an issue for ${wall.name}.'),
+                                const SizedBox(height: 12),
+                                TextField(
+                                  controller: issueController,
+                                  maxLines: 5,
+                                  decoration: const InputDecoration(
+                                    hintText: 'Describe the issue...',
+                                    border: OutlineInputBorder(),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.of(context).pop(),
+                                child: const Text('Cancel'),
+                              ),
+                              TextButton(
+                                onPressed: () async {
+                                  final issueBody = issueController.text.trim();
+                                  if (issueBody.isNotEmpty) {
+                                    final apiService = ApiService();
+                                    final navigator = Navigator.of(context);
+                                    final messenger = ScaffoldMessenger.of(context);
+                                    await apiService.createIssueReport(
+                                      wallId: wall.id,
+                                      body: issueBody,
+                                    );
+                                    navigator.pop();
+                                    messenger.showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          'Issue report submitted.',
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                },
+                                child: const Text('Submit'),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.report_problem_outlined),
+                    color: Theme.of(context).colorScheme.error,
                   ),
                 ],
               ),
@@ -64,14 +131,22 @@ class WallDetailsDialog extends StatelessWidget {
                       Chip(
                         label: Text(
                           isIndoor ? 'Indoor Facility' : 'Outdoor Crag',
-                          style: const TextStyle(color: Colors.white, fontSize: 12),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                          ),
                         ),
                         backgroundColor: typeColor,
                       ),
                       const SizedBox(height: 16),
 
                       // Difficulty Info
-                      _buildInfoRow(context, Icons.fitness_center, 'Difficulty', wall.difficulty),
+                      _buildInfoRow(
+                        context,
+                        Icons.fitness_center,
+                        'Difficulty',
+                        wall.difficulty,
+                      ),
                       const SizedBox(height: 12),
 
                       // Owner Info
@@ -95,10 +170,18 @@ class WallDetailsDialog extends StatelessWidget {
                       // Description section
                       const Text(
                         'Description',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
                       ),
                       const SizedBox(height: 4),
-                      Text(wall.description, style: Theme.of(context).textTheme.bodyMedium?.copyWith(height: 1.4)),
+                      Text(
+                        wall.description,
+                        style: Theme.of(
+                          context,
+                        ).textTheme.bodyMedium?.copyWith(height: 1.4),
+                      ),
                     ],
                   ),
                 ),
@@ -111,10 +194,16 @@ class WallDetailsDialog extends StatelessWidget {
   }
 
   // A helper widget to keep the code clean for rows with icons and text
-  Widget _buildInfoRow(BuildContext context, IconData icon, String label, String value) {
-    final textColor = Theme.of(context).textTheme.bodyMedium?.color ?? Colors.black87;
+  Widget _buildInfoRow(
+    BuildContext context,
+    IconData icon,
+    String label,
+    String value,
+  ) {
+    final textColor =
+        Theme.of(context).textTheme.bodyMedium?.color ?? Colors.black87;
     final iconColor = Theme.of(context).iconTheme.color ?? Colors.grey;
-    
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [

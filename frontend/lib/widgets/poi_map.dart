@@ -12,7 +12,8 @@ import '../services/api_service.dart';
 import '../dialogs/wall_details_dialog.dart';
 // Conditional web geolocation helper. Uses browser API on web, stub elsewhere.
 import 'web_geo_stub.dart'
-  if (dart.library.html) 'web_geo_html.dart' as web_geo;
+    if (dart.library.html) 'web_geo_html.dart'
+    as web_geo;
 
 class WallMapController extends ChangeNotifier {
   LatLng? _target;
@@ -46,7 +47,8 @@ class _POIMapState extends State<POIMap> {
   static const double _wallLoadRadius = 30000; // Load walls within 30km
   double _currentZoom = _defaultZoom;
   LatLng? _lastMapCenter;
-  static const double _mapMoveThreshold = 2000; // Reload walls if map center moves >2km
+  static const double _mapMoveThreshold =
+      2000; // Reload walls if map center moves >2km
   static const double _focusZoom = 16.0;
   bool _skipNextMoveFetch = false;
 
@@ -60,8 +62,12 @@ class _POIMapState extends State<POIMap> {
     _currentZoom = _focusZoom;
     _lastMapCenter = target;
     _mapController.move(target, _currentZoom);
-    _fetchWallsForLocation(target.longitude, target.latitude, zoom: _currentZoom);
-    
+    _fetchWallsForLocation(
+      target.longitude,
+      target.latitude,
+      zoom: _currentZoom,
+    );
+
     // Show wall info if a wall was selected
     if (wall != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -109,9 +115,11 @@ class _POIMapState extends State<POIMap> {
     }
     final currentCenter = _mapController.camera.center;
     _currentZoom = _mapController.camera.zoom;
-    print('Map moved to: ${currentCenter.latitude}, ${currentCenter.longitude}');
+    print(
+      'Map moved to: ${currentCenter.latitude}, ${currentCenter.longitude}',
+    );
     print('Map zoom: $_currentZoom');
-    
+
     // Check if we've moved far enough to reload walls
     if (_lastMapCenter == null || _shouldReloadWalls(currentCenter)) {
       print('Reloading walls for new map center');
@@ -126,9 +134,13 @@ class _POIMapState extends State<POIMap> {
 
   bool _shouldReloadWalls(LatLng newCenter) {
     if (_lastMapCenter == null) return true;
-    
+
     // Use latlong2 Distance calculator
-    final distance = const Distance().as(LengthUnit.Meter, _lastMapCenter!, newCenter);
+    final distance = const Distance().as(
+      LengthUnit.Meter,
+      _lastMapCenter!,
+      newCenter,
+    );
     print('Distance from last load: ${distance.toStringAsFixed(0)}m');
     return distance > _mapMoveThreshold;
   }
@@ -138,11 +150,17 @@ class _POIMapState extends State<POIMap> {
     return (_wallLoadRadius * (12 / zoom)).clamp(1500.0, 80000.0);
   }
 
-  Future<void> _fetchWallsForLocation(double lng, double lat, {double? zoom}) async {
+  Future<void> _fetchWallsForLocation(
+    double lng,
+    double lat, {
+    double? zoom,
+  }) async {
     try {
       final effectiveZoom = zoom ?? _currentZoom;
       final radius = _radiusForZoom(effectiveZoom);
-      print('Fetching nearby walls for location $lng, $lat at zoom $effectiveZoom => radius ${radius.toStringAsFixed(0)}m');
+      print(
+        'Fetching nearby walls for location $lng, $lat at zoom $effectiveZoom => radius ${radius.toStringAsFixed(0)}m',
+      );
       final walls = await ApiService().getNearbyWalls(lng, lat, radius: radius);
       print('Got ${walls.length} walls for location $lng, $lat');
       setState(() {
@@ -169,7 +187,9 @@ class _POIMapState extends State<POIMap> {
     } else {
       try {
         final radius = _radiusForZoom(_currentZoom);
-        print('Fetching nearby walls at zoom $_currentZoom => radius ${radius.toStringAsFixed(0)}m');
+        print(
+          'Fetching nearby walls at zoom $_currentZoom => radius ${radius.toStringAsFixed(0)}m',
+        );
         final walls = await ApiService().getNearbyWalls(
           _userLocation!.longitude,
           _userLocation!.latitude,
@@ -199,7 +219,11 @@ class _POIMapState extends State<POIMap> {
             setState(() {
               _locating = false;
             });
-            _fetchWallsForLocation(latlng.longitude, latlng.latitude, zoom: _currentZoom);
+            _fetchWallsForLocation(
+              latlng.longitude,
+              latlng.latitude,
+              zoom: _currentZoom,
+            );
             WidgetsBinding.instance.addPostFrameCallback((_) {
               try {
                 print('Moving map to user location (web)');
@@ -215,7 +239,9 @@ class _POIMapState extends State<POIMap> {
         } catch (e) {
           print('Web geolocation attempt $attempt/$maxRetries failed: $e');
           if (attempt == maxRetries) {
-            print('Web geolocation failed after $maxRetries attempts. Using default center.');
+            print(
+              'Web geolocation failed after $maxRetries attempts. Using default center.',
+            );
             setState(() {
               _locating = false;
             });
@@ -254,7 +280,9 @@ class _POIMapState extends State<POIMap> {
         print('Geolocation attempt $attempt/$maxRetries failed: $e');
         if (attempt == maxRetries) {
           // All retries exhausted
-          print('Geolocation failed after $maxRetries attempts. Using default center.');
+          print(
+            'Geolocation failed after $maxRetries attempts. Using default center.',
+          );
           setState(() {
             _locating = false;
           });
@@ -311,7 +339,9 @@ class _POIMapState extends State<POIMap> {
   List<Marker> _buildWallMarkers() {
     print('_buildWallMarkers called with ${_walls.length} walls');
     return _walls.map((wall) {
-      print('Building marker for wall: ${wall.name} at (${wall.latitude}, ${wall.longitude})');
+      print(
+        'Building marker for wall: ${wall.name} at (${wall.latitude}, ${wall.longitude})',
+      );
       final markerColor = _getDifficultyColor(wall.difficulty);
       return Marker(
         width: 32,
@@ -411,7 +441,11 @@ class _POIMapState extends State<POIMap> {
               ),
               child: Row(
                 children: const [
-                  SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+                  SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
                   SizedBox(width: 8),
                   Text('Locating...'),
                 ],
@@ -421,7 +455,8 @@ class _POIMapState extends State<POIMap> {
 
         Positioned(
           right: 16,
-          bottom: 100, // positioned above the nav bar (which is 70px + 16px padding)
+          bottom:
+              100, // positioned above the nav bar (which is 70px + 16px padding)
           child: FloatingActionButton.small(
             heroTag: 'recenter-map',
             tooltip: 'Center on my position / Retry location',
