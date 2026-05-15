@@ -68,7 +68,9 @@ const wallSchema = new mongoose.Schema(
         discriminatorKey: "wallType",
         toJSON: {
             transform: baseWallTransform,
+            virtuals: true,
         },
+        toObject: { virtuals: true },
     },
 );
 
@@ -77,7 +79,34 @@ wallSchema.index({ name: "text" });
 
 wallSchema.methods.editWall = function (updates) {};
 
-wallSchema.methods.computeRating = function () {};
+wallSchema.methods.computeRating = async function () {
+    const ClimbingSession = mongoose.model("ClimbingSession");
+
+    const sessions = await ClimbingSession.find({
+        wall_id: this._id,
+        review_id: { $ne: null },
+    }).populate("review_id", "rating");
+
+    if (!sessions.length) {
+        this.rating = 0;
+        await this.save();
+        return this.rating;
+    }
+
+    const totalRating = sessions.reduce((sum, session) => {
+        return sum + (session.review_id?.rating || 0);
+    }, 0);
+
+    this.rating = totalRating / sessions.length;
+    await this.save();
+
+    return this.rating;
+};
+
+// Virtual for counting sessions related to this wall
+wallSchema.virtual("totalSessions").get(function () {
+    return this._totalSessions || 0;
+});
 
 wallSchema.methods.getLeadboard = function () {};
 

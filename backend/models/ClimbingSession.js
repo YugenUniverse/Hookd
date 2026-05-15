@@ -54,6 +54,12 @@ climbingSessionSchema.methods.addReview = async function (rating, body) {
     this.review_id = review._id;
     await this.save();
 
+    const Wall = mongoose.models.Wall || require("./Wall").Wall;
+    const wall = await Wall.findById(this.wall_id);
+    if (wall) {
+        await wall.computeRating();
+    }
+
     return review;
 };
 
