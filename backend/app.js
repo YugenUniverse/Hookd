@@ -14,6 +14,7 @@ var authRouter = require("./routes/auth.routes");
 var wallRouter = require("./routes/wall.routes");
 var reviewRouter = require("./routes/review.routes");
 var sessionRouter = require("./routes/session.routes");
+var userRouter = require("./routes/user.routes");
 const climberRoutes = require("./routes/climber.routes");
 
 const errorMiddleware = require("./middleware/error.middleware");
@@ -66,6 +67,7 @@ app.use("/auth", authRouter);
 app.use("/walls", wallRouter);
 app.use("/reviews", reviewRouter);
 app.use("/climbers", climberRoutes);
+app.use("/users", userRouter);
 
 // Everything after this point requires a valid access token.
 app.use(authenticateJwt);

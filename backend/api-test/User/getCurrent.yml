@@ -1,0 +1,17 @@
+info:
+  name: getCurrent
+  type: http
+  seq: 2
+
+http:
+  method: GET
+  url: http://localhost:3000/users/me
+  auth:
+    type: bearer
+    token: ""
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
