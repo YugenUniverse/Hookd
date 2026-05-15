@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'dart:async';
 
 import '../models/user.dart';
+import '../models/climbing_session.dart';
 import '../models/review.dart';
 import '../models/wall.dart';
 import '../constants/api_config.dart';
@@ -80,15 +81,49 @@ class ApiService {
     );
   }
 
-  Future<User> fetchUserProfile(String userId, {String? bearerToken}) async {
+  Future<User> fetchCurrentUserProfile({String? bearerToken}) async {
     final options = Options(headers: {});
     if (bearerToken != null && bearerToken.isNotEmpty) {
       options.headers!['Authorization'] = 'Bearer $bearerToken';
     }
-    final response = await _dio.get('/me', options: options);
-    print(bearerToken);
-    print(response.data);
-    return User.fromJson(response.data);
+    final response = await _dio.get('/users/me', options: options);
+    final data = response.data;
+
+    if (data is Map<String, dynamic>) {
+      return User.fromJson(data);
+    }
+
+    throw StateError('Unexpected /users/me response shape: ${data.runtimeType}');
+  }
+
+  Future<User> fetchUserProfile(String userId, {String? bearerToken}) async {
+    return fetchCurrentUserProfile(bearerToken: bearerToken);
+  }
+
+  Future<List<ClimbingSession>> fetchCurrentUserSessions({
+    String? bearerToken,
+  }) async {
+    final options = Options(headers: {});
+    if (bearerToken != null && bearerToken.isNotEmpty) {
+      options.headers!['Authorization'] = 'Bearer $bearerToken';
+    }
+
+    final response = await _dio.get('/sessions', options: options);
+    final data = response.data;
+
+    final sessionsRaw = data is Map ? data['sessions'] : data;
+    if (sessionsRaw is! List) {
+      throw StateError(
+        'Unexpected /sessions response shape: ${data.runtimeType}',
+      );
+    }
+
+    return sessionsRaw
+        .whereType<Map>()
+        .map((session) => ClimbingSession.fromJson(
+              Map<String, dynamic>.from(session),
+            ))
+        .toList();
   }
 
   Future<Map<String, dynamic>> checkServerHealth() async {

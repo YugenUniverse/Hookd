@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
 
-import '../dialogs/profile_dialog.dart';
 import '../dialogs/login_dialog.dart';
 import '../pages/log_session_page.dart';
 import '../pages/global_leaderboard_page.dart';
+import '../pages/user_page.dart';
 import '../services/auth_service.dart';
 import '../services/wall_service.dart';
 import '../models/wall.dart';
@@ -145,9 +145,10 @@ class _MyHomePageState extends State<MyHomePage> {
                   hint: isAuthenticated ? null : 'Login',
                   onPressed: () {
                     _runProtectedAction(() async {
-                      await showDialog(
-                        context: context,
-                        builder: (_) => const ProfileDialog(),
+                      await Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const UserPage(),
+                        ),
                       );
                     });
                   },
