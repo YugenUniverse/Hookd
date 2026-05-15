@@ -3,6 +3,8 @@ require("dotenv").config();
 const axios = require("axios");
 const mongoose = require("mongoose");
 const { Wall } = require("./models/Wall");
+const Facility = require("./models/Facility");
+const { PublicBody } = require("./models/User");
 
 const query = `
 [out:json][timeout:90];
@@ -27,10 +29,26 @@ out center tags;
 `;
 
 const pickDifficulty = (tags) => {
-  if (tags?.["climbing:bouldering"] === "yes") return "BEGINNER";
-  if (tags?.["climbing:indoor"] === "yes") return "INTERMEDIATE";
-  if (tags?.sport === "climbing") return "UNKNOWN";
-  return "INTERMEDIATE";
+  // Bouldering areas skew beginner-friendly
+  if (tags?.["climbing:boulder"] === "yes" || tags?.["climbing:bouldering"] === "yes") return "BEGINNER";
+  // Trad and multipitch require solid leading skills
+  if (tags?.["climbing:trad"] === "yes" || tags?.["climbing:multipitch"] === "yes") return "ADVANCED";
+  // Managed indoor gyms tend to have beginner-through-intermediate grades
+  if (tags?.["climbing:indoor"] === "yes" || tags?.["leisure"] === "sports_centre") return "INTERMEDIATE";
+  return "UNKNOWN";
+};
+
+// Signals checked in order of certainty. Anything not matched is OutdoorWall.
+const pickWallType = (tags) => {
+  // Explicit indoor tags
+  if (tags?.["climbing:indoor"] === "yes") return "IndoorWall";
+  if (tags?.["indoor"] === "yes" || tags?.["indoor"] === "only") return "IndoorWall";
+  if (tags?.["outdoor"] === "no") return "IndoorWall";
+  // Indoor climbing gym tagged as a sports centre
+  if (tags?.["leisure"] === "sports_centre") return "IndoorWall";
+  // Feature sits inside a building (artificial wall)
+  if (tags?.["building"] && tags?.["building"] !== "no") return "IndoorWall";
+  return "OutdoorWall";
 };
 
 const overpassEndpoints = [
@@ -78,10 +96,29 @@ async function runOverpassQuery() {
 async function main() {
   await mongoose.connect(process.env.MONGO_URI || "mongodb://localhost:27017/hookd");
 
+  // Upsert the PublicBody that will own all seeded outdoor walls
+  const regioneTrentino = await PublicBody.findOneAndUpdate(
+    { username: "regione_trentino" },
+    {
+      $set: {
+        name: "Regione Trentino",
+        description: "Autonomous Province of Trento — manages outdoor climbing areas in the Trentino region.",
+        location: { type: "Point", coordinates: [11.1217, 46.0667] },
+      },
+      $setOnInsert: {
+        email: "regione.trentino@hookd.internal",
+        username: "regione_trentino",
+      },
+    },
+    { upsert: true, new: true },
+  );
+  console.log(`PublicBody "Regione Trentino" ready (id: ${regioneTrentino._id})`);
+
   const responseData = await runOverpassQuery();
   const elements = responseData?.elements || [];
   let imported = 0;
   let skipped = 0;
+  const outdoorWallIds = [];
 
   for (const el of elements) {
     const tags = el.tags || {};
@@ -95,6 +132,7 @@ async function main() {
 
     const name = tags.name || "Unnamed climbing wall";
     const difficulty = pickDifficulty(tags);
+    const wallType = pickWallType(tags);
     const climbingType = tags["climbing:indoor"] === "yes"
       ? "indoor"
       : tags["climbing:bouldering"] === "yes"
@@ -103,37 +141,56 @@ async function main() {
           ? "sport"
           : "climbing";
 
-    await Wall.updateOne(
-      {
-        name,
-        "location.coordinates": [lon, lat],
-      },
-      {
-        $set: {
-          name,
-          description:
-            tags.description ||
-            tags["climbing:description"] ||
-            `Imported from OpenStreetMap (${climbingType})`,
-          location: {
-            type: "Point",
-            coordinates: [lon, lat],
-            address: tags.address || tags["addr:full"],
-          },
-          difficulty,
-          status: "OPEN",
-          rating: 0,
-        },
-      },
-      {
-        upsert: true,
-      },
-    );
+    const description =
+      tags.description ||
+      tags["climbing:description"] ||
+      `Imported from OpenStreetMap (${climbingType})`;
+    const location = {
+      type: "Point",
+      coordinates: [lon, lat],
+      address: tags.address || tags["addr:full"],
+    };
+    const wallFilter = { name, "location.coordinates": [lon, lat] };
+
+    if (wallType === "IndoorWall") {
+      // 1. Upsert the Facility document
+      const facilityResult = await Facility.findOneAndUpdate(
+        { name, "location.coordinates": [lon, lat] },
+        { $set: { name, description, location } },
+        { upsert: true, new: true },
+      );
+
+      // 2. Upsert the IndoorWall linked to this Facility
+      const wallResult = await Wall.findOneAndUpdate(
+        wallFilter,
+        { $set: { name, wallType, description, location, difficulty, status: "OPEN", rating: 0, facility: facilityResult._id } },
+        { upsert: true, new: true, strict: false },
+      );
+
+      // 3. Register the wall in the Facility's walls array (idempotent)
+      await Facility.updateOne(
+        { _id: facilityResult._id },
+        { $addToSet: { walls: wallResult._id } },
+      );
+    } else {
+      const wallResult = await Wall.findOneAndUpdate(
+        wallFilter,
+        { $set: { name, wallType, description, location, difficulty, status: "OPEN", rating: 0, publicBody: regioneTrentino._id } },
+        { upsert: true, new: true, strict: false },
+      );
+      outdoorWallIds.push(wallResult._id);
+    }
 
     imported += 1;
   }
 
+  // Link all outdoor walls to Regione Trentino (idempotent)
+  await PublicBody.findByIdAndUpdate(regioneTrentino._id, {
+    $addToSet: { walls: { $each: outdoorWallIds } },
+  });
+
   console.log(`Import completed: ${imported} upserted, ${skipped} skipped`);
+  console.log(`Outdoor walls linked to Regione Trentino: ${outdoorWallIds.length}`);
 }
 
 main()
