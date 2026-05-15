@@ -75,8 +75,13 @@ exports.getIssueReportsForWall = async (userId, userType, wallId) => {
     }
 
     const wallIdStr = wallId.toString();
-    const userWallsStr = user.walls.map((w) => w.toString());
-    if (!userWallsStr.includes(wallIdStr)) {
+    const userWallsStr = (user.walls || []).map((w) => w.toString());
+
+    // Allow access if the wall is listed in the user's `walls` array
+    // or if the wall document itself references the facility/public body
+    // as its owner (e.g., `wall.facility` for IndoorWall).
+    const wallFacilityId = wall.facility ? wall.facility.toString() : null;
+    if (!userWallsStr.includes(wallIdStr) && wallFacilityId !== userId) {
         const error = new Error(
             "You can only access reports for walls you own",
         );

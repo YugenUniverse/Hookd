@@ -1,5 +1,5 @@
 const mongoose = require("mongoose");
-const IssueReport = require("../../models/IssueReport");
+const { IssueReport } = require("../../models/IssueReport");
 
 jest.setTimeout(30000);
 
