@@ -4,16 +4,19 @@ const mongoose = require("mongoose");
 const wallRoutes = require("../../routes/wall.routes");
 const errorMiddleware = require("../../middleware/error.middleware");
 const { Wall, IndoorWall } = require("../../models/Wall");
-const { User, Facility } = require("../../models/User");
+const { User } = require("../../models/User");
+const Facility = require("../../models/Facility");
 const ClimbingSession = require("../../models/ClimbingSession");
 
 jest.setTimeout(30000);
 
+const MOCK_USER_ID = "60d5ecdec021f13528e01369";
+
 jest.mock("../../middleware/auth.middleware", () => ({
     authenticateJwt: (req, res, next) => {
         req.user = {
-            id: "60d5ecdec021f13528e01369",
-            userType: "Facility",
+            id: MOCK_USER_ID,
+            userType: "FacilityOwner",
         };
         next();
     },
@@ -38,19 +41,16 @@ describe("Wall Routes", () => {
     });
 
     beforeEach(async () => {
-        const mockId = "60d5ecdec021f13528e01369";
-
         testFacility = await Facility.create({
-            _id: mockId, // 👈 Force the ID to match the Mock
-            email: "facility@test.com",
-            username: "testfacility",
             name: "Test Gym",
             location: { coordinates: [11.12, 46.06] },
+            ownerAccount: MOCK_USER_ID,
         });
     });
 
     afterEach(async () => {
         await Wall.deleteMany({});
+        await Facility.deleteMany({});
         await User.deleteMany({});
         await ClimbingSession.deleteMany({});
     });
@@ -113,7 +113,7 @@ describe("Wall Routes", () => {
     });
 
     describe("POST /walls", () => {
-        it("should create a new wall for a Facility", async () => {
+        it("should create a new wall and add it to the facility's walls array", async () => {
             const wallData = {
                 name: "New Gym Wall",
                 difficulty: "BEGINNER",
@@ -125,7 +125,6 @@ describe("Wall Routes", () => {
             expect(res.status).toBe(201);
             expect(res.body.wall.name).toBe("New Gym Wall");
 
-            // Check if wall was added to facility array
             const updatedFacility = await Facility.findById(testFacility._id);
             expect(updatedFacility.walls.length).toBe(1);
         });
@@ -163,19 +162,23 @@ describe("Wall Routes", () => {
     });
 
     describe("DELETE /walls/:id", () => {
-        it("should delete the wall and remove from owner's list", async () => {
+        it("should delete the wall and remove it from the facility's walls array", async () => {
             const wall = await IndoorWall.create({
                 name: "Wall to Delete",
                 difficulty: "BEGINNER",
                 location: { coordinates: [0, 0] },
                 facility: testFacility._id,
             });
+            await Facility.findByIdAndUpdate(testFacility._id, { $push: { walls: wall._id } });
 
             const res = await request(app).delete(`/walls/${wall._id}`);
             expect(res.status).toBe(200);
 
             const deletedWall = await Wall.findById(wall._id);
             expect(deletedWall).toBeNull();
+
+            const updatedFacility = await Facility.findById(testFacility._id);
+            expect(updatedFacility.walls).not.toContainEqual(wall._id);
         });
     });
 });

@@ -53,6 +53,16 @@ exports.getCurrentUser = async (req, res, next) => {
             throw error;
         }
 
+        if (user.userType === "FacilityOwner" && user.facility) {
+            await user.populate({
+                path: "facility",
+                populate: {
+                    path: "walls",
+                    select: "name description difficulty status rating wallType",
+                },
+            });
+        }
+
         res.status(200).json(user.toJSON());
     } catch (err) {
         next(err);

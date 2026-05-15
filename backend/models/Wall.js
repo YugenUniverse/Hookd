@@ -12,6 +12,8 @@ const baseWallTransform = (doc, ret) => {
     ret.id = ret._id;
     delete ret._id;
     delete ret.__v;
+    // wallType is absent on legacy seeded docs; default to OutdoorWall (all legacy walls are outdoor)
+    ret.wallType = ret.wallType || 'OutdoorWall';
     return ret;
 };
 
