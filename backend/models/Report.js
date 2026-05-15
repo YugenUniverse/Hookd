@@ -38,19 +38,25 @@ const reportSchema = new mongoose.Schema(
                 totalReviews: Number, // The total number of reviews left.
                 // A breakdown of how many 1, 2, 3, 4, and 5-star reviews were given.
                 distribution: [
-                    {
-                        stars: Number,
-                        count: Number,
-                    },
+                    new mongoose.Schema(
+                        {
+                            stars: Number,
+                            count: Number,
+                        },
+                        { _id: false },
+                    ),
                 ],
             },
             trends: {
                 // A time-series array tracking the number of sessions per day for the last 30 days.
                 last30Days: [
-                    {
-                        date: String,
-                        sessions: Number,
-                    },
+                    new mongoose.Schema(
+                        {
+                            date: String,
+                            sessions: Number,
+                        },
+                        { _id: false },
+                    ),
                 ],
             },
         },
