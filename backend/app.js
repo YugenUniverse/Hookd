@@ -65,13 +65,13 @@ app.use(
 app.use("/auth", authRouter);
 app.use("/walls", wallRouter);
 app.use("/reviews", reviewRouter);
+app.use("/climbers", climberRoutes);
 
 // Everything after this point requires a valid access token.
 app.use(authenticateJwt);
 
 app.use("/", indexRouter);
 app.use("/sessions", sessionRouter);
-app.use("/climbers", climberRoutes);
 // catch 404 and forward to error handler
 app.use(function (req, res, next) {
     next(createError(404));
