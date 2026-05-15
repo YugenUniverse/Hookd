@@ -1,14 +1,5 @@
 const mongoose = require("mongoose");
-const { User } = require("../models/User");
-
-const selectPublicProjection = {
-    username: 1,
-    avatar: 1,
-    userType: 1,
-    bio: 1,
-    description: 1,
-    location: 1,
-};
+const userService = require("../services/user.service");
 
 exports.getPublicUserById = async (req, res, next) => {
     try {
@@ -20,7 +11,7 @@ exports.getPublicUserById = async (req, res, next) => {
             throw error;
         }
 
-        const user = await User.findById(id).select(selectPublicProjection).lean();
+        const user = await userService.getPublicUserById(id);
 
         if (!user) {
             const error = new Error("User not found");
@@ -54,7 +45,7 @@ exports.getCurrentUser = async (req, res, next) => {
             throw error;
         }
 
-        const user = await User.findById(req.user.id);
+        const user = await userService.getUserById(req.user.id);
 
         if (!user) {
             const error = new Error("User not found");
