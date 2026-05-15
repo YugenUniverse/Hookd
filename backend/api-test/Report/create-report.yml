@@ -1,0 +1,24 @@
+info:
+    name: create-report
+    type: http
+    seq: 1
+
+http:
+    method: POST
+    url: http://localhost:3000/reports
+    body:
+        type: json
+        data: |-
+            {
+              "wall_id": "6a021092a362ceb8f7bd15fd",
+              "body": "This wall has a broken hold"
+            }
+    auth:
+        type: bearer
+        token:
+
+settings:
+    encodeUrl: true
+    timeout: 0
+    followRedirects: true
+    maxRedirects: 5
