@@ -1,5 +1,7 @@
-const { Wall } = require("../models/Wall");
+const mongoose = require("mongoose");
+const { Wall, IndoorWall, OutdoorWall } = require("../models/Wall");
 const { Facility, PublicBody } = require("../models/User");
+const ClimbingSession = require("../models/ClimbingSession");
 
 exports.createWall = async (wallData, userId, userType) => {
     let wall;
@@ -107,4 +109,158 @@ exports.deleteWall = async (id, userId, userType) => {
         });
     }
     await wall.deleteOne();
+};
+
+const getSeasonData = (offset = 0) => {
+    const now = new Date();
+
+    const currentQuarter = Math.floor(now.getMonth() / 3);
+    const totalQuarters =
+        now.getFullYear() * 4 + currentQuarter + parseInt(offset);
+
+    const targetYear = Math.floor(totalQuarters / 4);
+    const targetQuarter = totalQuarters % 4;
+
+    const startDate = new Date(targetYear, targetQuarter * 3, 1);
+    const endDate = new Date(targetYear, (targetQuarter + 1) * 3, 1);
+
+    const seasonNames = ["Winter", "Spring", "Summer", "Fall"];
+
+    return {
+        name: `${seasonNames[targetQuarter]} Season ${targetYear}`,
+        startDate,
+        endDate,
+        isHistorical: offset < 0,
+    };
+};
+
+exports.getWallLeaderboard = async (wallId, limit = 50, offset = 0) => {
+    if (!mongoose.Types.ObjectId.isValid(wallId)) {
+        const error = new Error("Invalid wall id");
+        error.statusCode = 400;
+        throw error;
+    }
+
+    const targetSeason = getSeasonData(offset);
+
+    const result = await ClimbingSession.aggregate([
+        {
+            $match: {
+                wall_id: new mongoose.Types.ObjectId(wallId),
+            },
+        },
+        {
+            $facet: {
+                wallStats: [
+                    { $group: { _id: null, averageTime: { $avg: "$time" } } },
+                ],
+
+                climberStats: [
+                    {
+                        $match: {
+                            date: {
+                                $gte: targetSeason.startDate,
+                                $lt: targetSeason.endDate,
+                            },
+                        },
+                    },
+                    {
+                        $group: {
+                            _id: "$climber_id",
+                            totalAscents: { $sum: 1 },
+                            bestTime: { $min: "$time" },
+                        },
+                    },
+                    {
+                        $lookup: {
+                            from: "users",
+                            localField: "_id",
+                            foreignField: "_id",
+                            as: "climberInfo",
+                        },
+                    },
+                    { $unwind: "$climberInfo" },
+                    {
+                        $project: {
+                            id: "$_id",
+                            username: "$climberInfo.username",
+                            avatar: "$climberInfo.avatar",
+                            totalAscents: 1,
+                            bestTime: 1,
+                        },
+                    },
+                    { $sort: { totalAscents: -1, bestTime: 1 } },
+                    { $limit: parseInt(limit) },
+                ],
+            },
+        },
+    ]);
+
+    const averageTime = result[0].wallStats[0]?.averageTime || 0;
+    const rawLeaderboard = result[0].climberStats;
+
+    if (rawLeaderboard.length === 0) {
+        return {
+            seasonName: targetSeason.name,
+            isHistorical: targetSeason.isHistorical,
+            daysRemaining: 0,
+            averageTime: Math.round(averageTime),
+            leaderboard: [],
+        };
+    }
+
+    let maxAscents = 0;
+    let minTime = Infinity;
+
+    rawLeaderboard.forEach((climber) => {
+        if (climber.totalAscents > maxAscents)
+            maxAscents = climber.totalAscents;
+        if (climber.bestTime && climber.bestTime < minTime)
+            minTime = climber.bestTime;
+    });
+
+    const leaderboard = rawLeaderboard.map((climber) => {
+        const badges = [];
+        let score = 0;
+
+        score += climber.totalAscents * 50;
+
+        if (averageTime > 0 && climber.bestTime < averageTime) {
+            const percentFaster =
+                ((averageTime - climber.bestTime) / averageTime) * 100;
+            const outlierBonus = Math.round(percentFaster * 10);
+            score += outlierBonus;
+        }
+
+        if (climber.totalAscents === maxAscents) badges.push("WALL_MASTER");
+        if (climber.bestTime === minTime) badges.push("SPEED_DEMON");
+
+        return {
+            id: climber.id.toString(),
+            username: climber.username,
+            avatar: climber.avatar,
+            totalAscents: climber.totalAscents,
+            bestTime: climber.bestTime,
+            score: score,
+            badges: badges,
+        };
+    });
+
+    leaderboard.sort((a, b) => b.score - a.score);
+
+    let daysRemaining = 0;
+    if (!targetSeason.isHistorical) {
+        const msPerDay = 1000 * 60 * 60 * 24;
+        daysRemaining = Math.ceil(
+            (targetSeason.endDate - new Date()) / msPerDay,
+        );
+    }
+
+    return {
+        seasonName: targetSeason.name,
+        isHistorical: targetSeason.isHistorical,
+        daysRemaining: daysRemaining,
+        averageTime: Math.round(averageTime),
+        leaderboard,
+    };
 };
