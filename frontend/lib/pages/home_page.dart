@@ -152,9 +152,9 @@ class _MyHomePageState extends State<MyHomePage> {
                         'PublicBody' => const PublicBodyPage(),
                         _ => const UserPage(),
                       };
-                      await Navigator.of(context).push(
-                        MaterialPageRoute(builder: (_) => page),
-                      );
+                      await Navigator.of(
+                        context,
+                      ).push(MaterialPageRoute(builder: (_) => page));
                     });
                   },
                 ),
@@ -202,6 +202,7 @@ class _WallSearchSheetState extends State<_WallSearchSheet> {
       ownerName: poi.ownerName,
       sessions: [],
       rating: poi.rating,
+      issues: [],
     );
 
     final rootContext = Navigator.of(context, rootNavigator: true).context;
@@ -247,7 +248,11 @@ class _WallSearchSheetState extends State<_WallSearchSheet> {
       final results = await ApiService().searchPois(query);
       if (mounted) setState(() => _results = results);
     } catch (e) {
-      if (mounted) setState(() { _error = e.toString(); _results = []; });
+      if (mounted)
+        setState(() {
+          _error = e.toString();
+          _results = [];
+        });
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -258,18 +263,21 @@ class _WallSearchSheetState extends State<_WallSearchSheet> {
     if (poi is FacilityPoi) {
       widget.mapController.focusOnFacility(poi);
     } else if (poi is OutdoorWallPoi) {
-      widget.mapController.focusOnWall(Wall(
-        id: poi.id,
-        name: poi.name,
-        latitude: poi.latitude,
-        longitude: poi.longitude,
-        description: poi.description,
-        difficulty: poi.difficulty,
-        wallType: 'OutdoorWall',
-        ownerName: poi.ownerName,
-        sessions: [],
-        rating: poi.rating,
-      ));
+      widget.mapController.focusOnWall(
+        Wall(
+          id: poi.id,
+          name: poi.name,
+          latitude: poi.latitude,
+          longitude: poi.longitude,
+          description: poi.description,
+          difficulty: poi.difficulty,
+          wallType: 'OutdoorWall',
+          ownerName: poi.ownerName,
+          sessions: [],
+          rating: poi.rating,
+          issues: [],
+        ),
+      );
     }
   }
 
@@ -317,7 +325,9 @@ class _WallSearchSheetState extends State<_WallSearchSheet> {
             else if (_results.isEmpty)
               const Padding(
                 padding: EdgeInsets.only(top: 12),
-                child: Text('Type a name to search for facilities and outdoor walls.'),
+                child: Text(
+                  'Type a name to search for facilities and outdoor walls.',
+                ),
               )
             else
               Expanded(
@@ -332,12 +342,16 @@ class _WallSearchSheetState extends State<_WallSearchSheet> {
                       child: ListTile(
                         leading: CircleAvatar(
                           child: Icon(
-                            facilityPoi != null ? Icons.domain : Icons.landscape,
+                            facilityPoi != null
+                                ? Icons.domain
+                                : Icons.landscape,
                           ),
                         ),
                         title: Text(poi.name),
                         subtitle: facilityPoi != null
-                            ? Text('Indoor Facility • ${facilityPoi.walls.length} wall${facilityPoi.walls.length == 1 ? '' : 's'}')
+                            ? Text(
+                                'Indoor Facility • ${facilityPoi.walls.length} wall${facilityPoi.walls.length == 1 ? '' : 's'}',
+                              )
                             : Text('${outdoorPoi!.difficulty} • Outdoor Wall'),
                         trailing: outdoorPoi != null
                             ? IconButton(
@@ -355,12 +369,15 @@ class _WallSearchSheetState extends State<_WallSearchSheet> {
                                         child: Icon(
                                           Icons.lock_outline,
                                           size: 11,
-                                          color: Theme.of(context).colorScheme.primary,
+                                          color: Theme.of(
+                                            context,
+                                          ).colorScheme.primary,
                                         ),
                                       ),
                                   ],
                                 ),
-                                onPressed: () => _handleLogOutdoorWall(outdoorPoi),
+                                onPressed: () =>
+                                    _handleLogOutdoorWall(outdoorPoi),
                               )
                             : null,
                         onTap: () => _selectPoi(poi),

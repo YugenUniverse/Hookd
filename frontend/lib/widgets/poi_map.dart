@@ -376,24 +376,25 @@ class _POIMapState extends State<POIMap> {
         useSafeArea: true,
         showDragHandle: true,
         context: context,
-        builder: (context) => FacilityDetailsDialog(
-          facility: poi,
-          onChanged: _fetchPois,
-        ),
+        builder: (context) =>
+            FacilityDetailsDialog(facility: poi, onChanged: _fetchPois),
       );
     } else if (poi is OutdoorWallPoi) {
-      _showWallDetails(Wall(
-        id: poi.id,
-        name: poi.name,
-        latitude: poi.latitude,
-        longitude: poi.longitude,
-        description: poi.description,
-        difficulty: poi.difficulty,
-        wallType: 'OutdoorWall',
-        ownerName: poi.ownerName,
-        sessions: [],
-        rating: poi.rating,
-      ));
+      _showWallDetails(
+        Wall(
+          id: poi.id,
+          name: poi.name,
+          latitude: poi.latitude,
+          longitude: poi.longitude,
+          description: poi.description,
+          difficulty: poi.difficulty,
+          wallType: 'OutdoorWall',
+          ownerName: poi.ownerName,
+          sessions: [],
+          rating: poi.rating,
+          issues: [],
+        ),
+      );
     }
   }
 
@@ -404,7 +405,8 @@ class _POIMapState extends State<POIMap> {
       useSafeArea: true,
       showDragHandle: true,
       context: context,
-      builder: (context) => WallDetailsDialog(wall: wall, onChanged: _fetchPois),
+      builder: (context) =>
+          WallDetailsDialog(wall: wall, onChanged: _fetchPois),
     );
   }
 

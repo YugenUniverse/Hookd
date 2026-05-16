@@ -141,17 +141,22 @@ class _WallDetailsDialogState extends State<WallDetailsDialog> {
 
   bool get _isOwner {
     final userType = AuthService().userType;
-    if (userType == 'FacilityOwner' && _wall.wallType == 'IndoorWall') return true;
-    if (userType == 'PublicBody' && _wall.wallType == 'OutdoorWall') return true;
+    if (userType == 'FacilityOwner' && _wall.wallType == 'IndoorWall')
+      return true;
+    if (userType == 'PublicBody' && _wall.wallType == 'OutdoorWall')
+      return true;
     return false;
   }
 
   Future<void> _showEditDialog() async {
     final wall = _wall;
-    final result = await showDialog<({String name, String description, String difficulty})>(
-      context: context,
-      builder: (_) => _EditWallDialog(wall: wall),
-    );
+    final result =
+        await showDialog<
+          ({String name, String description, String difficulty})
+        >(
+          context: context,
+          builder: (_) => _EditWallDialog(wall: wall),
+        );
     if (result == null || !mounted) return;
 
     final ok = await ApiService().updateWall(
@@ -176,14 +181,17 @@ class _WallDetailsDialogState extends State<WallDetailsDialog> {
           sessions: wall.sessions,
           rating: wall.rating,
           totalSessions: wall.totalSessions,
+          issues: wall.issues,
         );
       });
       widget.onChanged?.call();
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Wall updated')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Wall updated')));
     } else {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Failed to update wall')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Failed to update wall')));
     }
   }
 
@@ -194,7 +202,9 @@ class _WallDetailsDialogState extends State<WallDetailsDialog> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Delete wall?'),
-        content: Text('This will permanently delete "${_wall.name}". This cannot be undone.'),
+        content: Text(
+          'This will permanently delete "${_wall.name}". This cannot be undone.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
@@ -218,7 +228,9 @@ class _WallDetailsDialogState extends State<WallDetailsDialog> {
       Navigator.of(context).pop();
       messenger.showSnackBar(const SnackBar(content: Text('Wall deleted')));
     } else {
-      messenger.showSnackBar(const SnackBar(content: Text('Failed to delete wall')));
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Failed to delete wall')),
+      );
     }
   }
 
@@ -829,7 +841,11 @@ class _EditWallDialogState extends State<_EditWallDialog> {
   late String _difficulty;
 
   static const _options = [
-    'UNKNOWN', 'BEGINNER', 'INTERMEDIATE', 'ADVANCED', 'EXPERT',
+    'UNKNOWN',
+    'BEGINNER',
+    'INTERMEDIATE',
+    'ADVANCED',
+    'EXPERT',
   ];
 
   @override
@@ -852,8 +868,9 @@ class _EditWallDialogState extends State<_EditWallDialog> {
   void _confirm() {
     final name = _nameCtrl.text.trim();
     if (name.isEmpty) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Name cannot be empty')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Name cannot be empty')));
       return;
     }
     Navigator.of(context).pop((
@@ -889,7 +906,9 @@ class _EditWallDialogState extends State<_EditWallDialog> {
               items: _options
                   .map((d) => DropdownMenuItem(value: d, child: Text(d)))
                   .toList(),
-              onChanged: (v) { if (v != null) setState(() => _difficulty = v); },
+              onChanged: (v) {
+                if (v != null) setState(() => _difficulty = v);
+              },
             ),
           ],
         ),
@@ -899,10 +918,7 @@ class _EditWallDialogState extends State<_EditWallDialog> {
           onPressed: () => Navigator.of(context).pop(null),
           child: const Text('Cancel'),
         ),
-        FilledButton(
-          onPressed: _confirm,
-          child: const Text('Apply'),
-        ),
+        FilledButton(onPressed: _confirm, child: const Text('Apply')),
       ],
     );
   }
