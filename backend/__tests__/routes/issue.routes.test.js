@@ -67,6 +67,10 @@ describe("issue.routes", () => {
                 username: "facilityuser",
                 userType: "Facility",
                 name: "Test Facility",
+                    location: {
+                        type: "Point",
+                        coordinates: [10.5, 20.5],
+                    },
                 authMethods: ["local"],
             });
 
@@ -254,6 +258,10 @@ describe("issue.routes", () => {
                 username: "facilityuser",
                 userType: "Facility",
                 name: "Test Facility",
+                    location: {
+                        type: "Point",
+                        coordinates: [10.5, 20.5],
+                    },
                 authMethods: ["local"],
             });
 
@@ -293,6 +301,10 @@ describe("issue.routes", () => {
                 username: "facilityuser",
                 userType: "Facility",
                 name: "Test Facility",
+                    location: {
+                        type: "Point",
+                        coordinates: [10.5, 20.5],
+                    },
                 authMethods: ["local"],
             });
 
@@ -370,6 +382,10 @@ describe("issue.routes", () => {
                 username: "facilityuser",
                 userType: "Facility",
                 name: "Test Facility",
+                    location: {
+                        type: "Point",
+                        coordinates: [10.5, 20.5],
+                    },
                 authMethods: ["local"],
             });
 
@@ -403,6 +419,10 @@ describe("issue.routes", () => {
                 username: "facility1user",
                 userType: "Facility",
                 name: "Test Facility 1",
+                    location: {
+                        type: "Point",
+                        coordinates: [10.5, 20.5],
+                    },
                 authMethods: ["local"],
             });
 
@@ -411,6 +431,10 @@ describe("issue.routes", () => {
                 username: "facility2user",
                 userType: "Facility",
                 name: "Test Facility 2",
+                    location: {
+                        type: "Point",
+                        coordinates: [10.5, 20.5],
+                    },
                 authMethods: ["local"],
             });
 
@@ -446,6 +470,10 @@ describe("issue.routes", () => {
                 username: "facilityuser",
                 userType: "Facility",
                 name: "Test Facility",
+                    location: {
+                        type: "Point",
+                        coordinates: [10.5, 20.5],
+                    },
                 authMethods: ["local"],
             });
 
@@ -484,6 +512,10 @@ describe("issue.routes", () => {
                 username: "facilityuser",
                 userType: "Facility",
                 name: "Test Facility",
+                    location: {
+                        type: "Point",
+                        coordinates: [10.5, 20.5],
+                    },
                 authMethods: ["local"],
             });
 
@@ -506,6 +538,10 @@ describe("issue.routes", () => {
                 username: "facilityuser",
                 userType: "Facility",
                 name: "Test Facility",
+                    location: {
+                        type: "Point",
+                        coordinates: [10.5, 20.5],
+                    },
                 authMethods: ["local"],
             });
 
@@ -536,6 +572,10 @@ describe("issue.routes", () => {
                 username: "facilityuser",
                 userType: "Facility",
                 name: "Test Facility",
+                    location: {
+                        type: "Point",
+                        coordinates: [10.5, 20.5],
+                    },
                 authMethods: ["local"],
             });
 
@@ -642,6 +682,10 @@ describe("issue.routes", () => {
                 username: "facilityuser",
                 userType: "Facility",
                 name: "Test Facility",
+                    location: {
+                        type: "Point",
+                        coordinates: [10.5, 20.5],
+                    },
                 authMethods: ["local"],
             });
 
@@ -703,6 +747,10 @@ describe("issue.routes", () => {
                 username: "facilityuser",
                 userType: "Facility",
                 name: "Test Facility",
+                    location: {
+                        type: "Point",
+                        coordinates: [10.5, 20.5],
+                    },
                 authMethods: ["local"],
             });
 
