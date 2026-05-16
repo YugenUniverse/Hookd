@@ -63,18 +63,21 @@ class _ReportListPageState extends State<ReportListPage> {
                 child: FutureBuilder<List<dynamic>>(
                   future: widget.reportService.getFacilityWalls(),
                   builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting)
+                    if (snapshot.connectionState == ConnectionState.waiting) {
                       return const Center(child: CircularProgressIndicator());
-                    if (snapshot.hasError)
+                    }
+                    if (snapshot.hasError) {
                       return const Center(
                         child: Text('Error downloading wall profiles.'),
                       );
-                    if (!snapshot.hasData || snapshot.data!.isEmpty)
+                    }
+                    if (!snapshot.hasData || snapshot.data!.isEmpty) {
                       return const Center(
                         child: Text(
                           'No active walls found. Create a wall profile first.',
                         ),
                       );
+                    }
 
                     final walls = snapshot.data!;
                     return ListView.builder(
@@ -85,9 +88,9 @@ class _ReportListPageState extends State<ReportListPage> {
                         final wallName = wall['name'] ?? 'Unnamed Wall';
 
                         return ListTile(
-                          leading: const Icon(
+                          leading: Icon(
                             Icons.terrain_rounded,
-                            color: Colors.blueAccent,
+                            color: Theme.of(context).colorScheme.primary,
                           ),
                           title: Text(
                             wallName,
@@ -133,19 +136,19 @@ class _ReportListPageState extends State<ReportListPage> {
         onPressed: _openNewReportSelector,
         icon: const Icon(Icons.add),
         label: const Text('New Report'),
-        backgroundColor: Colors.blueAccent,
-        foregroundColor: Colors.white,
       ),
 
       body: FutureBuilder<List<Report>>(
         future: _futureSavedReports,
         builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting)
+          if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
-          if (snapshot.hasError)
+          }
+          if (snapshot.hasError) {
             return const Center(
               child: Text('Failed to load performance archive.'),
             );
+          }
           if (!snapshot.hasData || snapshot.data!.isEmpty) {
             return const Center(
               child: Text(

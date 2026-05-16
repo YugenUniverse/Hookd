@@ -1,4 +1,4 @@
-const baseUrl = 'http://127.0.0.1:3000';
+const baseUrl = 'http://${String.fromEnvironment('BACKEND_URL', defaultValue: 'localhost:3000')}';
 
 class ApiConfig {
   // Main API base URL

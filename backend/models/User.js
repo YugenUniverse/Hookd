@@ -51,9 +51,9 @@ const User = mongoose.model("User", userSchema);
 // --- CLIMBER ---
 const climberSchema = new mongoose.Schema(
     {
-        name: { type: String, required: true, trim: true },
-        surname: { type: String, required: true, trim: true },
-        birthdate: { type: Date, required: true },
+        name: { type: String, trim: true },
+        surname: { type: String, trim: true },
+        birthdate: { type: Date },
         bio: {
             type: String,
             default: "",

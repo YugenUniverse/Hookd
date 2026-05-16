@@ -136,7 +136,11 @@ class _FacilityDetailsDialogState extends State<FacilityDetailsDialog> {
               children: [
                 Row(
                   children: [
-                    const Icon(Icons.domain, color: Colors.blueGrey, size: 28),
+                    Icon(
+                      Icons.domain,
+                      color: Theme.of(context).colorScheme.primary,
+                      size: 28,
+                    ),
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(

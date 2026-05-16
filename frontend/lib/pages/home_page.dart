@@ -113,7 +113,7 @@ class _MyHomePageState extends State<MyHomePage> {
           borderRadius: BorderRadius.circular(18),
           color: Theme.of(context).colorScheme.surface,
           child: SizedBox(
-            height: 70,
+            height: 84,
             child: Row(
               children: [
                 _NavItem(
@@ -252,11 +252,12 @@ class _WallSearchSheetState extends State<_WallSearchSheet> {
       final results = await ApiService().searchPois(query);
       if (mounted) setState(() => _results = results);
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         setState(() {
           _error = e.toString();
           _results = [];
         });
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -426,21 +427,21 @@ class _NavItem extends StatelessWidget {
         borderRadius: BorderRadius.circular(14),
         onTap: onTap ?? onPressed,
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 6),
+          padding: const EdgeInsets.symmetric(vertical: 10),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             mainAxisSize: MainAxisSize.min,
             children: [
               Tooltip(
                 message: tooltip ?? '',
-                child: Icon(icon, color: color, size: 24),
+                child: Icon(icon, color: color, size: 28),
               ),
               if (label != null) ...[
-                const SizedBox(height: 1),
+                const SizedBox(height: 2),
                 Text(
                   label!,
                   style: TextStyle(
-                    fontSize: 11,
+                    fontSize: 12,
                     fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
                     color: color,
                   ),

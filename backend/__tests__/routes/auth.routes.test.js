@@ -198,6 +198,28 @@ describe("auth.routes", () => {
                 error: expect.stringContaining("User already exists"),
             });
         });
+
+        it("POST /auth/register succeeds with optional name, surname, birthdate", async () => {
+            const minimalPayload = {
+                email: "minimal@example.com",
+                username: "minimal",
+                password: "Minimal123!",
+                userType: "Climber",
+            };
+
+            const response = await request(app)
+                .post("/auth/register")
+                .send(minimalPayload);
+
+            expect(response.status).toBe(201);
+            expect(response.body).toEqual({
+                message: "User created",
+                user: expect.objectContaining({
+                    id: expect.any(String),
+                    email: "minimal@example.com",
+                }),
+            });
+        });
     });
 
     describe("Login validation", () => {

@@ -57,10 +57,7 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
                 // HEADER
                 Text(
                   report.title,
-                  style: const TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 16),
 
@@ -126,7 +123,7 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
                 // RATINGS CHART
                 const Text(
                   'Quality Distribution',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 16),
 
@@ -142,7 +139,7 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
                 // RECENT FEEDBACK
                 const Text(
                   'Recent Feedback',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 12),
                 if (data.recentFeedback.isEmpty)
@@ -176,7 +173,7 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
                 // TRENDS SWITCHER SECTION
                 const Text(
                   'Traffic & Trends',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 16),
 
@@ -240,31 +237,29 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
     String title,
     String value,
     IconData icon, {
-    Color color = Colors.blue,
+    Color? color,
   }) {
-    final textColor = Theme.of(context).colorScheme.onSurfaceVariant;
-    final red = color.r.round();
-    final green = color.g.round();
-    final blue = color.b.round();
+    final colorScheme = Theme.of(context).colorScheme;
+    final effectiveColor = color ?? colorScheme.primary;
+    final textColor = colorScheme.onSurfaceVariant;
 
     return Container(
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        color: Color.fromRGBO(red, green, blue, 0.1),
+        color: effectiveColor.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Color.fromRGBO(red, green, blue, 0.3)),
+        border: Border.all(color: effectiveColor.withValues(alpha: 0.3)),
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon, color: color, size: 26),
+          Icon(icon, color: effectiveColor, size: 26),
           const SizedBox(height: 6),
           Text(
             value,
-            style: TextStyle(
-              fontSize: 22,
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
               fontWeight: FontWeight.bold,
-              color: color,
+              color: effectiveColor,
             ),
           ),
           const SizedBox(height: 2),
@@ -491,7 +486,7 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
   }
 
   Widget _buildTrafficLineChart(BuildContext context, List<dynamic> trends) {
-    if (trends.isEmpty) return const Center(child: Text('Not enough data'));
+    if (trends.length <= 1) return const Center(child: Text('Not enough data'));
 
     final textColor = Theme.of(context).colorScheme.onSurfaceVariant;
     List<FlSpot> spots = [];
@@ -612,7 +607,7 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
       children: [
         const Text(
           'Send Rate (Success vs Attempts)',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 16),
         SizedBox(
@@ -662,12 +657,16 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
                       children: [
                         Container(width: 12, height: 12, color: Colors.green),
                         const SizedBox(width: 8),
-                        Text(
-                          'Sends ($totalSends)',
-                          style: TextStyle(
-                            color: textColor,
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
+                        Flexible(
+                          child: Text(
+                            'Sends ($totalSends)',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: textColor,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
                       ],
@@ -681,12 +680,16 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
                           color: Colors.redAccent,
                         ),
                         const SizedBox(width: 8),
-                        Text(
-                          'Fails ($totalAttempts)',
-                          style: TextStyle(
-                            color: textColor,
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
+                        Flexible(
+                          child: Text(
+                            'Fails ($totalAttempts)',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: textColor,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
                       ],
@@ -721,12 +724,14 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
       totalUsers += (d['count'] as int);
     }
 
+    if (totalUsers == 0) return const SizedBox.shrink();
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
           'Climber Demographics',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 16),
         SizedBox(

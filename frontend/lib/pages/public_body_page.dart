@@ -6,6 +6,7 @@ import '../pages/all_walls_page.dart';
 import '../pages/wall_issues_page.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
+import '../dialogs/login_dialog.dart';
 
 const _kMaxPreviewWalls = 5;
 
@@ -25,8 +26,15 @@ class _PublicBodyPageState extends State<PublicBodyPage> {
     _profileFuture = _loadProfile();
   }
 
-  Future<User> _loadProfile() =>
-      ApiService().fetchCurrentUserProfile(bearerToken: AuthService().jwt);
+  Future<User> _loadProfile() async {
+    if (!AuthService().isAuthenticated) {
+      final loggedIn = await showLoginDialog(context);
+      if (loggedIn != true || !AuthService().isAuthenticated) {
+        throw StateError('Not authenticated');
+      }
+    }
+    return ApiService().fetchCurrentUserProfile(bearerToken: AuthService().jwt);
+  }
 
   void _refresh() {
     setState(() {
@@ -140,10 +148,13 @@ class _PublicBodyPageState extends State<PublicBodyPage> {
                 child: ListView(
                   padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
                   children: [
-                    Center(
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 560),
-                        child: Column(
+                    Builder(builder: (ctx) {
+                      final screenWidth = MediaQuery.of(ctx).size.width;
+                      final dialogMaxWidth = screenWidth < 600 ? screenWidth * 0.96 : 560.0;
+                      return Center(
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(maxWidth: dialogMaxWidth),
+                          child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
                             _AccountCard(
@@ -173,7 +184,8 @@ class _PublicBodyPageState extends State<PublicBodyPage> {
                           ],
                         ),
                       ),
-                    ),
+                    );
+                    }),
                   ],
                 ),
               );

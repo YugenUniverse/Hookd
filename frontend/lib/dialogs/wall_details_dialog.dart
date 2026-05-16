@@ -1,9 +1,9 @@
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
+import '../constants/api_config.dart';
 import '../dialogs/login_dialog.dart';
 import '../models/leaderboard_entry.dart';
 import '../models/review.dart';
@@ -51,27 +51,26 @@ class _WallDetailsDialogState extends State<WallDetailsDialog> {
   }
 
   Future<_LeaderboardData> _fetchLeaderboard() async {
-    final String baseUrl = kIsWeb
-        ? 'http://localhost:3000'
-        : 'http://10.0.2.2:3000';
     final token = AuthService().jwt;
+    try {
+      final response = await http
+          .get(
+        Uri.parse(
+          '${ApiConfig.apiBaseUrl}/walls/${widget.wall.id}/leaderboard?offset=$_leaderboardOffset',
+        ),
+        headers: {
+          'Content-Type': 'application/json',
+          if (token != null) 'Authorization': 'Bearer $token',
+        },
+      )
+          .timeout(const Duration(seconds: 12));
 
-    final response = await http.get(
-      Uri.parse(
-        '$baseUrl/walls/${widget.wall.id}/leaderboard?offset=$_leaderboardOffset',
-      ),
-      headers: {
-        'Content-Type': 'application/json',
-        if (token != null) 'Authorization': 'Bearer $token',
-      },
-    );
+      if (response.statusCode != 200) {
+        throw Exception('Failed to load leaderboard (${response.statusCode})');
+      }
 
-    if (response.statusCode != 200) {
-      throw Exception('Failed to load leaderboard');
-    }
-
-    final decoded = jsonDecode(response.body) as Map<String, dynamic>;
-    final rawList = decoded['leaderboard'];
+      final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+      final rawList = decoded['leaderboard'];
     final leaderboard = rawList is List
         ? rawList
               .whereType<Map>()
@@ -89,6 +88,10 @@ class _WallDetailsDialogState extends State<WallDetailsDialog> {
       averageTime: _toInt(decoded['averageTime']),
       leaderboard: leaderboard,
     );
+    } catch (e, st) {
+      debugPrint('Failed to fetch leaderboard: $e\n$st');
+      throw Exception('Network error while loading leaderboard');
+    }
   }
 
   void _reloadLeaderboard() {
@@ -646,9 +649,23 @@ class _WallDetailsDialogState extends State<WallDetailsDialog> {
 
         if (snapshot.hasError) {
           return Center(
-            child: Text(
-              'Error loading leaderboard.',
-              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Error loading leaderboard.',
+                    style: TextStyle(color: Theme.of(context).colorScheme.error),
+                  ),
+                  const SizedBox(height: 8),
+                  FilledButton.icon(
+                    onPressed: _reloadLeaderboard,
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('Retry'),
+                  ),
+                ],
+              ),
             ),
           );
         }

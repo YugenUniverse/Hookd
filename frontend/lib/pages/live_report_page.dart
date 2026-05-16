@@ -23,6 +23,11 @@ class _LiveReportPageState extends State<LiveReportPage> {
   late Future<ReportData> futureLiveReport;
   int _selectedChartIndex = 0;
 
+  String _percentageLabel(num part, num total) {
+    if (total <= 0) return '0%';
+    return '${((part / total) * 100).toInt()}%';
+  }
+
   @override
   void initState() {
     super.initState();
@@ -77,7 +82,7 @@ class _LiveReportPageState extends State<LiveReportPage> {
                     onPressed: () => Navigator.pop(context),
                     child: const Text('Cancel'),
                   ),
-                ElevatedButton(
+                FilledButton(
                   onPressed: isSaving
                       ? null
                       : () async {
@@ -90,18 +95,14 @@ class _LiveReportPageState extends State<LiveReportPage> {
                               notesController.text.trim(),
                             );
                             if (context.mounted) {
-                              Navigator.pop(context); // Close dialog loop
-                              Navigator.pop(
-                                context,
-                              ); // Bounce back to Dashboard View
+                              Navigator.pop(context);
+                              Navigator.pop(context);
                             }
                           } catch (e) {
                             setState(() => isSaving = false);
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
-                                content: Text(
-                                  'Failed to cache performance log.',
-                                ),
+                                content: Text('Failed to cache performance log.'),
                               ),
                             );
                           }
@@ -144,18 +145,19 @@ class _LiveReportPageState extends State<LiveReportPage> {
         onPressed: _showSaveDialog,
         icon: const Icon(Icons.save_rounded),
         label: const Text('Save Snapshot'),
-        backgroundColor: Colors.green,
-        foregroundColor: Colors.white,
       ),
       body: FutureBuilder<ReportData>(
         future: futureLiveReport,
         builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting)
+          if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
-          if (snapshot.hasError)
+          }
+          if (snapshot.hasError) {
             return const Center(child: Text('Telemetry error occurred.'));
-          if (snapshot.data == null)
+          }
+          if (snapshot.data == null) {
             return const Center(child: Text('Metrics array unpopulated.'));
+          }
 
           final data = snapshot.data!;
           return SingleChildScrollView(
@@ -163,9 +165,9 @@ class _LiveReportPageState extends State<LiveReportPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Text(
+                Text(
                   'Live Metrics Engine',
-                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 16),
 
@@ -228,7 +230,7 @@ class _LiveReportPageState extends State<LiveReportPage> {
 
                 const Text(
                   'Quality Distribution',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 16),
                 SizedBox(
@@ -242,7 +244,7 @@ class _LiveReportPageState extends State<LiveReportPage> {
 
                 const Text(
                   'Live Traffic Stream',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 16),
                 SegmentedButton<int>(
@@ -283,10 +285,12 @@ class _LiveReportPageState extends State<LiveReportPage> {
 
   // --- UI ARCHITECTURE GRAPH CHARTS MAPS ---
   Widget _buildDynamicChart(BuildContext context, ReportData data) {
-    if (_selectedChartIndex == 0)
+    if (_selectedChartIndex == 0) {
       return _buildTrafficLineChart(context, data.trends);
-    if (_selectedChartIndex == 1)
+    }
+    if (_selectedChartIndex == 1) {
       return _buildHourBarChart(context, data.byHourOfDay);
+    }
     return _buildDayBarChart(context, data.byDayOfWeek);
   }
 
@@ -313,28 +317,28 @@ class _LiveReportPageState extends State<LiveReportPage> {
     String title,
     String value,
     IconData icon, {
-    Color color = Colors.blue,
+    Color? color,
   }) {
-    final textColor = Theme.of(context).colorScheme.onSurfaceVariant;
-    final r = color.r.round(), g = color.g.round(), b = color.b.round();
+    final colorScheme = Theme.of(context).colorScheme;
+    final effectiveColor = color ?? colorScheme.primary;
+    final textColor = colorScheme.onSurfaceVariant;
     return Container(
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        color: Color.fromRGBO(r, g, b, 0.1),
+        color: effectiveColor.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Color.fromRGBO(r, g, b, 0.3)),
+        border: Border.all(color: effectiveColor.withValues(alpha: 0.3)),
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon, color: color, size: 26),
+          Icon(icon, color: effectiveColor, size: 26),
           const SizedBox(height: 6),
           Text(
             value,
-            style: TextStyle(
-              fontSize: 22,
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
               fontWeight: FontWeight.bold,
-              color: color,
+              color: effectiveColor,
             ),
           ),
           const SizedBox(height: 2),
@@ -379,7 +383,7 @@ class _LiveReportPageState extends State<LiveReportPage> {
                 PieChartSectionData(
                   color: Colors.green,
                   value: totalSends.toDouble(),
-                  title: '${((totalSends / total) * 100).toInt()}%',
+                  title: _percentageLabel(totalSends, total),
                   radius: 30,
                   titleStyle: const TextStyle(
                     fontSize: 10,
@@ -390,7 +394,7 @@ class _LiveReportPageState extends State<LiveReportPage> {
                 PieChartSectionData(
                   color: Colors.redAccent,
                   value: totalAttempts.toDouble(),
-                  title: '${((totalAttempts / total) * 100).toInt()}%',
+                  title: _percentageLabel(totalAttempts, total),
                   radius: 30,
                   titleStyle: const TextStyle(
                     fontSize: 10,
@@ -436,6 +440,7 @@ class _LiveReportPageState extends State<LiveReportPage> {
     for (var d in demographics) {
       totalUsers += (d['count'] as int);
     }
+    if (totalUsers <= 0) return const SizedBox.shrink();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
@@ -456,7 +461,7 @@ class _LiveReportPageState extends State<LiveReportPage> {
                 return PieChartSectionData(
                   color: colors[i % colors.length],
                   value: count.toDouble(),
-                  title: '${((count / totalUsers) * 100).toInt()}%',
+                  title: _percentageLabel(count, totalUsers),
                   radius: 30,
                   titleStyle: const TextStyle(
                     fontSize: 10,
@@ -673,7 +678,7 @@ class _LiveReportPageState extends State<LiveReportPage> {
   }
 
   Widget _buildTrafficLineChart(BuildContext context, List<dynamic> trends) {
-    if (trends.isEmpty) return const Center(child: Text('Not enough data'));
+    if (trends.length <= 1) return const Center(child: Text('Not enough data'));
     final textColor = Theme.of(context).colorScheme.onSurfaceVariant;
     List<FlSpot> spots = [];
     double maxSessions = 0;
@@ -704,7 +709,7 @@ class _LiveReportPageState extends State<LiveReportPage> {
                   final parts = (trends[v.toInt()]['date'] as String).split(
                     '-',
                   );
-                  if (parts.length >= 3)
+                  if (parts.length >= 3) {
                     return SideTitleWidget(
                       meta: m,
                       child: Text(
@@ -712,6 +717,7 @@ class _LiveReportPageState extends State<LiveReportPage> {
                         style: TextStyle(fontSize: 11, color: textColor),
                       ),
                     );
+                  }
                 }
                 return const SizedBox.shrink();
               },

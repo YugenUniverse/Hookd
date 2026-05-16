@@ -1,9 +1,10 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import '../constants/api_config.dart';
 import '../models/wall.dart';
 
 class WallService {
-  static const String baseUrl = 'http://127.0.0.1:3000';
+  static const String baseUrl = ApiConfig.apiBaseUrl;
 
   Future<List<Wall>> fetchAllWalls() async {
     try {

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/climbing_session.dart';
 import '../models/user.dart';
 import '../services/api_service.dart';
+import '../dialogs/login_dialog.dart';
 import '../services/auth_service.dart';
 import 'my_issues_page.dart';
 import 'wall_issues_page.dart';
@@ -36,6 +37,13 @@ class _UserPageState extends State<UserPage> {
   Future<_UserPageData> _loadProfile() async {
     final apiService = ApiService();
     final bearerToken = AuthService().jwt;
+    // Ensure we're authenticated before attempting protected requests.
+    if (!AuthService().isAuthenticated) {
+      final loggedIn = await showLoginDialog(context);
+      if (loggedIn != true || !AuthService().isAuthenticated) {
+        throw StateError('Not authenticated');
+      }
+    }
     final results = await Future.wait([
       apiService.fetchCurrentUserProfile(bearerToken: bearerToken),
       apiService.fetchCurrentUserSessions(bearerToken: bearerToken),
@@ -181,10 +189,15 @@ class _UserPageState extends State<UserPage> {
                 child: ListView(
                   padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
                   children: [
-                    Center(
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 560),
-                        child: Column(
+                    
+                    // Responsive container width for mobile
+                    Builder(builder: (ctx) {
+                      final screenWidth = MediaQuery.of(ctx).size.width;
+                      final dialogMaxWidth = screenWidth < 600 ? screenWidth * 0.96 : 560.0;
+                      return Center(
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(maxWidth: dialogMaxWidth),
+                          child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
                             Container(
@@ -312,7 +325,8 @@ class _UserPageState extends State<UserPage> {
                           ],
                         ),
                       ),
-                    ),
+                    );
+                    }),
                   ],
                 ),
               );

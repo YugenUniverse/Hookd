@@ -1,10 +1,10 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
+import '../constants/api_config.dart';
 import '../models/leaderboard_entry.dart';
+import '../services/auth_service.dart';
 import '../widgets/leaderboard_list.dart';
 
 class GlobalLeaderboardPage extends StatefulWidget {
@@ -15,11 +15,6 @@ class GlobalLeaderboardPage extends StatefulWidget {
 }
 
 class _GlobalLeaderboardPageState extends State<GlobalLeaderboardPage> {
-  final FlutterSecureStorage _storage = const FlutterSecureStorage();
-
-  final String baseUrl = kIsWeb
-      ? 'http://localhost:3000'
-      : 'http://10.0.2.2:3000';
 
   List<LeaderboardEntry> _climbers = [];
   bool _isLoading = true;
@@ -38,10 +33,10 @@ class _GlobalLeaderboardPageState extends State<GlobalLeaderboardPage> {
     });
 
     try {
-      String? token = await _storage.read(key: 'jwt_token');
+      final token = AuthService().jwt;
 
       final response = await http.get(
-        Uri.parse('$baseUrl/climbers/leaderboard'),
+        Uri.parse('${ApiConfig.apiBaseUrl}/climbers/leaderboard'),
         headers: {
           'Content-Type': 'application/json',
           if (token != null) 'Authorization': 'Bearer $token',

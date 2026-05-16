@@ -163,14 +163,6 @@ exports.register = async ({
     };
 
     if (normalizedUserType === "Climber") {
-        const { name, surname, birthdate } = restData;
-        if (!name || !surname || !birthdate) {
-            const error = new Error(
-                "name, surname, and birthdate are required for Climber",
-            );
-            error.statusCode = 400;
-            throw error;
-        }
         user = await Climber.create(baseUserData);
     } else if (normalizedUserType === "FacilityOwner") {
         user = await FacilityOwner.create({ email, password, username, authMethods: ["local"], userType: "FacilityOwner" });

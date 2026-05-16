@@ -14,6 +14,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "128159806952-q3d89pi8anqpjdbs8h1atnuopds5eeoq.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.fiatlinux.hookd",
+            "certificate_hash": "263f0360cec5fdebdd93fbe7da988c791ae5a1b3"
+          }
+        },
+        {
           "client_id": "128159806952-4cv0h9kg41n6g9fcs9k7sb6raqml2fve.apps.googleusercontent.com",
           "client_type": 3
         }

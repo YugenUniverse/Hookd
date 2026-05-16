@@ -9,6 +9,7 @@ import '../pages/report_list_page.dart';
 import '../pages/wall_issues_page.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
+import '../dialogs/login_dialog.dart';
 import '../services/report_service.dart';
 
 const _kMaxPreviewWalls = 5;
@@ -29,8 +30,15 @@ class _FacilityOwnerPageState extends State<FacilityOwnerPage> {
     _profileFuture = _loadProfile();
   }
 
-  Future<User> _loadProfile() =>
-      ApiService().fetchCurrentUserProfile(bearerToken: AuthService().jwt);
+  Future<User> _loadProfile() async {
+    if (!AuthService().isAuthenticated) {
+      final loggedIn = await showLoginDialog(context);
+      if (loggedIn != true || !AuthService().isAuthenticated) {
+        throw StateError('Not authenticated');
+      }
+    }
+    return ApiService().fetchCurrentUserProfile(bearerToken: AuthService().jwt);
+  }
 
   void _refresh() {
     setState(() {
@@ -144,10 +152,13 @@ class _FacilityOwnerPageState extends State<FacilityOwnerPage> {
                 child: ListView(
                   padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
                   children: [
-                    Center(
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 560),
-                        child: Column(
+                    Builder(builder: (ctx) {
+                      final screenWidth = MediaQuery.of(ctx).size.width;
+                      final dialogMaxWidth = screenWidth < 600 ? screenWidth * 0.96 : 560.0;
+                      return Center(
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(maxWidth: dialogMaxWidth),
+                          child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
                             _AccountCard(
@@ -169,7 +180,8 @@ class _FacilityOwnerPageState extends State<FacilityOwnerPage> {
                           ],
                         ),
                       ),
-                    ),
+                    );
+                    }),
                   ],
                 ),
               );
@@ -427,29 +439,35 @@ class _FacilityCard extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 10),
-              OutlinedButton.icon(
-                onPressed: () {
-                  final token = AuthService().jwt ?? '';
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => ReportListPage(
-                        reportService: ReportService(token: token),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    final token = AuthService().jwt ?? '';
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => ReportListPage(
+                          reportService: ReportService(token: token),
+                        ),
                       ),
-                    ),
-                  );
-                },
-                icon: const Icon(Icons.analytics_outlined),
-                label: const Text('Performance Analytics'),
+                    );
+                  },
+                  icon: const Icon(Icons.analytics_outlined),
+                  label: const Text('Performance Analytics'),
+                ),
               ),
               const SizedBox(height: 10),
-              OutlinedButton.icon(
-                onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const WallIssuesPage()),
-                  );
-                },
-                icon: const Icon(Icons.report_problem_outlined),
-                label: const Text('Wall issues'),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const WallIssuesPage()),
+                    );
+                  },
+                  icon: const Icon(Icons.report_problem_outlined),
+                  label: const Text('Wall issues'),
+                ),
               ),
             ],
           ),

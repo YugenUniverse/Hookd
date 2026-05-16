@@ -59,6 +59,7 @@ class _POIMapState extends State<POIMap> {
   bool _locating = true;
   LatLng? _userLocation;
   List<Poi> _pois = [];
+  bool _isCompactScreen = false;
 
   // Initialized once per app session. Static so every rebuild reuses the same
   // resolved future — no tile-provider swaps mid-render.
@@ -73,10 +74,18 @@ class _POIMapState extends State<POIMap> {
 
   static const double _defaultZoom = 11;
   static const double _focusZoom = 16.0;
+    static const double _compactDefaultZoom = 12.5;
+    static const double _compactFocusZoom = 17.0;
   double _currentZoom = _defaultZoom;
   LatLng? _lastMapCenter;
   static const double _mapMoveThreshold = 2000;
   bool _skipNextMoveFetch = false;
+
+    double get _effectiveDefaultZoom =>
+      _isCompactScreen ? _compactDefaultZoom : _defaultZoom;
+
+    double get _effectiveFocusZoom =>
+      _isCompactScreen ? _compactFocusZoom : _focusZoom;
 
   void _handleControllerCommand() {
     final controller = widget.controller;
@@ -84,7 +93,7 @@ class _POIMapState extends State<POIMap> {
     if (controller == null || target == null) return;
 
     _skipNextMoveFetch = true;
-    _currentZoom = _focusZoom;
+    _currentZoom = _effectiveFocusZoom;
     _lastMapCenter = target;
     _mapController.move(target, _currentZoom);
     _fetchPoisForLocation(
@@ -110,6 +119,12 @@ class _POIMapState extends State<POIMap> {
     _initLocation();
     _setupMapListener();
     widget.controller?.addListener(_handleControllerCommand);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _isCompactScreen = MediaQuery.sizeOf(context).shortestSide < 600;
   }
 
   @override
@@ -243,7 +258,7 @@ class _POIMapState extends State<POIMap> {
             );
             WidgetsBinding.instance.addPostFrameCallback((_) {
               try {
-                _mapController.move(_userLocation!, _defaultZoom);
+                _mapController.move(_userLocation!, _effectiveDefaultZoom);
               } catch (e) {
                 print('Error moving map: $e');
               }
@@ -267,6 +282,31 @@ class _POIMapState extends State<POIMap> {
       return;
     }
 
+    final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      print('Location services are disabled.');
+      setState(() {
+        _locating = false;
+      });
+      _fetchPois();
+      return;
+    }
+
+    var permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+    }
+
+    if (permission == LocationPermission.denied ||
+        permission == LocationPermission.deniedForever) {
+      print('Location permission denied: $permission');
+      setState(() {
+        _locating = false;
+      });
+      _fetchPois();
+      return;
+    }
+
     for (int attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         final pos = await Geolocator.getCurrentPosition(
@@ -279,7 +319,7 @@ class _POIMapState extends State<POIMap> {
         _fetchPoisForLocation(pos.longitude, pos.latitude, zoom: _currentZoom);
         WidgetsBinding.instance.addPostFrameCallback((_) {
           try {
-            _mapController.move(_userLocation!, _defaultZoom);
+            _mapController.move(_userLocation!, _effectiveDefaultZoom);
           } catch (e) {
             print('Error moving map: $e');
           }
@@ -346,8 +386,8 @@ class _POIMapState extends State<POIMap> {
 
       if (poi is FacilityPoi) {
         return Marker(
-          width: 36,
-          height: 36,
+          width: 48,
+          height: 48,
           point: point,
           child: GestureDetector(
             onTap: () => _showPoiInfo(poi),
@@ -365,7 +405,7 @@ class _POIMapState extends State<POIMap> {
                 ],
               ),
               padding: const EdgeInsets.all(4),
-              child: const Icon(Icons.domain, color: Colors.white, size: 18),
+              child: const Icon(Icons.domain, color: Colors.white, size: 24),
             ),
           ),
         );
@@ -374,8 +414,8 @@ class _POIMapState extends State<POIMap> {
       final wall = poi as OutdoorWallPoi;
       final markerColor = _getDifficultyColor(wall.difficulty);
       return Marker(
-        width: 32,
-        height: 32,
+        width: 44,
+        height: 44,
         point: point,
         child: GestureDetector(
           onTap: () => _showPoiInfo(poi),
@@ -393,7 +433,7 @@ class _POIMapState extends State<POIMap> {
               ],
             ),
             padding: const EdgeInsets.all(4),
-            child: const Icon(Icons.landscape, color: Colors.white, size: 18),
+            child: const Icon(Icons.landscape, color: Colors.white, size: 22),
           ),
         ),
       );
@@ -462,11 +502,14 @@ class _POIMapState extends State<POIMap> {
           children: [
             FlutterMap(
               mapController: _mapController,
-              options: const MapOptions(
-                initialCenter: LatLng(46.067, 11.117),
-                initialZoom: _defaultZoom,
+              options: MapOptions(
+                initialCenter: const LatLng(46.067, 11.117),
+                initialZoom: _effectiveDefaultZoom,
                 // Prevents zooming out past the Trentino Alto Adige scale (~220km visible).
                 minZoom: 8,
+                interactionOptions: const InteractionOptions(
+                  flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
+                ),
               ),
               children: [
                 // TileLayer is withheld until the cache store is ready so that
@@ -515,12 +558,15 @@ class _POIMapState extends State<POIMap> {
 
         Positioned(
           right: 16,
-          bottom: 100,
-          child: FloatingActionButton.small(
-            heroTag: 'recenter-map',
-            tooltip: 'Center on my position / Retry location',
-            onPressed: retryLocation,
-            child: const Icon(Icons.my_location),
+          bottom: 16,
+          child: SafeArea(
+            minimum: const EdgeInsets.only(bottom: 16),
+            child: FloatingActionButton(
+              heroTag: 'recenter-map',
+              tooltip: 'Center on my position / Retry location',
+              onPressed: retryLocation,
+              child: const Icon(Icons.my_location, size: 28),
+            ),
           ),
         ),
       ],

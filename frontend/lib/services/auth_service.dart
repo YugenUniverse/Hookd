@@ -39,7 +39,8 @@ class AuthService extends ChangeNotifier {
   String? get username => _username;
   String? get userType => _userType;
   bool get isAdmin => _isAdmin;
-  bool get isAuthenticated => _accessToken != null && _accessToken!.isNotEmpty;
+  bool get isAuthenticated => _accessToken != null && _accessToken!.isNotEmpty && !_isJwtExpired(_accessToken);
+  
   bool get isKeyringLocked => _keyringLocked;
 
   // Load tokens from secure storage.
@@ -51,11 +52,29 @@ class AuthService extends ChangeNotifier {
       _refreshToken = await _secure.read(key: 'refresh_token');
       _trySetUserFromJwt(_accessToken);
       _keyringLocked = false;
-      if (_accessToken != null) {
-        print('Successfully loaded access token from storage');
+
+      if (_accessToken != null && _accessToken!.isNotEmpty) {
+        // Validate expiry. If expired, attempt refresh immediately.
+        try {
+          if (_isJwtExpired(_accessToken)) {
+            print('Access token expired at startup, attempting refresh...');
+            final refreshed = await refresh();
+            if (!refreshed) {
+              print('Startup refresh failed, clearing tokens');
+              await logout();
+            } else {
+              print('Startup refresh succeeded');
+            }
+          } else {
+            print('Successfully loaded access token from storage (valid)');
+          }
+        } catch (e) {
+          print('Error while validating or refreshing token at startup: $e');
+        }
       } else {
         print('No access token found in storage');
       }
+
       notifyListeners();
       return;
     } on PlatformException catch (e) {
@@ -69,6 +88,33 @@ class AuthService extends ChangeNotifier {
       _refreshToken = null;
       _keyringLocked = false;
       notifyListeners();
+    }
+  }
+
+  // Returns true if the JWT is expired or has no exp claim. Uses UTC seconds.
+  bool _isJwtExpired(String? token, {int leewaySeconds = 5}) {
+    if (token == null || token.isEmpty) return true;
+    final parts = token.split('.');
+    if (parts.length < 2) return true;
+    try {
+      final payload = _decodeJwtPart(parts[1]);
+      if (payload is! Map) return true;
+      final expVal = payload['exp'] ?? payload['expires'] ?? payload['exp_ts'];
+      if (expVal == null) return true;
+      int exp;
+      if (expVal is int) {
+        exp = expVal;
+      } else if (expVal is double) {
+        exp = expVal.toInt();
+      } else {
+        exp = int.tryParse(expVal.toString()) ?? 0;
+      }
+      if (exp <= 0) return true;
+      final now = DateTime.now().toUtc().millisecondsSinceEpoch ~/ 1000;
+      return now >= (exp - leewaySeconds);
+    } catch (e) {
+      // If anything fails, consider the token invalid/expired
+      return true;
     }
   }
 
@@ -284,11 +330,8 @@ class AuthService extends ChangeNotifier {
   Future<bool> register(
     String email,
     String username,
-    String password, {
-    required String name,
-    required String surname,
-    required String birthdate,
-  }) async {
+    String password,
+  ) async {
     try {
       final dio = Dio(BaseOptions(baseUrl: ApiConfig.apiBaseUrl));
       
@@ -297,9 +340,6 @@ class AuthService extends ChangeNotifier {
         'username': username.trim(),
         'password': password,
         'userType': 'Climber',
-        'name': name.trim(),
-        'surname': surname.trim(),
-        'birthdate': birthdate.trim(),
       };
       
       print('Registering user: $username');

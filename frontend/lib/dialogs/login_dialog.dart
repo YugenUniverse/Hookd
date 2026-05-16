@@ -1,25 +1,23 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
+import '../constants/ui_constants.dart';
 
 enum _AccountType { climber, facility }
 
-class LoginDialog extends StatefulWidget {
-  const LoginDialog({super.key});
+class LoginPage extends StatefulWidget {
+  const LoginPage({super.key});
   @override
-  State<LoginDialog> createState() => _LoginDialogState();
+  State<LoginPage> createState() => _LoginPageState();
 }
 
-class _LoginDialogState extends State<LoginDialog> {
+class _LoginPageState extends State<LoginPage> {
   // Shared
   final _emailCtrl = TextEditingController();
   final _userCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
   final _confirmPassCtrl = TextEditingController();
-
-  // Climber-specific
-  final _nameCtrl = TextEditingController();
-  final _surnameCtrl = TextEditingController();
-  final _birthdateCtrl = TextEditingController();
+  final _initialFocusNode = FocusNode();
 
   bool _isLoading = false;
   bool _obscurePassword = true;
@@ -28,15 +26,26 @@ class _LoginDialogState extends State<LoginDialog> {
   _AccountType _accountType = _AccountType.climber;
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _requestInitialFocus();
+    });
+  }
+
+  @override
   void dispose() {
     _emailCtrl.dispose();
     _userCtrl.dispose();
     _passCtrl.dispose();
     _confirmPassCtrl.dispose();
-    _nameCtrl.dispose();
-    _surnameCtrl.dispose();
-    _birthdateCtrl.dispose();
+    _initialFocusNode.dispose();
     super.dispose();
+  }
+
+  void _requestInitialFocus() {
+    if (!mounted || defaultTargetPlatform != TargetPlatform.android) return;
+    _initialFocusNode.requestFocus();
   }
 
   Future<void> _submitLogin() async {
@@ -69,13 +78,9 @@ class _LoginDialogState extends State<LoginDialog> {
     final email = _emailCtrl.text.trim();
     final username = _userCtrl.text.trim();
     final password = _passCtrl.text;
-    final name = _nameCtrl.text.trim();
-    final surname = _surnameCtrl.text.trim();
-    final birthdate = _birthdateCtrl.text.trim();
 
-    if (email.isEmpty || username.isEmpty || password.isEmpty ||
-        name.isEmpty || surname.isEmpty || birthdate.isEmpty) {
-      _snack('Please fill in all fields');
+    if (email.isEmpty || username.isEmpty || password.isEmpty) {
+      _snack('Please fill in email, username, and password');
       return;
     }
     if (password != _confirmPassCtrl.text) {
@@ -89,10 +94,7 @@ class _LoginDialogState extends State<LoginDialog> {
 
     setState(() => _isLoading = true);
     try {
-      final ok = await AuthService().register(
-        email, username, password,
-        name: name, surname: surname, birthdate: birthdate,
-      );
+      final ok = await AuthService().register(email, username, password);
       if (!mounted) return;
       setState(() => _isLoading = false);
       if (ok) {
@@ -148,78 +150,80 @@ class _LoginDialogState extends State<LoginDialog> {
     setState(() {
       _isRegisterMode = false;
       _accountType = _AccountType.climber;
-      for (final c in [
-        _emailCtrl, _userCtrl, _passCtrl, _confirmPassCtrl,
-        _nameCtrl, _surnameCtrl, _birthdateCtrl,
-      ]) {
+      for (final c in [_emailCtrl, _userCtrl, _passCtrl, _confirmPassCtrl]) {
         c.clear();
       }
     });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _requestInitialFocus();
+    });
+  }
+
+  void _toggleAuthMode() {
+    _requestInitialFocus();
+    setState(() => _isRegisterMode = !_isRegisterMode);
   }
 
   void _snack(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
+  VoidCallback get _submitAction => _isRegisterMode
+      ? (_accountType == _AccountType.facility
+          ? _submitRegisterFacility
+          : _submitRegisterClimber)
+      : _submitLogin;
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return AlertDialog(
-      title: Text(_isRegisterMode ? 'Create Account' : 'Login'),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (_isRegisterMode) ..._buildRegisterFields(theme),
-            if (!_isRegisterMode) ...[
-              _field(_userCtrl, 'Username or Email'),
-              const SizedBox(height: 12),
-              _passwordField(_passCtrl, 'Password', _obscurePassword,
-                  () => setState(() => _obscurePassword = !_obscurePassword)),
-              const SizedBox(height: 16),
-              _googleButton(),
-            ],
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                TextButton(
-                  onPressed: _isLoading
-                      ? null
-                      : () => setState(() => _isRegisterMode = !_isRegisterMode),
-                  child: Text(_isRegisterMode
-                      ? 'Have an account? Login'
-                      : 'Create account'),
-                ),
-              ],
-            ),
-          ],
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(_isRegisterMode ? 'Create Account' : 'Login'),
+        leading: IconButton(
+          icon: const Icon(Icons.close),
+          tooltip: 'Cancel',
+          onPressed: _isLoading ? null : () => Navigator.pop(context, false),
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: _isLoading ? null : () => Navigator.pop(context, false),
-          child: const Text('Cancel'),
-        ),
-        _isLoading
-            ? const SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              )
-            : ElevatedButton(
-                onPressed: _isRegisterMode
-                    ? (_accountType == _AccountType.facility
-                        ? _submitRegisterFacility
-                        : _submitRegisterClimber)
-                    : _submitLogin,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: theme.colorScheme.primaryContainer,
-                  foregroundColor: theme.colorScheme.onPrimaryContainer,
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (_isRegisterMode) ..._buildRegisterFields(theme),
+              if (!_isRegisterMode) ...[
+                _field(_userCtrl, 'Username or Email', focusNode: _initialFocusNode),
+                const SizedBox(height: AppSpacing.md),
+                _passwordField(
+                  _passCtrl, 'Password', _obscurePassword,
+                  () => setState(() => _obscurePassword = !_obscurePassword),
                 ),
-                child: Text(_isRegisterMode ? 'Register' : 'Login'),
+                const SizedBox(height: AppSpacing.lg),
+                _googleButton(),
+              ],
+              const SizedBox(height: AppSpacing.sm),
+              TextButton(
+                onPressed: _isLoading ? null : _toggleAuthMode,
+                child: Text(_isRegisterMode
+                    ? 'Already have an account? Login'
+                    : 'Create account'),
               ),
-      ],
+              const SizedBox(height: AppSpacing.lg),
+              _isLoading
+                  ? const Center(
+                      child: CircularProgressIndicator(),
+                    )
+                  : FilledButton(
+                      onPressed: _submitAction,
+                      child: Text(_isRegisterMode ? 'Register' : 'Login'),
+                    ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -241,32 +245,27 @@ class _LoginDialogState extends State<LoginDialog> {
         selected: {_accountType},
         onSelectionChanged: (s) => setState(() => _accountType = s.first),
       ),
-      const SizedBox(height: 16),
-
-      _field(_emailCtrl, 'Email', type: TextInputType.emailAddress),
-      const SizedBox(height: 12),
+      const SizedBox(height: AppSpacing.lg),
+      _field(
+        _emailCtrl,
+        'Email',
+        type: TextInputType.emailAddress,
+        focusNode: _initialFocusNode,
+      ),
+      const SizedBox(height: AppSpacing.sm),
       _field(_userCtrl, 'Username'),
-      const SizedBox(height: 12),
-
-      if (_accountType == _AccountType.climber) ...[
-        _field(_nameCtrl, 'First Name'),
-        const SizedBox(height: 12),
-        _field(_surnameCtrl, 'Surname'),
-        const SizedBox(height: 12),
-        _field(_birthdateCtrl, 'Birthdate (YYYY-MM-DD)',
-            type: TextInputType.datetime),
-        const SizedBox(height: 12),
-      ],
-
-      _passwordField(_passCtrl, 'Password', _obscurePassword,
-          () => setState(() => _obscurePassword = !_obscurePassword)),
-      const SizedBox(height: 12),
-      _passwordField(_confirmPassCtrl, 'Confirm Password',
-          _obscureConfirmPassword,
-          () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword)),
-
+      const SizedBox(height: AppSpacing.sm),
+      _passwordField(
+        _passCtrl, 'Password', _obscurePassword,
+        () => setState(() => _obscurePassword = !_obscurePassword),
+      ),
+      const SizedBox(height: AppSpacing.sm),
+      _passwordField(
+        _confirmPassCtrl, 'Confirm Password', _obscureConfirmPassword,
+        () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
+      ),
       if (_accountType == _AccountType.facility) ...[
-        const SizedBox(height: 12),
+        const SizedBox(height: AppSpacing.md),
         Text(
           'After registration, log in and claim your facility from your profile.',
           style: TextStyle(
@@ -276,6 +275,7 @@ class _LoginDialogState extends State<LoginDialog> {
           textAlign: TextAlign.center,
         ),
       ],
+      const SizedBox(height: AppSpacing.sm),
     ];
   }
 
@@ -283,11 +283,13 @@ class _LoginDialogState extends State<LoginDialog> {
     TextEditingController ctrl,
     String label, {
     TextInputType type = TextInputType.text,
+    FocusNode? focusNode,
   }) {
     return TextField(
       controller: ctrl,
       enabled: !_isLoading,
       keyboardType: type,
+      focusNode: focusNode,
       decoration: InputDecoration(
         labelText: label,
         border: const OutlineInputBorder(),
@@ -318,39 +320,34 @@ class _LoginDialogState extends State<LoginDialog> {
   }
 
   Widget _googleButton() {
-    return SizedBox(
-      width: double.infinity,
-      child: OutlinedButton.icon(
-        icon: const Icon(Icons.login),
-        label: const Text('Sign in with Google'),
-        onPressed: _isLoading
-            ? null
-            : () async {
-                setState(() => _isLoading = true);
-                try {
-                  final ok = await AuthService().loginWithGoogle();
-                  if (!mounted) return;
-                  setState(() => _isLoading = false);
-                  if (ok) {
-                    Navigator.pop(context, true);
-                  } else {
-                    _snack('Google login failed');
-                  }
-                } catch (e) {
-                  if (!mounted) return;
-                  setState(() => _isLoading = false);
-                  _snack('Google login error: $e');
+    return OutlinedButton.icon(
+      icon: const Icon(Icons.login),
+      label: const Text('Sign in with Google'),
+      onPressed: _isLoading
+          ? null
+          : () async {
+              setState(() => _isLoading = true);
+              try {
+                final ok = await AuthService().loginWithGoogle();
+                if (!mounted) return;
+                setState(() => _isLoading = false);
+                if (ok) {
+                  Navigator.pop(context, true);
+                } else {
+                  _snack('Google login failed');
                 }
-              },
-      ),
+              } catch (e) {
+                if (!mounted) return;
+                setState(() => _isLoading = false);
+                _snack('Google login error: $e');
+              }
+            },
     );
   }
 }
 
 Future<bool?> showLoginDialog(BuildContext context) {
-  return showDialog<bool>(
-    context: context,
-    barrierDismissible: false,
-    builder: (_) => const LoginDialog(),
+  return Navigator.of(context, rootNavigator: true).push<bool>(
+    MaterialPageRoute(fullscreenDialog: true, builder: (_) => const LoginPage()),
   );
 }

@@ -85,9 +85,12 @@ class ApiService {
 
   Future<User> fetchCurrentUserProfile({String? bearerToken}) async {
     final options = Options(headers: {});
-    if (bearerToken != null && bearerToken.isNotEmpty) {
-      options.headers!['Authorization'] = 'Bearer $bearerToken';
+    final token = (bearerToken != null && bearerToken.isNotEmpty) ? bearerToken : AuthService().jwt;
+    if (token == null || token.isEmpty || !AuthService().isAuthenticated) {
+      // Fail fast so callers can react (show login) instead of receiving a DioException
+      throw StateError('Not authenticated');
     }
+    options.headers!['Authorization'] = 'Bearer $token';
     final response = await _dio.get('/users/me', options: options);
     final data = response.data;
 

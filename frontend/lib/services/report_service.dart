@@ -1,9 +1,10 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import '../constants/api_config.dart';
 import '../models/report.dart';
 
 class ReportService {
-  final String baseUrl = 'http://localhost:3000';
+  final String baseUrl = ApiConfig.apiBaseUrl;
   final String token;
 
   ReportService({required this.token});
