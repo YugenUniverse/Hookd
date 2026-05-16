@@ -5,6 +5,7 @@ import '../models/user.dart';
 import '../models/climbing_session.dart';
 import '../models/review.dart';
 import '../models/wall.dart';
+import '../models/issue.dart';
 import '../constants/api_config.dart';
 import 'auth_service.dart';
 
@@ -323,6 +324,57 @@ class ApiService {
       return Map<String, dynamic>.from(data);
     }
     throw Exception('Unexpected response while creating session');
+  }
+
+  // Issue endpoints
+  Future<void> createIssue({
+    required String wallId,
+    required String body,
+  }) async {
+    final payload = {'wall_id': wallId, 'body': body};
+    final response = await _dio.post('/issues', data: payload);
+    if (response.statusCode != 201) {
+      throw Exception('Failed to create issue: ${response.statusCode}');
+    }
+  }
+
+  Future<List<Issue>> fetchIssuesForWall(String wallId) async {
+    final response = await _dio.get('/issues/walls/$wallId');
+    final data = response.data;
+    final issuesList = <Issue>[];
+    if (data is Map && data['issues'] is List) {
+      for (final item in data['issues']) {
+        if (item is Map<String, dynamic>) {
+          issuesList.add(Issue.fromJson(item));
+        } else if (item is Map) {
+          issuesList.add(Issue.fromJson(Map<String, dynamic>.from(item)));
+        }
+      }
+    }
+    return issuesList;
+  }
+
+  Future<List<Issue>> fetchIssuesForUser() async {
+    final response = await _dio.get('/issues/my-issues');
+    final data = response.data;
+    final issuesList = <Issue>[];
+    if (data is Map && data['issues'] is List) {
+      for (final item in data['issues']) {
+        if (item is Map<String, dynamic>) {
+          issuesList.add(Issue.fromJson(item));
+        } else if (item is Map) {
+          issuesList.add(Issue.fromJson(Map<String, dynamic>.from(item)));
+        }
+      }
+    }
+    return issuesList;
+  }
+
+  Future<void> deleteIssue(String issueId) async {
+    final response = await _dio.delete('/issues/$issueId');
+    if (response.statusCode != 204) {
+      throw Exception('Failed to delete issue: ${response.statusCode}');
+    }
   }
 
   String _formatDate(DateTime date) {

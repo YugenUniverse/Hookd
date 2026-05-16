@@ -6,7 +6,13 @@ const STATUS_ENUM = [
     "UNDER_MAINTAINANCE",
     "PERMANENTLY_CLOSED",
 ];
-const DIFFICULTY_ENUM = ["UNKNOWN", "BEGINNER", "INTERMEDIATE", "ADVANCED", "EXPERT"];
+const DIFFICULTY_ENUM = [
+    "UNKNOWN",
+    "BEGINNER",
+    "INTERMEDIATE",
+    "ADVANCED",
+    "EXPERT",
+];
 
 const baseWallTransform = (doc, ret) => {
     ret.id = ret._id;
@@ -60,6 +66,12 @@ const wallSchema = new mongoose.Schema(
             {
                 type: mongoose.Schema.Types.ObjectId,
                 ref: "ClimbingSession",
+            },
+        ],
+        issues: [
+            {
+                type: mongoose.Schema.Types.ObjectId,
+                ref: "Issue",
             },
         ],
     },

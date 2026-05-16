@@ -198,6 +198,70 @@ class _WallDetailsDialogState extends State<WallDetailsDialog> {
                         ),
                         color: Theme.of(context).colorScheme.primary,
                       ),
+                      IconButton(
+                        tooltip: 'Report an issue',
+                        onPressed: () {
+                          final TextEditingController issueController =
+                              TextEditingController();
+                          showDialog(
+                            context: context,
+                            builder: (context) => StatefulBuilder(
+                              builder: (context, setState) => AlertDialog(
+                                title: const Text('Report an issue'),
+                                content: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text('Report an issue for ${wall.name}.'),
+                                    const SizedBox(height: 12),
+                                    TextField(
+                                      controller: issueController,
+                                      maxLines: 5,
+                                      decoration: const InputDecoration(
+                                        hintText: 'Describe the issue...',
+                                        border: OutlineInputBorder(),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () =>
+                                        Navigator.of(context).pop(),
+                                    child: const Text('Cancel'),
+                                  ),
+                                  TextButton(
+                                    onPressed: () async {
+                                      final issueBody = issueController.text
+                                          .trim();
+                                      if (issueBody.isNotEmpty) {
+                                        final apiService = ApiService();
+                                        final navigator = Navigator.of(context);
+                                        final messenger = ScaffoldMessenger.of(
+                                          context,
+                                        );
+                                        await apiService.createIssue(
+                                          wallId: wall.id,
+                                          body: issueBody,
+                                        );
+                                        navigator.pop();
+                                        messenger.showSnackBar(
+                                          const SnackBar(
+                                            content: Text('Issue submitted.'),
+                                          ),
+                                        );
+                                      }
+                                    },
+                                    child: const Text('Submit'),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                        icon: const Icon(Icons.report_problem_outlined),
+                        color: Theme.of(context).colorScheme.error,
+                      ),
                     ],
                   ),
                   const SizedBox(height: 12),
@@ -556,6 +620,7 @@ class _WallDetailsDialogState extends State<WallDetailsDialog> {
     );
   }
 
+  // A helper widget to keep the code clean for rows with icons and text
   Widget _buildInfoRow(
     BuildContext context,
     IconData icon,

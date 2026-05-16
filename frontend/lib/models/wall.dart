@@ -1,4 +1,5 @@
 import 'climbing_session.dart';
+import 'issue.dart';
 
 class Wall {
   final String id;
@@ -12,6 +13,7 @@ class Wall {
   final List<ClimbingSession> sessions;
   final double rating;
   final int totalSessions;
+  final List<Issue> issues;
 
   Wall({
     required this.id,
@@ -25,6 +27,7 @@ class Wall {
     required this.sessions,
     this.rating = 0.0,
     this.totalSessions = 0,
+    required this.issues,
   });
 
   // Compatibility with older UI code that expects `type`.
@@ -56,7 +59,21 @@ class Wall {
         if (item is Map<String, dynamic>) {
           sessions.add(ClimbingSession.fromJson(item));
         } else if (item is Map) {
-          sessions.add(ClimbingSession.fromJson(Map<String, dynamic>.from(item)));
+          sessions.add(
+            ClimbingSession.fromJson(Map<String, dynamic>.from(item)),
+          );
+        }
+      }
+    }
+
+    final issuesRaw = json['issues'];
+    final issues = <Issue>[];
+    if (issuesRaw is List) {
+      for (final item in issuesRaw) {
+        if (item is Map<String, dynamic>) {
+          issues.add(Issue.fromJson(item));
+        } else if (item is Map) {
+          issues.add(Issue.fromJson(Map<String, dynamic>.from(item)));
         }
       }
     }
@@ -77,20 +94,24 @@ class Wall {
     }
 
     final rating = parseRating(json['rating']);
-    final totalSessions = parseTotalSessions(json['totalSessions'] ?? json['total_sessions']);
+    final totalSessions = parseTotalSessions(
+      json['totalSessions'] ?? json['total_sessions'],
+    );
 
     return Wall(
       id: (json['id'] ?? json['_id'] ?? '').toString(),
       name: (json['name'] ?? 'Unknown Wall').toString(),
       latitude: latitude,
       longitude: longitude,
-      description: (json['description'] ?? 'No description available.').toString(),
+      description: (json['description'] ?? 'No description available.')
+          .toString(),
       difficulty: (json['difficulty'] ?? 'UNKNOWN').toString(),
       wallType: wallType,
       ownerName: owner,
       sessions: sessions,
       rating: rating,
       totalSessions: totalSessions,
+      issues: issues,
     );
   }
 
@@ -115,6 +136,7 @@ class Wall {
       'sessions': sessions.map((session) => session.toJson()).toList(),
       'rating': rating,
       'totalSessions': totalSessions,
+      'issues': issues.map((issue) => issue.toJson()).toList(),
     };
   }
 }
