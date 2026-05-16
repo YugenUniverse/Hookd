@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/poi.dart' show IndoorWallSummary;
 import '../models/user.dart';
 import '../pages/all_walls_page.dart';
+import '../pages/wall_issues_page.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
 
@@ -153,6 +154,16 @@ class _PublicBodyPageState extends State<PublicBodyPage> {
                               profilePictureUrl: user.profilePictureUrl,
                               memberSince: memberSince,
                               publicBodyData: user.publicBodyData,
+                            ),
+                            const SizedBox(height: 20),
+                            _NavButton(
+                              icon: Icons.report_problem_outlined,
+                              label: 'Wall issues',
+                              onTap: () => Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => const WallIssuesPage(),
+                                ),
+                              ),
                             ),
                             const SizedBox(height: 20),
                             _WallsSection(
@@ -902,6 +913,48 @@ class _EditWallDialogState extends State<_EditWallDialog> {
               : const Text('Apply'),
         ),
       ],
+    );
+  }
+}
+
+// ─── Nav button ───────────────────────────────────────────────────────────────
+
+class _NavButton extends StatelessWidget {
+  const _NavButton({required this.icon, required this.label, required this.onTap});
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(20),
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.7),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.3)),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, size: 20, color: colorScheme.primary),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                label,
+                style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
+              ),
+            ),
+            Icon(Icons.chevron_right, size: 20, color: colorScheme.onSurfaceVariant),
+          ],
+        ),
+      ),
     );
   }
 }

@@ -20,6 +20,9 @@ router.get("/nearby", wallController.getWallsByLocation);
 // Get wall leaderboard
 router.get("/:id/leaderboard", wallController.getWallLeaderboard);
 
+// Get walls owned by the authenticated Facility or PublicBody
+router.get("/owned", authenticateJwt, restrictTo("FacilityOwner", "PublicBody"), wallController.getOwnedWalls);
+
 // Get a single wall by ID (🚨 MUST be the last GET route!)
 router.get("/:id", wallController.getWallById);
 

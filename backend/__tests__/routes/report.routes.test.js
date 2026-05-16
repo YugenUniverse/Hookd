@@ -6,7 +6,7 @@ const reportRoutes = require("../../routes/report.routes");
 const errorMiddleware = require("../../middleware/error.middleware");
 const Report = require("../../models/Report");
 const { Wall, IndoorWall } = require("../../models/Wall");
-const { Facility } = require("../../models/User");
+const Facility = require("../../models/Facility");
 
 jest.mock("../../middleware/auth.middleware", () => ({
     authenticateJwt: (req, res, next) => {

@@ -6,6 +6,7 @@ import '../models/poi.dart' show IndoorWallSummary;
 import '../models/user.dart';
 import '../pages/all_walls_page.dart';
 import '../pages/report_list_page.dart';
+import '../pages/wall_issues_page.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
 import '../services/report_service.dart';
@@ -439,6 +440,16 @@ class _FacilityCard extends StatelessWidget {
                 },
                 icon: const Icon(Icons.analytics_outlined),
                 label: const Text('Performance Analytics'),
+              ),
+              const SizedBox(height: 10),
+              OutlinedButton.icon(
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const WallIssuesPage()),
+                  );
+                },
+                icon: const Icon(Icons.report_problem_outlined),
+                label: const Text('Wall issues'),
               ),
             ],
           ),
@@ -914,6 +925,41 @@ class _WallTile extends StatelessWidget {
     }
   }
 
+  Future<void> _confirmDelete(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete wall?'),
+        content: Text('This will permanently delete "${wall.name}". This cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    final ok = await ApiService().deleteWall(wall.id);
+    if (!context.mounted) return;
+
+    if (ok) {
+      onRefresh();
+      messenger.showSnackBar(const SnackBar(content: Text('Wall deleted')));
+    } else {
+      messenger.showSnackBar(const SnackBar(content: Text('Failed to delete wall')));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
@@ -973,11 +1019,6 @@ class _WallTile extends StatelessWidget {
               ],
             ),
           ),
-          IconButton(
-            tooltip: 'Edit wall',
-            onPressed: () => _showEditDialog(context),
-            icon: const Icon(Icons.edit_outlined),
-          ),
           if (wall.rating > 0) ...[
             Icon(Icons.star, size: 14, color: Colors.amber.shade700),
             const SizedBox(width: 2),
@@ -985,7 +1026,18 @@ class _WallTile extends StatelessWidget {
               wall.rating.toStringAsFixed(1),
               style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
             ),
+            const SizedBox(width: 4),
           ],
+          IconButton(
+            tooltip: 'Edit wall',
+            onPressed: () => _showEditDialog(context),
+            icon: const Icon(Icons.edit_outlined),
+          ),
+          IconButton(
+            tooltip: 'Delete wall',
+            onPressed: () => _confirmDelete(context),
+            icon: Icon(Icons.delete_outline, color: colorScheme.error),
+          ),
         ],
       ),
     );

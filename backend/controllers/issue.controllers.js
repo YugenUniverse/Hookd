@@ -26,10 +26,37 @@ exports.getIssuesForWall = async (req, res, next) => {
     }
 };
 
-exports.getIssuesByClimber = async (req, res, next) => {
+exports.getIssuesByUser = async (req, res, next) => {
     try {
-        const issues = await issueService.getIssuesByClimber(req.user.id);
+        let issues;
+        if (req.user.userType === "Climber") {
+            issues = await issueService.getIssuesByClimber(req.user.id);
+        } else if (req.user.userType === "PublicBody") {
+            issues = await issueService.getIssuesByPublicBody(req.user.id);
+        } else if (req.user.userType === "FacilityOwner") {
+            issues = await issueService.getIssuesByFacility(req.user.id);
+        } else {
+            const error = new Error("Invalid user type");
+            error.statusCode = 400;
+            throw error;
+        }
+
         res.json({ issues });
+    } catch (err) {
+        next(err);
+    }
+};
+
+exports.updateIssueStatus = async (req, res, next) => {
+    try {
+        const issue = await issueService.updateIssueStatus(
+            req.params.issueId,
+            req.body.status,
+            req.user.id,
+            req.user.userType,
+        );
+
+        res.json({ issues: [issue] });
     } catch (err) {
         next(err);
     }

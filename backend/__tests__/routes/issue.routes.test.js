@@ -6,6 +6,7 @@ const mongoose = require("mongoose");
 const issueRoutes = require("../../routes/issue.routes");
 const errorMiddleware = require("../../middleware/error.middleware");
 const { Issue } = require("../../models/Issue");
+const Facility = require("../../models/Facility");
 const { User, Climber, FacilityOwner, PublicBody } = require("../../models/User");
 const { Wall, IndoorWall, OutdoorWall } = require("../../models/Wall");
 
@@ -67,6 +68,10 @@ describe("issue.routes", () => {
                 username: "facilityuser",
                 userType: "FacilityOwner",
                 name: "Test Facility",
+                location: {
+                    type: "Point",
+                    coordinates: [10.5, 20.5],
+                },
                 authMethods: ["local"],
             });
 
@@ -106,9 +111,9 @@ describe("issue.routes", () => {
 
             const updatedWall = await IndoorWall.findById(wall._id);
             expect(updatedWall).not.toBeNull();
-            expect(
-                updatedWall.issues.map((id) => id.toString()),
-            ).toContain(response.body.issue.id);
+            expect(updatedWall.issues.map((id) => id.toString())).toContain(
+                response.body.issue.id,
+            );
         });
 
         it("should return 400 when wall_id is missing", async () => {
@@ -254,6 +259,10 @@ describe("issue.routes", () => {
                 username: "facilityuser",
                 userType: "FacilityOwner",
                 name: "Test Facility",
+                location: {
+                    type: "Point",
+                    coordinates: [10.5, 20.5],
+                },
                 authMethods: ["local"],
             });
 
@@ -293,6 +302,10 @@ describe("issue.routes", () => {
                 username: "facilityuser",
                 userType: "FacilityOwner",
                 name: "Test Facility",
+                location: {
+                    type: "Point",
+                    coordinates: [10.5, 20.5],
+                },
                 authMethods: ["local"],
             });
 
@@ -370,6 +383,10 @@ describe("issue.routes", () => {
                 username: "facilityuser",
                 userType: "FacilityOwner",
                 name: "Test Facility",
+                location: {
+                    type: "Point",
+                    coordinates: [10.5, 20.5],
+                },
                 authMethods: ["local"],
             });
 
@@ -403,6 +420,10 @@ describe("issue.routes", () => {
                 username: "facility1user",
                 userType: "FacilityOwner",
                 name: "Test Facility 1",
+                location: {
+                    type: "Point",
+                    coordinates: [10.5, 20.5],
+                },
                 authMethods: ["local"],
             });
 
@@ -411,6 +432,10 @@ describe("issue.routes", () => {
                 username: "facility2user",
                 userType: "FacilityOwner",
                 name: "Test Facility 2",
+                location: {
+                    type: "Point",
+                    coordinates: [10.5, 20.5],
+                },
                 authMethods: ["local"],
             });
 
@@ -446,6 +471,10 @@ describe("issue.routes", () => {
                 username: "facilityuser",
                 userType: "FacilityOwner",
                 name: "Test Facility",
+                location: {
+                    type: "Point",
+                    coordinates: [10.5, 20.5],
+                },
                 authMethods: ["local"],
             });
 
@@ -484,6 +513,10 @@ describe("issue.routes", () => {
                 username: "facilityuser",
                 userType: "FacilityOwner",
                 name: "Test Facility",
+                location: {
+                    type: "Point",
+                    coordinates: [10.5, 20.5],
+                },
                 authMethods: ["local"],
             });
 
@@ -506,6 +539,10 @@ describe("issue.routes", () => {
                 username: "facilityuser",
                 userType: "FacilityOwner",
                 name: "Test Facility",
+                location: {
+                    type: "Point",
+                    coordinates: [10.5, 20.5],
+                },
                 authMethods: ["local"],
             });
 
@@ -518,7 +555,6 @@ describe("issue.routes", () => {
             expect(response.status).toBe(400);
         });
     });
-
     describe("GET /issues/my-issues - Get Issues by Climber", () => {
         it("should return all issues created by the climber", async () => {
             const climber = await User.create({
@@ -536,6 +572,10 @@ describe("issue.routes", () => {
                 username: "facilityuser",
                 userType: "FacilityOwner",
                 name: "Test Facility",
+                location: {
+                    type: "Point",
+                    coordinates: [10.5, 20.5],
+                },
                 authMethods: ["local"],
             });
 
@@ -625,6 +665,379 @@ describe("issue.routes", () => {
         });
     });
 
+    describe("GET /issues/my-issues - Get Issues by Facility", () => {
+        it("should return all issues for the facility linked to the owner account", async () => {
+            const climber = await User.create({
+                email: "climber-linked@example.com",
+                username: "climberlinked",
+                userType: "Climber",
+                name: "Climber",
+                surname: "Linked",
+                birthdate: new Date("1990-01-01"),
+                authMethods: ["local"],
+            });
+
+            const facility = await Facility.create({
+                name: "Linked Facility",
+                description: "Facility linked to the owner account",
+                location: {
+                    type: "Point",
+                    coordinates: [10.5, 20.5],
+                },
+            });
+
+            const owner = await FacilityOwner.create({
+                email: "owner-linked@example.com",
+                username: "ownerlinked",
+                userType: "FacilityOwner",
+                facility: facility._id,
+                authMethods: ["local"],
+            });
+
+            facility.ownerAccount = owner._id;
+            await facility.save();
+
+            const wall1 = await IndoorWall.create({
+                facility: facility._id,
+                name: "Linked Wall 1",
+                location: {
+                    type: "Point",
+                    coordinates: [10.5, 20.5],
+                },
+                difficulty: "INTERMEDIATE",
+            });
+
+            const wall2 = await IndoorWall.create({
+                facility: facility._id,
+                name: "Linked Wall 2",
+                location: {
+                    type: "Point",
+                    coordinates: [11.5, 21.5],
+                },
+                difficulty: "ADVANCED",
+            });
+
+            await Facility.findByIdAndUpdate(facility._id, {
+                $push: { walls: [wall1._id, wall2._id] },
+            });
+
+            await Issue.create({
+                climber_id: climber._id,
+                wall_id: wall1._id,
+                body: "Linked first report",
+            });
+
+            await Issue.create({
+                climber_id: climber._id,
+                wall_id: wall2._id,
+                body: "Linked second report",
+            });
+
+            const accessToken = createAuthToken(owner);
+
+            const response = await request(app)
+                .get("/issues/my-issues")
+                .set("Authorization", `Bearer ${accessToken}`);
+
+            expect(response.status).toBe(200);
+            expect(response.body.issues).toHaveLength(2);
+            expect(response.body.issues).toEqual(
+                expect.arrayContaining([
+                    expect.objectContaining({ body: "Linked first report" }),
+                    expect.objectContaining({ body: "Linked second report" }),
+                ]),
+            );
+        });
+
+        it("should return all issues created by the facility", async () => {
+            const climber = await User.create({
+                email: "climber@example.com",
+                username: "climberuser",
+                userType: "Climber",
+                name: "Climber",
+                surname: "User",
+                birthdate: new Date("1990-01-01"),
+                authMethods: ["local"],
+            });
+
+            const facility = await User.create({
+                email: "facility@example.com",
+                username: "facilityuser",
+                userType: "FacilityOwner",
+                name: "Test Facility",
+                location: {
+                    type: "Point",
+                    coordinates: [10.5, 20.5],
+                },
+                authMethods: ["local"],
+            });
+
+            const wall1 = await IndoorWall.create({
+                facility: facility._id,
+                name: "Test Wall 1",
+                location: {
+                    type: "Point",
+                    coordinates: [10.5, 20.5],
+                },
+                difficulty: "INTERMEDIATE",
+            });
+
+            const wall2 = await IndoorWall.create({
+                facility: facility._id,
+                name: "Test Wall 2",
+                location: {
+                    type: "Point",
+                    coordinates: [11.5, 21.5],
+                },
+                difficulty: "ADVANCED",
+            });
+
+            await User.findByIdAndUpdate(facility._id, {
+                $push: { walls: [wall1._id, wall2._id] },
+            });
+
+            await Issue.create({
+                climber_id: climber._id,
+                wall_id: wall1._id,
+                body: "First report",
+            });
+
+            await Issue.create({
+                climber_id: climber._id,
+                wall_id: wall2._id,
+                body: "Second report",
+            });
+
+            const accessToken = createAuthToken(facility);
+
+            const response = await request(app)
+                .get("/issues/my-issues")
+                .set("Authorization", `Bearer ${accessToken}`);
+
+            expect(response.status).toBe(200);
+            expect(response.body).toEqual({
+                issues: expect.arrayContaining([
+                    expect.objectContaining({
+                        id: expect.any(String),
+                        body: "First report",
+                    }),
+                    expect.objectContaining({
+                        id: expect.any(String),
+                        body: "Second report",
+                    }),
+                ]),
+            });
+            expect(response.body.issues).toHaveLength(2);
+        });
+
+        it("should return empty array when facility has no issues", async () => {
+            const facility = await User.create({
+                email: "facility@example.com",
+                username: "facilityuser",
+                userType: "FacilityOwner",
+                name: "Test Facility",
+                location: {
+                    type: "Point",
+                    coordinates: [10.5, 20.5],
+                },
+                authMethods: ["local"],
+            });
+
+            const accessToken = createAuthToken(facility);
+
+            const response = await request(app)
+                .get("/issues/my-issues")
+                .set("Authorization", `Bearer ${accessToken}`);
+
+            expect(response.status).toBe(200);
+            expect(response.body).toEqual({ issues: [] });
+        });
+
+        it("should return 401 when no authentication token is provided", async () => {
+            const response = await request(app).get("/issues/my-issues");
+
+            expect(response.status).toBe(401);
+        });
+    });
+
+    describe("GET /issues/my-issues - Get Issues by PublicBody", () => {
+        it("should return all issues created by the public body", async () => {
+            const climber = await User.create({
+                email: "climber@example.com",
+                username: "climberuser",
+                userType: "Climber",
+                name: "Climber",
+                surname: "User",
+                birthdate: new Date("1990-01-01"),
+                authMethods: ["local"],
+            });
+
+            const publicBody = await User.create({
+                email: "publicbody@example.com",
+                username: "publicbodyuser",
+                userType: "PublicBody",
+                name: "Test Public Body",
+                location: {
+                    type: "Point",
+                    coordinates: [10.5, 20.5],
+                },
+                authMethods: ["local"],
+            });
+
+            const wall1 = await OutdoorWall.create({
+                publicBody: publicBody._id,
+                name: "Test Wall 1",
+                location: {
+                    type: "Point",
+                    coordinates: [10.5, 20.5],
+                },
+                difficulty: "INTERMEDIATE",
+            });
+
+            const wall2 = await OutdoorWall.create({
+                publicBody: publicBody._id,
+                name: "Test Wall 2",
+                location: {
+                    type: "Point",
+                    coordinates: [11.5, 21.5],
+                },
+                difficulty: "ADVANCED",
+            });
+
+            await User.findByIdAndUpdate(publicBody._id, {
+                $push: { walls: [wall1._id, wall2._id] },
+            });
+
+            await Issue.create({
+                climber_id: climber._id,
+                wall_id: wall1._id,
+                body: "First report",
+            });
+
+            await Issue.create({
+                climber_id: climber._id,
+                wall_id: wall2._id,
+                body: "Second report",
+            });
+
+            const accessToken = createAuthToken(publicBody);
+
+            const response = await request(app)
+                .get("/issues/my-issues")
+                .set("Authorization", `Bearer ${accessToken}`);
+
+            expect(response.status).toBe(200);
+            expect(response.body).toEqual({
+                issues: expect.arrayContaining([
+                    expect.objectContaining({
+                        id: expect.any(String),
+                        body: "First report",
+                    }),
+                    expect.objectContaining({
+                        id: expect.any(String),
+                        body: "Second report",
+                    }),
+                ]),
+            });
+            expect(response.body.issues).toHaveLength(2);
+        });
+
+        it("should return empty array when public body has no issues", async () => {
+            const publicBody = await User.create({
+                email: "publicbody@example.com",
+                username: "publicbodyuser",
+                userType: "PublicBody",
+                name: "Test Public Body",
+                location: {
+                    type: "Point",
+                    coordinates: [10.5, 20.5],
+                },
+                authMethods: ["local"],
+            });
+
+            const accessToken = createAuthToken(publicBody);
+
+            const response = await request(app)
+                .get("/issues/my-issues")
+                .set("Authorization", `Bearer ${accessToken}`);
+
+            expect(response.status).toBe(200);
+            expect(response.body).toEqual({ issues: [] });
+        });
+
+        it("should return 401 when no authentication token is provided", async () => {
+            const response = await request(app).get("/issues/my-issues");
+
+            expect(response.status).toBe(401);
+        });
+    });
+
+    describe("PATCH /issues/:issueId/status - Update Issue Status", () => {
+        it("should update the issue status and return the updated issue in an issues array", async () => {
+            const facility = await User.create({
+                email: "facility@example.com",
+                username: "facilityuser",
+                userType: "FacilityOwner",
+                name: "Facility",
+                location: {
+                    type: "Point",
+                    coordinates: [10.5, 20.5],
+                },
+                authMethods: ["local"],
+            });
+
+            const climber = await User.create({
+                email: "climber@example.com",
+                username: "climberuser",
+                userType: "Climber",
+                name: "Climber",
+                surname: "User",
+                birthdate: new Date("1990-01-01"),
+                authMethods: ["local"],
+            });
+
+            const wall = await IndoorWall.create({
+                facility: facility._id,
+                name: "Test Wall",
+                location: {
+                    type: "Point",
+                    coordinates: [10.5, 20.5],
+                },
+                difficulty: "INTERMEDIATE",
+            });
+
+            await User.findByIdAndUpdate(facility._id, {
+                $push: { walls: wall._id },
+            });
+
+            const issue = await Issue.create({
+                climber_id: climber._id,
+                wall_id: wall._id,
+                body: "This wall has a broken hold",
+            });
+
+            const accessToken = createAuthToken(facility);
+
+            const response = await request(app)
+                .patch(`/issues/${issue._id.toString()}/status`)
+                .set("Authorization", `Bearer ${accessToken}`)
+                .send({ status: "IN_PROGRESS" });
+
+            expect(response.status).toBe(200);
+            expect(response.body).toEqual({
+                issues: [
+                    expect.objectContaining({
+                        id: issue._id.toString(),
+                        climber_id: climber._id.toString(),
+                        wall_id: wall._id.toString(),
+                        body: "This wall has a broken hold",
+                        status: "IN_PROGRESS",
+                    }),
+                ],
+            });
+        });
+    });
+
     describe("DELETE /issues/:issueId - Delete Issue", () => {
         it("should delete an issue when the climber who created it requests deletion", async () => {
             const climber = await User.create({
@@ -642,6 +1055,10 @@ describe("issue.routes", () => {
                 username: "facilityuser",
                 userType: "FacilityOwner",
                 name: "Test Facility",
+                location: {
+                    type: "Point",
+                    coordinates: [10.5, 20.5],
+                },
                 authMethods: ["local"],
             });
 
@@ -703,6 +1120,10 @@ describe("issue.routes", () => {
                 username: "facilityuser",
                 userType: "FacilityOwner",
                 name: "Test Facility",
+                location: {
+                    type: "Point",
+                    coordinates: [10.5, 20.5],
+                },
                 authMethods: ["local"],
             });
 

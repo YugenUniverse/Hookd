@@ -4,6 +4,8 @@ import '../models/climbing_session.dart';
 import '../models/user.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
+import 'my_issues_page.dart';
+import 'wall_issues_page.dart';
 
 class _UserPageData {
   const _UserPageData({required this.user, required this.sessions});
@@ -273,6 +275,8 @@ class _UserPageState extends State<UserPage> {
                               ),
                             ),
                             const SizedBox(height: 20),
+                            _IssuesButton(userType: AuthService().userType),
+                            const SizedBox(height: 20),
                             Text(
                               'Activity',
                               style: theme.textTheme.titleLarge?.copyWith(
@@ -479,6 +483,55 @@ class _InfoTile extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _IssuesButton extends StatelessWidget {
+  const _IssuesButton({required this.userType});
+
+  final String? userType;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isClimber = userType == null || userType == 'Climber';
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(20),
+      onTap: () {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => isClimber ? const MyIssuesPage() : const WallIssuesPage(),
+          ),
+        );
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.7),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.3)),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              isClimber ? Icons.report_outlined : Icons.report_problem_outlined,
+              size: 20,
+              color: colorScheme.primary,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                isClimber ? 'My reports' : 'Wall issues',
+                style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
+              ),
+            ),
+            Icon(Icons.chevron_right, size: 20, color: colorScheme.onSurfaceVariant),
+          ],
+        ),
       ),
     );
   }

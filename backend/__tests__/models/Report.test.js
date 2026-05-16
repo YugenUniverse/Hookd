@@ -1,7 +1,7 @@
 const mongoose = require("mongoose");
 const Report = require("../../models/Report");
 const { Wall, IndoorWall } = require("../../models/Wall");
-const { Facility } = require("../../models/User");
+const Facility = require("../../models/Facility");
 
 describe("Report model", () => {
     beforeAll(async () => {

@@ -18,6 +18,15 @@ exports.createWall = async (req, res, next) => {
     }
 };
 
+exports.getOwnedWalls = async (req, res, next) => {
+    try {
+        const walls = await wallService.getOwnedWalls(req.user.id, req.user.userType);
+        res.json(walls);
+    } catch (err) {
+        next(err);
+    }
+};
+
 exports.getAllWalls = async (req, res, next) => {
     try {
         const walls = await wallService.getAllWalls();

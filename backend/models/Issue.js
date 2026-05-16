@@ -2,6 +2,8 @@ const mongoose = require("mongoose");
 const { Climber } = require("../models/User");
 const { Wall } = require("../models/Wall");
 
+const STATUS_ENUM = ["OPEN", "IN_PROGRESS", "RESOLVED", "CLOSED"];
+
 const baseTransform = (doc, ret) => {
     ret.id = ret._id;
     delete ret._id;
@@ -27,6 +29,11 @@ const issueSchema = new mongoose.Schema(
             trim: true,
             maxlength: [500, "Issue body cannot exceed 500 characters"],
         },
+        status: {
+            type: String,
+            enum: STATUS_ENUM,
+            default: "OPEN",
+        },
     },
     {
         timestamps: {
@@ -38,6 +45,16 @@ const issueSchema = new mongoose.Schema(
         },
     },
 );
+
+issueSchema.methods.updateStatus = function (newStatus) {
+    if (!STATUS_ENUM.includes(newStatus)) {
+        const error = new Error(`Invalid status: ${newStatus}`);
+        error.statusCode = 400;
+        throw error;
+    }
+    this.status = newStatus;
+    return this.save();
+};
 
 const Issue = mongoose.model("Issue", issueSchema);
 

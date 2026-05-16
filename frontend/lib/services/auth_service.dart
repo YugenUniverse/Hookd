@@ -180,7 +180,7 @@ class AuthService extends ChangeNotifier {
       final rawAdmin =
           payload['is_admin'] ?? payload['isAdmin'] ?? payload['admin'];
       final admin = _parseBool(rawAdmin);
-      final userType = payload['userType']?.toString();
+      final userType = payload['userType']?.toString() ?? payload['user_type']?.toString();
       if (userId != null || rawAdmin != null || userType != null) {
         setCurrentUserProfile(
           id: userId,

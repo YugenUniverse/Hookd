@@ -162,6 +162,19 @@ exports.getWallsByLocation = async (lng, lat, radius) => {
         .populate("publicBody", "username email avatar");
 };
 
+exports.getOwnedWalls = async (userId, userType) => {
+    if (userType === "FacilityOwner") {
+        const facility = await Facility.findOne({ ownerAccount: userId });
+        if (!facility) return [];
+        return Wall.find({ facility: facility._id });
+    } else if (userType === "PublicBody") {
+        return Wall.find({ publicBody: userId });
+    }
+    const error = new Error("Only Facilities and Public Bodies can view owned walls.");
+    error.statusCode = 403;
+    throw error;
+};
+
 exports.deleteWall = async (id, userId, userType) => {
     const wall = await Wall.findById(id);
 
