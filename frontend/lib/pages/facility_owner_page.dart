@@ -4,8 +4,11 @@ import 'package:flutter/material.dart';
 
 import '../models/poi.dart' show IndoorWallSummary;
 import '../models/user.dart';
+import '../pages/all_walls_page.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
+
+const _kMaxPreviewWalls = 5;
 
 class FacilityOwnerPage extends StatefulWidget {
   const FacilityOwnerPage({super.key});
@@ -447,14 +450,34 @@ class _FacilityCard extends StatelessWidget {
               ),
             ),
           )
-        else
-          ...facility.walls.map((wall) => Padding(
+        else ...[
+          ...facility.walls.take(_kMaxPreviewWalls).map((wall) => Padding(
                 padding: const EdgeInsets.only(bottom: 10),
-                  child: _WallTile(
-                    wall: wall,
-                    onRefresh: onRefresh,
-                  ),
+                child: _WallTile(wall: wall, onRefresh: onRefresh),
               )),
+          if (facility.walls.length > _kMaxPreviewWalls)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: OutlinedButton.icon(
+                onPressed: () async {
+                  await Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => AllWallsPage(
+                        title: 'All walls — ${facility.name}',
+                        walls: facility.walls,
+                        canDelete: false,
+                      ),
+                    ),
+                  );
+                  onRefresh();
+                },
+                icon: const Icon(Icons.list, size: 18),
+                label: Text(
+                  'View all ${facility.walls.length} walls',
+                ),
+              ),
+            ),
+        ],
       ],
     );
   }

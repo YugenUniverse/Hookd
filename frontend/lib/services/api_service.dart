@@ -417,6 +417,40 @@ class ApiService {
     }
   }
 
+  Future<bool> createWall({
+    required String name,
+    required String description,
+    required String difficulty,
+    required double longitude,
+    required double latitude,
+    String? address,
+  }) async {
+    try {
+      await _dio.post('/walls', data: {
+        'name': name,
+        'description': description,
+        'difficulty': difficulty,
+        'location': {
+          'type': 'Point',
+          'coordinates': [longitude, latitude],
+          if (address != null && address.isNotEmpty) 'address': address,
+        },
+      });
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<bool> deleteWall(String wallId) async {
+    try {
+      await _dio.delete('/walls/$wallId');
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<bool> updateWall(
     String wallId, {
     required String name,

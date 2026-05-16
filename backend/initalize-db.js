@@ -2,6 +2,7 @@ require("dotenv").config();
 
 const axios = require("axios");
 const mongoose = require("mongoose");
+const bcrypt = require("bcrypt");
 const { Wall } = require("./models/Wall");
 const Facility = require("./models/Facility");
 const { PublicBody } = require("./models/User");
@@ -97,6 +98,9 @@ async function main() {
   await mongoose.connect(process.env.MONGO_URI || "mongodb://localhost:27017/hookd");
 
   // Upsert the PublicBody that will own all seeded outdoor walls
+  const seedPasswordPlain = process.env.SEED_PUBLICBODY_PASSWORD || "hookd_test_password";
+  const seedPasswordHash = await bcrypt.hash(seedPasswordPlain, 10);
+
   const regioneTrentino = await PublicBody.findOneAndUpdate(
     { username: "regione_trentino" },
     {
@@ -104,6 +108,8 @@ async function main() {
         name: "Regione Trentino",
         description: "Autonomous Province of Trento — manages outdoor climbing areas in the Trentino region.",
         location: { type: "Point", coordinates: [11.1217, 46.0667] },
+        password: seedPasswordHash,
+        authMethods: ["local"],
       },
       $setOnInsert: {
         email: "regione.trentino@hookd.internal",

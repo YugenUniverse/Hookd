@@ -63,6 +63,13 @@ exports.getCurrentUser = async (req, res, next) => {
             });
         }
 
+        if (user.userType === "PublicBody" && user.walls?.length) {
+            await user.populate({
+                path: "walls",
+                select: "name description difficulty status rating wallType",
+            });
+        }
+
         res.status(200).json(user.toJSON());
     } catch (err) {
         next(err);

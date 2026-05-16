@@ -1,5 +1,58 @@
 import 'poi.dart' show IndoorWallSummary;
 
+class PublicBodyData {
+  final String name;
+  final String description;
+  final String? address;
+  final List<double>? coordinates;
+  final List<IndoorWallSummary> walls;
+
+  const PublicBodyData({
+    required this.name,
+    required this.description,
+    required this.walls,
+    this.address,
+    this.coordinates,
+  });
+
+  factory PublicBodyData.fromJson(Map<String, dynamic> json) {
+    final location = json['location'];
+    String? address;
+    List<double>? coordinates;
+    if (location is Map) address = location['address']?.toString();
+    if (location is Map && location['coordinates'] is List) {
+      final raw = location['coordinates'] as List;
+      if (raw.length == 2) {
+        final lng = raw[0];
+        final lat = raw[1];
+        final parsedLng = lng is num ? lng.toDouble() : double.tryParse(lng.toString());
+        final parsedLat = lat is num ? lat.toDouble() : double.tryParse(lat.toString());
+        if (parsedLng != null && parsedLat != null) {
+          coordinates = [parsedLng, parsedLat];
+        }
+      }
+    }
+
+    final wallsRaw = json['walls'];
+    final walls = <IndoorWallSummary>[];
+    if (wallsRaw is List) {
+      for (final w in wallsRaw) {
+        if (w is Map) {
+          walls.add(IndoorWallSummary.fromJson(Map<String, dynamic>.from(w)));
+        }
+      }
+    }
+
+    return PublicBodyData(
+      name: (json['name'] ?? '').toString(),
+      description: (json['description'] ?? '').toString(),
+      address: address,
+      coordinates: coordinates,
+      walls: walls,
+    );
+  }
+}
+
 class FacilityProfile {
   final String id;
   final String name;
@@ -66,6 +119,7 @@ class User {
   final bool originalMember;
   final String? userType;
   final FacilityProfile? facilityData;
+  final PublicBodyData? publicBodyData;
 
   User({
     required this.id,
@@ -77,6 +131,7 @@ class User {
     this.originalMember = false,
     this.userType,
     this.facilityData,
+    this.publicBodyData,
   });
 
   factory User.fromJson(Map<String, dynamic> json) {
@@ -129,6 +184,11 @@ class User {
           FacilityProfile.fromJson(Map<String, dynamic>.from(facilityRaw));
     }
 
+    PublicBodyData? publicBodyData;
+    if (userType == 'PublicBody') {
+      publicBodyData = PublicBodyData.fromJson(json);
+    }
+
     return User(
       id: id,
       username: username,
@@ -139,6 +199,7 @@ class User {
       originalMember: originalMember,
       userType: userType,
       facilityData: facilityData,
+      publicBodyData: publicBodyData,
     );
   }
 

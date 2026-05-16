@@ -6,6 +6,7 @@ import '../pages/log_session_page.dart';
 import '../pages/global_leaderboard_page.dart';
 import '../pages/user_page.dart';
 import '../pages/facility_owner_page.dart';
+import '../pages/public_body_page.dart';
 import '../services/auth_service.dart';
 import '../services/wall_service.dart';
 import '../models/wall.dart';
@@ -146,9 +147,12 @@ class _MyHomePageState extends State<MyHomePage> {
                   hint: isAuthenticated ? null : 'Login',
                   onPressed: () {
                     _runProtectedAction(() async {
-                      final page = AuthService().userType == 'FacilityOwner'
-                          ? const FacilityOwnerPage()
-                          : const UserPage();
+                      final userType = AuthService().userType;
+                      final Widget page = switch (userType) {
+                        'FacilityOwner' => const FacilityOwnerPage(),
+                        'PublicBody' => const PublicBodyPage(),
+                        _ => const UserPage(),
+                      };
                       await Navigator.of(context).push(
                         MaterialPageRoute(builder: (_) => page),
                       );
@@ -304,7 +308,7 @@ class _WallSearchSheetState extends State<_WallSearchSheet> {
               Expanded(
                 child: ListView.separated(
                   itemCount: _results.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 8),
+                  separatorBuilder: (_, _) => const SizedBox(height: 8),
                   itemBuilder: (context, index) {
                     final wall = _results[index];
                     return Card(
@@ -436,14 +440,14 @@ class _NavItem extends StatelessWidget {
                     Icon(
                       Icons.lock_outline,
                       size: 11,
-                      color: color.withOpacity(0.85),
+                      color: color.withValues(alpha: 0.85),
                     ),
                     const SizedBox(width: 2),
                     Text(
                       hint!,
                       style: TextStyle(
                         fontSize: 9,
-                        color: color.withOpacity(0.85),
+                        color: color.withValues(alpha: 0.85),
                         fontWeight: FontWeight.w600,
                       ),
                     ),

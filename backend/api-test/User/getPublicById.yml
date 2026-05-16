@@ -5,7 +5,11 @@ info:
 
 http:
   method: GET
-  url: http://localhost:3000/users/{{userId}}
+  url: http://localhost:3000/users/:userId
+  params:
+    - name: userId
+      value: 6a05f03a650adaff5fe3b87d
+      type: path
   auth: inherit
 
 settings:
