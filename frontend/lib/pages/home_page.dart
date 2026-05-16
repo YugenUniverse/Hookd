@@ -130,7 +130,7 @@ class _MyHomePageState extends State<MyHomePage> {
                 ),
                 _NavItem(
                   tooltip: 'Global Rankings',
-                  icon: Icons.leaderboard_outlined, // A sleek podium icon
+                  icon: Icons.leaderboard_outlined,
                   label: 'Rank',
                   onTap: _openGlobalLeaderboard,
                 ),

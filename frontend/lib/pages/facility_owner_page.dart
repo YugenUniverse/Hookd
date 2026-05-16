@@ -5,8 +5,10 @@ import 'package:flutter/material.dart';
 import '../models/poi.dart' show IndoorWallSummary;
 import '../models/user.dart';
 import '../pages/all_walls_page.dart';
+import '../pages/report_list_page.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
+import '../services/report_service.dart';
 
 const _kMaxPreviewWalls = 5;
 
@@ -422,6 +424,21 @@ class _FacilityCard extends StatelessWidget {
                     ),
                   ),
                 ],
+              ),
+              const SizedBox(height: 10),
+              OutlinedButton.icon(
+                onPressed: () {
+                  final token = AuthService().jwt ?? '';
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => ReportListPage(
+                        reportService: ReportService(token: token),
+                      ),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.analytics_outlined),
+                label: const Text('Performance Analytics'),
               ),
             ],
           ),

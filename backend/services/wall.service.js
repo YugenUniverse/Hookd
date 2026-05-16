@@ -90,7 +90,9 @@ exports.getAllWalls = async () => {
         } catch (e) {
             // ignore compute errors and continue
         }
-        const totalSessions = await ClimbingSession.countDocuments({ wall_id: wall._id });
+        const totalSessions = await ClimbingSession.countDocuments({
+            wall_id: wall._id,
+        });
         wall._totalSessions = totalSessions;
     }
 
@@ -135,7 +137,9 @@ exports.searchWalls = async (searchQuery) => {
         try {
             await wall.computeRating();
         } catch (e) {}
-        const totalSessions = await ClimbingSession.countDocuments({ wall_id: wall._id });
+        const totalSessions = await ClimbingSession.countDocuments({
+            wall_id: wall._id,
+        });
         wall._totalSessions = totalSessions;
     }
 
