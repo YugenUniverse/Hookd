@@ -1,6 +1,6 @@
 const mongoose = require("mongoose");
 const { Issue } = require("../models/Issue");
-const { Wall } = require("../models/Wall");
+const { Wall, IndoorWall, OutdoorWall } = require("../models/Wall");
 const { User } = require("../models/User");
 
 const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
@@ -104,7 +104,8 @@ exports.getIssuesByClimber = async (userId) => {
 };
 
 const getOwnedWallIds = async (userId, ownerField) => {
-    const wallsByField = await Wall.find({ [ownerField]: userId }).distinct(
+    const ownedWallModel = ownerField === "facility" ? IndoorWall : OutdoorWall;
+    const wallsByField = await ownedWallModel.find({ [ownerField]: userId }).distinct(
         "_id",
     );
     const user = await User.findById(userId).select("walls");
@@ -168,7 +169,7 @@ exports.updateIssueStatus = async (issueId, newStatus, userId, userType) => {
         throw error;
     }
 
-    const issue = await Issue.findById(issueId).populate("wall_id");
+    const issue = await Issue.findById(issueId);
     if (!issue) {
         const error = new Error("Issue not found");
         error.statusCode = 404;
@@ -177,9 +178,7 @@ exports.updateIssueStatus = async (issueId, newStatus, userId, userType) => {
 
     const ownerField = userType === "Facility" ? "facility" : "publicBody";
     const ownedWallIds = await getOwnedWallIds(userId, ownerField);
-    const issueWallId = issue.wall_id._id
-        ? issue.wall_id._id.toString()
-        : issue.wall_id.toString();
+    const issueWallId = issue.wall_id.toString();
 
     if (!ownedWallIds.some((id) => id.toString() === issueWallId)) {
         const error = new Error("You can only update issues for walls you own");

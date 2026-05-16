@@ -377,6 +377,10 @@ class ApiService {
     }
   }
 
+  Future<void> updateIssueStatus(String issueId, String status) async {
+    await _dio.patch('/issues/$issueId/status', data: {'status': status});
+  }
+
   String _formatDate(DateTime date) {
     final y = date.year.toString().padLeft(4, '0');
     final m = date.month.toString().padLeft(2, '0');

@@ -665,6 +665,72 @@ describe("issue.routes", () => {
         });
     });
 
+    describe("PATCH /issues/:issueId/status - Update Issue Status", () => {
+        it("should update the issue status and return the updated issue in an issues array", async () => {
+            const facility = await User.create({
+                email: "facility@example.com",
+                username: "facilityuser",
+                userType: "Facility",
+                name: "Facility",
+                location: {
+                    type: "Point",
+                    coordinates: [10.5, 20.5],
+                },
+                authMethods: ["local"],
+            });
+
+            const climber = await User.create({
+                email: "climber@example.com",
+                username: "climberuser",
+                userType: "Climber",
+                name: "Climber",
+                surname: "User",
+                birthdate: new Date("1990-01-01"),
+                authMethods: ["local"],
+            });
+
+            const wall = await IndoorWall.create({
+                facility: facility._id,
+                name: "Test Wall",
+                location: {
+                    type: "Point",
+                    coordinates: [10.5, 20.5],
+                },
+                difficulty: "INTERMEDIATE",
+            });
+
+            await User.findByIdAndUpdate(facility._id, {
+                $push: { walls: wall._id },
+            });
+
+            const issue = await Issue.create({
+                climber_id: climber._id,
+                wall_id: wall._id,
+                body: "This wall has a broken hold",
+            });
+
+            const accessToken = createAuthToken(facility);
+
+            const response = await request(app)
+                .patch(`/issues/${issue._id.toString()}/status`)
+                .set("Authorization", `Bearer ${accessToken}`)
+                .send({ status: "IN_PROGRESS" });
+
+            expect(response.status).toBe(200);
+            expect(response.body).toEqual({
+                issues: [
+                    expect.objectContaining({
+                        id: issue._id.toString(),
+                        climber_id: climber._id.toString(),
+                        wall_id: wall._id.toString(),
+                        body: "This wall has a broken hold",
+                        status: "IN_PROGRESS",
+                    }),
+                ],
+            });
+        });
+    });
+
     describe("DELETE /issues/:issueId - Delete Issue", () => {
         it("should delete an issue when the climber who created it requests deletion", async () => {
             const climber = await User.create({

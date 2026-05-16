@@ -56,7 +56,7 @@ exports.updateIssueStatus = async (req, res, next) => {
             req.user.userType,
         );
 
-        res.json({ issue });
+        res.json({ issues: [issue] });
     } catch (err) {
         next(err);
     }

@@ -30,6 +30,7 @@ class AuthService extends ChangeNotifier {
   String? _username;
   bool _isAdmin = false;
   bool _keyringLocked = false;
+  String? _userType;
 
   // public getters
   String? get jwt => _accessToken;
@@ -39,6 +40,7 @@ class AuthService extends ChangeNotifier {
   bool get isAdmin => _isAdmin;
   bool get isAuthenticated => _accessToken != null && _accessToken!.isNotEmpty;
   bool get isKeyringLocked => _keyringLocked;
+  String? get userType => _userType;
 
   // Load tokens from secure storage.
   // Throws KeyringLockedException if secure storage cannot be accessed (e.g. libsecret locked).
@@ -136,6 +138,7 @@ class AuthService extends ChangeNotifier {
     _userId = null;
     _username = null;
     _isAdmin = false;
+    _userType = null;
     try {
       await _secure.delete(key: 'access_token');
       await _secure.delete(key: 'refresh_token');
@@ -173,6 +176,8 @@ class AuthService extends ChangeNotifier {
       final rawAdmin =
           payload['is_admin'] ?? payload['isAdmin'] ?? payload['admin'];
       final admin = _parseBool(rawAdmin);
+      final userType = payload['userType']?.toString() ?? payload['user_type']?.toString();
+      if (userType != null) _userType = userType;
       if (userId != null || rawAdmin != null) {
         setCurrentUserProfile(id: userId, isAdmin: rawAdmin == null ? null : admin);
       }
