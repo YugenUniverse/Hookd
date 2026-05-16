@@ -5,8 +5,11 @@ import '../dialogs/login_dialog.dart';
 import '../pages/log_session_page.dart';
 import '../pages/global_leaderboard_page.dart';
 import '../pages/user_page.dart';
+import '../pages/facility_owner_page.dart';
+import '../pages/public_body_page.dart';
 import '../services/auth_service.dart';
-import '../services/wall_service.dart';
+import '../services/api_service.dart';
+import '../models/poi.dart';
 import '../models/wall.dart';
 import '../widgets/poi_map.dart';
 
@@ -18,7 +21,6 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  final WallService _wallService = WallService();
   final WallMapController _mapController = WallMapController();
 
   @override
@@ -60,7 +62,6 @@ class _MyHomePageState extends State<MyHomePage> {
       useSafeArea: true,
       showDragHandle: true,
       builder: (_) => _WallSearchSheet(
-        wallService: _wallService,
         mapController: _mapController,
         onLogWall: _openLogSessionSheetWithWall,
       ),
@@ -145,10 +146,14 @@ class _MyHomePageState extends State<MyHomePage> {
                   hint: isAuthenticated ? null : 'Login',
                   onPressed: () {
                     _runProtectedAction(() async {
+                      final userType = AuthService().userType;
+                      final Widget page = switch (userType) {
+                        'FacilityOwner' => const FacilityOwnerPage(),
+                        'PublicBody' => const PublicBodyPage(),
+                        _ => const UserPage(),
+                      };
                       await Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => const UserPage(),
-                        ),
+                        MaterialPageRoute(builder: (_) => page),
                       );
                     });
                   },
@@ -167,12 +172,10 @@ class _MyHomePageState extends State<MyHomePage> {
 
 class _WallSearchSheet extends StatefulWidget {
   const _WallSearchSheet({
-    required this.wallService,
     required this.mapController,
     required this.onLogWall,
   });
 
-  final WallService wallService;
   final WallMapController mapController;
   final Future<void> Function(Wall wall) onLogWall;
 
@@ -182,27 +185,34 @@ class _WallSearchSheet extends StatefulWidget {
 
 class _WallSearchSheetState extends State<_WallSearchSheet> {
   final TextEditingController _controller = TextEditingController();
-  List<Wall> _results = [];
+  List<Poi> _results = [];
   bool _loading = false;
   String? _error;
   Timer? _debounce;
 
-  Future<void> _handleLogWall(Wall wall) async {
-    final rootContext = Navigator.of(context, rootNavigator: true).context;
+  Future<void> _handleLogOutdoorWall(OutdoorWallPoi poi) async {
+    final wall = Wall(
+      id: poi.id,
+      name: poi.name,
+      latitude: poi.latitude,
+      longitude: poi.longitude,
+      description: poi.description,
+      difficulty: poi.difficulty,
+      wallType: 'OutdoorWall',
+      ownerName: poi.ownerName,
+      sessions: [],
+      rating: poi.rating,
+    );
 
+    final rootContext = Navigator.of(context, rootNavigator: true).context;
     Navigator.of(context).pop();
 
     if (!AuthService().isAuthenticated) {
       final loggedIn = await showLoginDialog(rootContext);
-      if (loggedIn != true || !AuthService().isAuthenticated) {
-        return;
-      }
+      if (loggedIn != true || !AuthService().isAuthenticated) return;
     }
 
-    if (!mounted || !rootContext.mounted) {
-      return;
-    }
-
+    if (!mounted || !rootContext.mounted) return;
     await widget.onLogWall(wall);
   }
 
@@ -234,21 +244,32 @@ class _WallSearchSheetState extends State<_WallSearchSheet> {
     });
 
     try {
-      final results = await widget.wallService.searchWalls(query);
-      setState(() {
-        _results = results;
-      });
+      final results = await ApiService().searchPois(query);
+      if (mounted) setState(() => _results = results);
     } catch (e) {
-      setState(() {
-        _error = e.toString();
-        _results = [];
-      });
+      if (mounted) setState(() { _error = e.toString(); _results = []; });
     } finally {
-      if (mounted) {
-        setState(() {
-          _loading = false;
-        });
-      }
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  void _selectPoi(Poi poi) {
+    Navigator.of(context).pop();
+    if (poi is FacilityPoi) {
+      widget.mapController.focusOnFacility(poi);
+    } else if (poi is OutdoorWallPoi) {
+      widget.mapController.focusOnWall(Wall(
+        id: poi.id,
+        name: poi.name,
+        latitude: poi.latitude,
+        longitude: poi.longitude,
+        description: poi.description,
+        difficulty: poi.difficulty,
+        wallType: 'OutdoorWall',
+        ownerName: poi.ownerName,
+        sessions: [],
+        rating: poi.rating,
+      ));
     }
   }
 
@@ -264,7 +285,7 @@ class _WallSearchSheetState extends State<_WallSearchSheet> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Search climbing walls',
+              'Search climbing spots',
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 12),
@@ -275,7 +296,7 @@ class _WallSearchSheetState extends State<_WallSearchSheet> {
               onChanged: _onQueryChanged,
               onSubmitted: (_) => _search(),
               decoration: InputDecoration(
-                hintText: 'Search by name',
+                hintText: 'Search facilities and outdoor walls',
                 prefixIcon: const Icon(Icons.search),
                 suffixIcon: IconButton(
                   tooltip: 'Search',
@@ -296,75 +317,53 @@ class _WallSearchSheetState extends State<_WallSearchSheet> {
             else if (_results.isEmpty)
               const Padding(
                 padding: EdgeInsets.only(top: 12),
-                child: Text('Type a name and search for walls.'),
+                child: Text('Type a name to search for facilities and outdoor walls.'),
               )
             else
               Expanded(
                 child: ListView.separated(
                   itemCount: _results.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 8),
+                  separatorBuilder: (_, _) => const SizedBox(height: 8),
                   itemBuilder: (context, index) {
-                    final wall = _results[index];
+                    final poi = _results[index];
+                    final facilityPoi = poi is FacilityPoi ? poi : null;
+                    final outdoorPoi = poi is OutdoorWallPoi ? poi : null;
                     return Card(
                       child: ListTile(
                         leading: CircleAvatar(
                           child: Icon(
-                            wall.wallType == 'IndoorWall'
-                                ? Icons.domain
-                                : Icons.landscape,
+                            facilityPoi != null ? Icons.domain : Icons.landscape,
                           ),
                         ),
-                        title: Text(wall.name),
-                        subtitle: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('${wall.difficulty} • ${wall.type}'),
-                            const SizedBox(height: 4),
-                            Row(
-                              children: [
-                                Icon(Icons.star, size: 14, color: Colors.amber[600]),
-                                const SizedBox(width: 6),
-                                Text(
-                                  wall.rating.toStringAsFixed(1),
-                                  style: const TextStyle(fontSize: 13),
+                        title: Text(poi.name),
+                        subtitle: facilityPoi != null
+                            ? Text('Indoor Facility • ${facilityPoi.walls.length} wall${facilityPoi.walls.length == 1 ? '' : 's'}')
+                            : Text('${outdoorPoi!.difficulty} • Outdoor Wall'),
+                        trailing: outdoorPoi != null
+                            ? IconButton(
+                                tooltip: isAuthenticated
+                                    ? 'Log session'
+                                    : 'Log session (login required)',
+                                icon: Stack(
+                                  clipBehavior: Clip.none,
+                                  children: [
+                                    const Icon(Icons.edit_calendar_outlined),
+                                    if (!isAuthenticated)
+                                      Positioned(
+                                        right: -2,
+                                        bottom: -2,
+                                        child: Icon(
+                                          Icons.lock_outline,
+                                          size: 11,
+                                          color: Theme.of(context).colorScheme.primary,
+                                        ),
+                                      ),
+                                  ],
                                 ),
-                                const SizedBox(width: 12),
-                                Text(
-                                  '${wall.totalSessions} sessions',
-                                  style: const TextStyle(fontSize: 13),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                        trailing: IconButton(
-                          tooltip: isAuthenticated
-                              ? 'Log session'
-                              : 'Log session (login required)',
-                          icon: Stack(
-                            clipBehavior: Clip.none,
-                            children: [
-                              const Icon(Icons.edit_calendar_outlined),
-                              if (!isAuthenticated)
-                                Positioned(
-                                  right: -2,
-                                  bottom: -2,
-                                  child: Icon(
-                                    Icons.lock_outline,
-                                    size: 11,
-                                    color: Theme.of(
-                                      context,
-                                    ).colorScheme.primary,
-                                  ),
-                                ),
-                            ],
-                          ),
-                          onPressed: () => _handleLogWall(wall),
-                        ),
-                        onTap: () {
-                          Navigator.of(context).pop();
-                          widget.mapController.focusOnWall(wall);
-                        },
+                                onPressed: () => _handleLogOutdoorWall(outdoorPoi),
+                              )
+                            : null,
+                        onTap: () => _selectPoi(poi),
                       ),
                     );
                   },
@@ -434,14 +433,14 @@ class _NavItem extends StatelessWidget {
                     Icon(
                       Icons.lock_outline,
                       size: 11,
-                      color: color.withOpacity(0.85),
+                      color: color.withValues(alpha: 0.85),
                     ),
                     const SizedBox(width: 2),
                     Text(
                       hint!,
                       style: TextStyle(
                         fontSize: 9,
-                        color: color.withOpacity(0.85),
+                        color: color.withValues(alpha: 0.85),
                         fontWeight: FontWeight.w600,
                       ),
                     ),

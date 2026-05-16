@@ -59,7 +59,7 @@ class _WallsScreenState extends State<WallsPage> {
                     wall.name,
                     style: TextStyle(fontWeight: FontWeight.bold),
                   ),
-                  subtitle: Text('${wall.difficulty} • By ${wall.ownerName}'),
+                  subtitle: Text('${wall.wallType == 'IndoorWall' ? 'Indoor' : 'Outdoor'} • ${wall.difficulty} • By ${wall.ownerName}'),
                   trailing: Icon(Icons.chevron_right),
                   onTap: () {
                     showDialog(

@@ -10,10 +10,10 @@ http:
     type: json
     data: |-
       {
-          "email": "celli2@celli.it",
-          "username": "celli",
+          "email": "celli3@celli.it",
+          "username": "celli_facility",
           "password": "celli",
-          "userType": "Climber",
+          "userType": "Facilty",
           "name": "celli",
           "surname" : "celli",
           "birthdate" : "2000-01-01"

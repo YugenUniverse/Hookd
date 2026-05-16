@@ -67,6 +67,21 @@ exports.getWallsByLocation = async (req, res, next) => {
     }
 };
 
+exports.updateWall = async (req, res, next) => {
+    try {
+        const wall = await wallService.updateWall(
+            req.params.id,
+            req.body,
+            req.user.id,
+            req.user.userType,
+        );
+        res.status(200).json({ message: "Wall updated successfully", wall });
+    } catch (err) {
+        if (err.name === "ValidationError") err.statusCode = 400;
+        next(err);
+    }
+};
+
 exports.deleteWall = async (req, res, next) => {
     try {
         await wallService.deleteWall(

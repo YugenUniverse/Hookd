@@ -444,7 +444,7 @@ describe("sessions.routes", () => {
         const user = await User.create({
             email: "nonclimber@example.com",
             username: "nonclimber",
-            userType: "Facility",
+            userType: "FacilityOwner",
             name: "Non",
             surname: "Climber",
             birthdate: new Date("1990-01-01"),
@@ -643,7 +643,7 @@ describe("sessions.routes", () => {
         const user = await User.create({
             email: "nonclimber2@example.com",
             username: "nonclimber2",
-            userType: "Facility",
+            userType: "FacilityOwner",
             name: "Non",
             surname: "Climber",
             birthdate: new Date("1990-01-01"),
@@ -747,7 +747,7 @@ describe("sessions.routes", () => {
         const user = await User.create({
             email: "nonclimber3@example.com",
             username: "nonclimber3",
-            userType: "Facility",
+            userType: "FacilityOwner",
             name: "Non",
             surname: "Climber",
             birthdate: new Date("1990-01-01"),
@@ -771,7 +771,7 @@ describe("sessions.routes", () => {
         const user = await User.create({
             email: "nonclimber4@example.com",
             username: "nonclimber4",
-            userType: "Facility",
+            userType: "FacilityOwner",
             name: "Non",
             surname: "Climber",
             birthdate: new Date("1990-01-01"),
@@ -812,7 +812,7 @@ describe("sessions.routes", () => {
         const user = await User.create({
             email: "nonclimber5@example.com",
             username: "nonclimber5",
-            userType: "Facility",
+            userType: "FacilityOwner",
             name: "Non",
             surname: "Climber",
             birthdate: new Date("1990-01-01"),
@@ -917,7 +917,7 @@ describe("sessions.routes", () => {
         const user = await User.create({
             email: "nonclimber6@example.com",
             username: "nonclimber6",
-            userType: "Facility",
+            userType: "FacilityOwner",
             name: "Non",
             surname: "Climber",
             birthdate: new Date("1990-01-01"),

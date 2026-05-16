@@ -43,7 +43,7 @@ class Wall {
       latitude = _parseDouble(coordinates[1]);
     }
 
-    final wallType = (json['wallType'] ?? json['type'] ?? 'Wall').toString();
+    final wallType = (json['wallType'] ?? json['type'] ?? 'OutdoorWall').toString();
 
     String? owner;
     if (json['facility'] is Map) {

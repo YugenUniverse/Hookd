@@ -17,6 +17,8 @@ var sessionRouter = require("./routes/session.routes");
 var userRouter = require("./routes/user.routes");
 const climberRoutes = require("./routes/climber.routes");
 var issueRouter = require("./routes/issue.routes");
+var poiRouter = require("./routes/poi.routes");
+var facilityRouter = require("./routes/facility.routes");
 
 const errorMiddleware = require("./middleware/error.middleware");
 
@@ -66,6 +68,8 @@ app.use(
 
 app.use("/auth", authRouter);
 app.use("/walls", wallRouter);
+app.use("/pois", poiRouter);
+app.use("/facilities", facilityRouter);
 app.use("/reviews", reviewRouter);
 app.use("/climbers", climberRoutes);
 app.use("/users", userRouter);

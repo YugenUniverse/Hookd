@@ -1,5 +1,5 @@
 const mongoose = require("mongoose");
-const { User, Climber, Facility, PublicBody } = require("../../models/User");
+const { User, Climber, FacilityOwner, PublicBody } = require("../../models/User");
 
 jest.setTimeout(30000);
 
@@ -143,45 +143,26 @@ describe("User model suite", () => {
         });
     });
 
-    describe("Facility discriminator", () => {
-        it("creates a facility with valid location and description", async () => {
-            const facility = await Facility.create({
+    describe("FacilityOwner discriminator", () => {
+        it("creates a FacilityOwner account with email and username", async () => {
+            const owner = await FacilityOwner.create({
                 email: "gym@example.com",
                 username: "vertical_limit",
-                name: "Vertical Limit Gym",
-                description: "Best indoor climbing in town",
-                location: {
-                    coordinates: [12.4964, 41.9028], // [Lng, Lat]
-                    address: "123 Climbing St, Rome",
-                },
             });
 
-            expect(facility.userType).toBe("Facility");
-            expect(facility.location.type).toBe("Point");
-            expect(facility.location.coordinates).toContain(12.4964);
+            expect(owner.userType).toBe("FacilityOwner");
+            expect(owner.email).toBe("gym@example.com");
         });
 
-        it("fails if description exceeds 1000 characters", async () => {
-            const facility = new Facility({
+        it("can store an optional facility reference", async () => {
+            const facilityId = new mongoose.Types.ObjectId();
+            const owner = await FacilityOwner.create({
                 email: "gym2@example.com",
-                username: "long_desc",
-                name: "The Gym",
-                description: "a".repeat(1001),
-                location: { coordinates: [0, 0] },
+                username: "gym_owner",
+                facility: facilityId,
             });
-            await expect(facility.save()).rejects.toThrow(
-                /Description cannot be more than 1000 characters/,
-            );
-        });
 
-        it("requires coordinates in location", async () => {
-            const facility = new Facility({
-                email: "gym3@example.com",
-                username: "no_loc",
-                name: "No Loc Gym",
-                location: { address: "Somewhere" }, // missing coordinates
-            });
-            await expect(facility.save()).rejects.toThrow();
+            expect(owner.facility.toString()).toBe(facilityId.toString());
         });
     });
 
@@ -223,14 +204,12 @@ describe("User model suite", () => {
                 birthdate: new Date(),
             });
 
-            const gym = new Facility({
+            const gymOwner = new FacilityOwner({
                 email: "shared@test.com",
                 username: "gym1",
-                name: "Gym One",
-                location: { coordinates: [0, 0] },
             });
 
-            await expect(gym.save()).rejects.toThrow();
+            await expect(gymOwner.save()).rejects.toThrow();
         });
     });
 });

@@ -86,44 +86,15 @@ climberSchema.methods.editUser = function (updates) {};
 
 const Climber = User.discriminator("Climber", climberSchema);
 
-// --- FACILITY ---
-const facilitySchema = new mongoose.Schema(
+// --- FACILITY OWNER ---
+// Auth account for a gym/facility operator. Profile data (name, location, walls)
+// lives in the standalone Facility model; this holds only the account link.
+const facilityOwnerSchema = new mongoose.Schema(
     {
-        name: {
-            type: String,
-            required: true,
-            trim: true,
+        facility: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Facility",
         },
-        description: {
-            type: String,
-            trim: true,
-            maxLength: [
-                1000,
-                "Description cannot be more than 1000 characters",
-            ],
-        },
-        location: {
-            type: {
-                type: String,
-                enum: ["Point"],
-                default: "Point",
-            },
-            coordinates: {
-                type: [Number], // [Longitude, Latitude]
-                required: [true, "Coordinates are required"],
-                validate: {
-                    validator: (val) => val.length === 2,
-                    message: "Coordinates must be [longitude, latitude]",
-                },
-            },
-            address: String,
-        },
-        walls: [
-            {
-                type: mongoose.Schema.Types.ObjectId,
-                ref: "IndoorWall",
-            },
-        ],
     },
     {
         toJSON: {
@@ -135,9 +106,9 @@ const facilitySchema = new mongoose.Schema(
     },
 );
 
-facilitySchema.methods.editUser = function (updates) {};
+facilityOwnerSchema.methods.editUser = function (updates) {};
 
-const Facility = User.discriminator("Facility", facilitySchema);
+const FacilityOwner = User.discriminator("FacilityOwner", facilityOwnerSchema);
 
 // --- PUBLIC BODY ---
 const publicBodySchema = new mongoose.Schema(
@@ -195,6 +166,6 @@ const PublicBody = User.discriminator("PublicBody", publicBodySchema);
 module.exports = {
     User,
     Climber,
-    Facility,
+    FacilityOwner,
     PublicBody,
 };

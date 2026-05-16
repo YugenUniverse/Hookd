@@ -28,6 +28,7 @@ class AuthService extends ChangeNotifier {
   String? _refreshToken;
   String? _userId;
   String? _username;
+  String? _userType;
   bool _isAdmin = false;
   bool _keyringLocked = false;
 
@@ -36,6 +37,7 @@ class AuthService extends ChangeNotifier {
   String? get refreshToken => _refreshToken;
   String? get currentUserId => _userId;
   String? get username => _username;
+  String? get userType => _userType;
   bool get isAdmin => _isAdmin;
   bool get isAuthenticated => _accessToken != null && _accessToken!.isNotEmpty;
   bool get isKeyringLocked => _keyringLocked;
@@ -135,6 +137,7 @@ class AuthService extends ChangeNotifier {
     _refreshToken = null;
     _userId = null;
     _username = null;
+    _userType = null;
     _isAdmin = false;
     try {
       await _secure.delete(key: 'access_token');
@@ -143,7 +146,7 @@ class AuthService extends ChangeNotifier {
     notifyListeners();
   }
 
-  void setCurrentUserProfile({String? id, String? username, bool? isAdmin}) {
+  void setCurrentUserProfile({String? id, String? username, bool? isAdmin, String? userType}) {
     var changed = false;
     if (id != null && id.isNotEmpty && _userId != id) {
       _userId = id;
@@ -155,6 +158,10 @@ class AuthService extends ChangeNotifier {
     }
     if (isAdmin != null && _isAdmin != isAdmin) {
       _isAdmin = isAdmin;
+      changed = true;
+    }
+    if (userType != null && userType.isNotEmpty && _userType != userType) {
+      _userType = userType;
       changed = true;
     }
     if (changed) notifyListeners();
@@ -173,8 +180,13 @@ class AuthService extends ChangeNotifier {
       final rawAdmin =
           payload['is_admin'] ?? payload['isAdmin'] ?? payload['admin'];
       final admin = _parseBool(rawAdmin);
-      if (userId != null || rawAdmin != null) {
-        setCurrentUserProfile(id: userId, isAdmin: rawAdmin == null ? null : admin);
+      final userType = payload['userType']?.toString();
+      if (userId != null || rawAdmin != null || userType != null) {
+        setCurrentUserProfile(
+          id: userId,
+          isAdmin: rawAdmin == null ? null : admin,
+          userType: userType,
+        );
       }
     } catch (_) {
       // ignore jwt parse errors
@@ -318,6 +330,32 @@ class AuthService extends ChangeNotifier {
       } else {
         print('Register error: $e');
       }
+      return false;
+    }
+  }
+
+  // Register a new FacilityOwner account (facility linking happens post-login via /facilities/:id/claim).
+  Future<bool> registerFacilityOwner(
+    String email,
+    String username,
+    String password,
+  ) async {
+    try {
+      final dio = Dio(BaseOptions(baseUrl: ApiConfig.apiBaseUrl));
+
+      final resp = await dio.post(
+        ApiConfig.registerPath,
+        data: {
+          'email': email.trim(),
+          'username': username.trim(),
+          'password': password,
+          'userType': 'FacilityOwner',
+        },
+        options: Options(validateStatus: (status) => true),
+      );
+
+      return (resp.statusCode ?? 0) >= 200 && (resp.statusCode ?? 0) < 300;
+    } catch (_) {
       return false;
     }
   }

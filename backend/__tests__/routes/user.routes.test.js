@@ -5,7 +5,9 @@ const request = require("supertest");
 
 const userRoutes = require("../../routes/user.routes");
 const errorMiddleware = require("../../middleware/error.middleware");
-const { User, Climber } = require("../../models/User");
+const { User, Climber, FacilityOwner } = require("../../models/User");
+const Facility = require("../../models/Facility");
+const { IndoorWall } = require("../../models/Wall");
 
 const app = express();
 app.use(express.json());
@@ -41,6 +43,8 @@ describe("user.routes", () => {
 
     afterEach(async () => {
         await User.deleteMany({});
+        await Facility.deleteMany({});
+        await IndoorWall.deleteMany({});
     });
 
     afterAll(async () => {
@@ -148,5 +152,50 @@ describe("user.routes", () => {
             }),
         );
         expect(response.body.password).toBeUndefined();
+    });
+
+    it("GET /users/me returns facility wall descriptions for facility owners", async () => {
+        const facility = await Facility.create({
+            name: "Private Gym",
+            description: "A testing gym",
+            location: { type: "Point", coordinates: [11.1, 46.1] },
+        });
+
+        const wall = await IndoorWall.create({
+            name: "Overhang 1",
+            description: "Steep training wall",
+            difficulty: "INTERMEDIATE",
+            location: { type: "Point", coordinates: [11.1, 46.1] },
+            facility: facility._id,
+        });
+
+        facility.walls = [wall._id];
+        await facility.save();
+
+        const owner = await FacilityOwner.create({
+            email: "owner@example.com",
+            username: "facilityOwner",
+            userType: "FacilityOwner",
+            facility: facility._id,
+            password: "VerySecret123!",
+        });
+
+        facility.ownerAccount = owner._id;
+        await facility.save();
+
+        const token = createAuthToken({
+            _id: { toString: () => owner.id },
+            email: owner.email,
+            userType: owner.userType,
+        });
+
+        const response = await request(app)
+            .get("/users/me")
+            .set("Authorization", `Bearer ${token}`);
+
+        expect(response.status).toBe(200);
+        expect(response.body.facility).toBeDefined();
+        expect(response.body.facility.walls).toHaveLength(1);
+        expect(response.body.facility.walls[0].description).toBe("Steep training wall");
     });
 });

@@ -29,15 +29,23 @@ router.get("/:id", wallController.getWallById);
 router.post(
     "/",
     authenticateJwt,
-    restrictTo("Facility", "PublicBody"),
+    restrictTo("FacilityOwner", "PublicBody"),
     wallController.createWall,
+);
+
+// Update a wall
+router.put(
+    "/:id",
+    authenticateJwt,
+    restrictTo("FacilityOwner", "PublicBody"),
+    wallController.updateWall,
 );
 
 // Delete a wall
 router.delete(
     "/:id",
     authenticateJwt,
-    restrictTo("Facility", "PublicBody"),
+    restrictTo("FacilityOwner", "PublicBody"),
     wallController.deleteWall,
 );
 

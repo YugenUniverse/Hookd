@@ -8,7 +8,7 @@ http:
   url: http://localhost:3000/walls/:id
   params:
     - name: id
-      value: 6a021092a362ceb8f7bd15fd
+      value: 6a05f2460ce2585362fa24c3
       type: path
 
 settings:

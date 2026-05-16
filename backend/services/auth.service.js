@@ -2,7 +2,8 @@ const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
 const admin = require("firebase-admin");
 
-const { User, Climber, Facility, PublicBody } = require("../models/User");
+const { User, Climber, FacilityOwner, PublicBody } = require("../models/User");
+const Facility = require("../models/Facility");
 const RefreshToken = require("../models/RefreshToken");
 
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || "1h";
@@ -171,8 +172,8 @@ exports.register = async ({
             throw error;
         }
         user = await Climber.create(baseUserData);
-    } else if (normalizedUserType === "Facility") {
-        user = await Facility.create(baseUserData);
+    } else if (normalizedUserType === "FacilityOwner") {
+        user = await FacilityOwner.create({ email, password, username, authMethods: ["local"], userType: "FacilityOwner" });
     } else if (normalizedUserType === "PublicBody") {
         user = await PublicBody.create(baseUserData);
     } else {
