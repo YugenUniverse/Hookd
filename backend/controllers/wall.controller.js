@@ -111,3 +111,15 @@ exports.getWallLeaderboard = async (req, res, next) => {
         next(err);
     }
 };
+
+exports.getUserWalls = async (req, res, next) => {
+    try {
+        const walls = await wallService.getUserWalls(
+            req.user.id,
+            req.user.userType,
+        );
+        res.status(200).json(walls);
+    } catch (err) {
+        next(err);
+    }
+};

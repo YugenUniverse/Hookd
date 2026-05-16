@@ -33,6 +33,13 @@ router.post(
     wallController.createWall,
 );
 
+router.get(
+    "/",
+    authenticateJwt,
+    restrictTo("Facility", "PublicBody"),
+    wallController.getUserWalls,
+);
+
 // Delete a wall
 router.delete(
     "/:id",

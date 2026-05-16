@@ -1,0 +1,17 @@
+info:
+  name: getUserWall
+  type: http
+  seq: 8
+
+http:
+  method: GET
+  url: http://localhost:3000/walls
+  auth:
+    type: bearer
+    token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2YTA4NWIwZTM5NTM5NDE4MTM2MDY1ODMiLCJlbWFpbCI6Imd5bV9hMDM3YjhAdGVzdC5jb20iLCJ1c2VyVHlwZSI6IkZhY2lsaXR5IiwiaWF0IjoxNzc4OTMzOTcxLCJleHAiOjE3Nzg5Mzc1NzEsImlzcyI6Imhvb2tkIn0.hMrWXKGRYxKc-8vJGaQCIMtv49YpZVA9n5WtoUj3J20
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

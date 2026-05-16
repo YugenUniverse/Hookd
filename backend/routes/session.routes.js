@@ -8,7 +8,7 @@ const mongoose = require("mongoose");
 
 // Validation middleware
 const validateCreateSessionInput = (req, res, next) => {
-    const { wall_id, date, time, review, is_private } = req.body;
+    const { wall_id, date, time, review, is_private, isSend } = req.body;
 
     // Check required fields
     if (!wall_id || !date || time === undefined) {
@@ -45,6 +45,12 @@ const validateCreateSessionInput = (req, res, next) => {
         });
     }
 
+    if (isSend !== undefined && typeof isSend !== "boolean") {
+        return res.status(400).json({
+            error: "isSend must be a boolean",
+        });
+    }
+
     // If review is provided, validate it
     if (review) {
         if (review.rating === undefined) {
@@ -63,12 +69,17 @@ const validateCreateSessionInput = (req, res, next) => {
 };
 
 const validateUpdateSessionInput = (req, res, next) => {
-    const { wall_id, date, time, is_private } = req.body;
+    const { wall_id, date, time, is_private, isSend } = req.body;
 
     // At least one field must be provided
-    if (wall_id === undefined && date === undefined && time === undefined) {
+    if (
+        wall_id === undefined &&
+        date === undefined &&
+        time === undefined &&
+        isSend === undefined
+    ) {
         return res.status(400).json({
-            error: "At least one field (wall_id, date, or time) must be provided to update",
+            error: "At least one field (wall_id, date, time, or isSend) must be provided to update",
         });
     }
 
@@ -101,6 +112,12 @@ const validateUpdateSessionInput = (req, res, next) => {
     if (is_private !== undefined && typeof is_private !== "boolean") {
         return res.status(400).json({
             error: "is_private must be a boolean",
+        });
+    }
+
+    if (isSend !== undefined && typeof isSend !== "boolean") {
+        return res.status(400).json({
+            error: "isSend must be a boolean",
         });
     }
 

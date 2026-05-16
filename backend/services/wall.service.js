@@ -43,7 +43,9 @@ exports.getAllWalls = async () => {
         } catch (e) {
             // ignore compute errors and continue
         }
-        const totalSessions = await ClimbingSession.countDocuments({ wall_id: wall._id });
+        const totalSessions = await ClimbingSession.countDocuments({
+            wall_id: wall._id,
+        });
         wall._totalSessions = totalSessions;
     }
 
@@ -88,7 +90,9 @@ exports.searchWalls = async (searchQuery) => {
         try {
             await wall.computeRating();
         } catch (e) {}
-        const totalSessions = await ClimbingSession.countDocuments({ wall_id: wall._id });
+        const totalSessions = await ClimbingSession.countDocuments({
+            wall_id: wall._id,
+        });
         wall._totalSessions = totalSessions;
     }
 
@@ -303,4 +307,16 @@ exports.getWallLeaderboard = async (wallId, limit = 50, offset = 0) => {
         averageTime: Math.round(averageTime),
         leaderboard,
     };
+};
+
+exports.getUserWalls = async (userId, userType) => {
+    if (userType === "Facility") {
+        return await Wall.find({ facility: userId });
+    } else if (userType === "PublicBody") {
+        return await Wall.find({ publicBody: userId });
+    } else {
+        const error = new Error("Invalid user type");
+        error.statusCode = 400;
+        throw error;
+    }
 };

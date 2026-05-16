@@ -22,7 +22,7 @@ const ensureSessionOwnership = (session, userId) => {
 exports.createSession = async (
     userId,
     userType,
-    { wall_id, date, time, review, is_private = false },
+    { wall_id, date, time, review, is_private = false, isSend = false },
 ) => {
     if (userType !== "Climber") {
         const error = new Error("Only climbers can create climbing sessions");
@@ -61,6 +61,7 @@ exports.createSession = async (
         date: parsedDate,
         time,
         is_private,
+        isSend,
     });
 
     await Promise.all([

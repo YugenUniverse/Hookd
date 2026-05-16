@@ -35,6 +35,10 @@ const climbingSessionSchema = new mongoose.Schema(
             ref: "Review",
             default: null,
         },
+        isSend: {
+            type: Boolean,
+            default: false,
+        },
     },
     {
         toJSON: {
