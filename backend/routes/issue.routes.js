@@ -5,6 +5,8 @@ const issueController = require("../controllers/issue.controllers");
 
 const router = express.Router();
 
+const VALID_ISSUE_STATUSES = ["OPEN", "IN_PROGRESS", "RESOLVED", "CLOSED"];
+
 // Validation middleware
 const validateCreateIssueInput = (req, res, next) => {
     const { wall_id, body } = req.body;
@@ -46,9 +48,32 @@ const validateCreateIssueInput = (req, res, next) => {
     next();
 };
 
+const validateUpdateIssueStatusInput = (req, res, next) => {
+    const { status } = req.body;
+
+    if (!status || typeof status !== "string") {
+        return res.status(400).json({
+            error: "status is required and must be a string",
+        });
+    }
+
+    if (!VALID_ISSUE_STATUSES.includes(status)) {
+        return res.status(400).json({
+            error: `Invalid status. Valid values are: ${VALID_ISSUE_STATUSES.join(", ")}`,
+        });
+    }
+
+    next();
+};
+
 router.use(authenticateJwt);
 router.post("/", validateCreateIssueInput, issueController.createIssue);
 router.get("/walls/:wallId", issueController.getIssuesForWall);
-router.get("/my-issues", issueController.getIssuesByClimber);
+router.get("/my-issues", issueController.getIssuesByUser);
+router.patch(
+    "/:issueId/status",
+    validateUpdateIssueStatusInput,
+    issueController.updateIssueStatus,
+);
 router.delete("/:issueId", issueController.deleteIssue);
 module.exports = router;

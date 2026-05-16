@@ -46,6 +46,16 @@ const issueSchema = new mongoose.Schema(
     },
 );
 
+issueSchema.methods.updateStatus = function (newStatus) {
+    if (!STATUS_ENUM.includes(newStatus)) {
+        const error = new Error(`Invalid status: ${newStatus}`);
+        error.statusCode = 400;
+        throw error;
+    }
+    this.status = newStatus;
+    return this.save();
+};
+
 const Issue = mongoose.model("Issue", issueSchema);
 
 module.exports = { Issue };

@@ -1,0 +1,27 @@
+info:
+    name: update-issue-status
+    type: http
+    seq: 5
+
+http:
+    method: PATCH
+    url: http://localhost:3000/issues/:issueId/status
+    params:
+        - name: issueId
+          value: 6a021092a362ceb8f7bd15fd
+          type: path
+    body:
+        type: json
+        data: |-
+            {
+              "status": "IN_PROGRESS"
+            }
+    auth:
+        type: bearer
+        token:
+
+settings:
+    encodeUrl: true
+    timeout: 0
+    followRedirects: true
+    maxRedirects: 5
