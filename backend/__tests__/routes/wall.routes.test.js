@@ -75,6 +75,30 @@ describe("Wall Routes", () => {
         });
     });
 
+    describe("GET /walls/owned", () => {
+        it("should return walls owned by the authenticated Facility", async () => {
+            await IndoorWall.create({
+                name: "Facility Wall",
+                difficulty: "INTERMEDIATE",
+                location: { coordinates: [0, 0] },
+                facility: testFacility._id,
+            });
+
+            await IndoorWall.create({
+                name: "Other Facility Wall",
+                difficulty: "BEGINNER",
+                location: { coordinates: [1, 1] },
+                facility: new mongoose.Types.ObjectId(),
+            });
+
+            const res = await request(app).get("/walls/owned");
+            expect(res.status).toBe(200);
+            expect(Array.isArray(res.body)).toBe(true);
+            expect(res.body).toHaveLength(1);
+            expect(res.body[0].name).toBe("Facility Wall");
+        });
+    });
+
     describe("GET /walls/search", () => {
         it("should return walls matching query", async () => {
             await IndoorWall.create({

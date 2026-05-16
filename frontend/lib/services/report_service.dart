@@ -8,10 +8,9 @@ class ReportService {
 
   ReportService({required this.token});
 
-  // 1. Fetch all walls so the user can select one for a new report
   Future<List<dynamic>> getFacilityWalls() async {
     final response = await http.get(
-      Uri.parse('$baseUrl/walls'), // Your route is perfectly correct!
+      Uri.parse('$baseUrl/walls/owned'),
       headers: {'Authorization': 'Bearer $token'},
     );
 

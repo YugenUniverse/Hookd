@@ -310,10 +310,14 @@ exports.getWallLeaderboard = async (wallId, limit = 50, offset = 0) => {
 };
 
 exports.getUserWalls = async (userId, userType) => {
+    const objectId = mongoose.Types.ObjectId.isValid(userId)
+        ? new mongoose.Types.ObjectId(userId)
+        : userId;
+
     if (userType === "Facility") {
-        return await Wall.find({ facility: userId });
+        return await Wall.find({ facility: objectId });
     } else if (userType === "PublicBody") {
-        return await Wall.find({ publicBody: userId });
+        return await Wall.find({ publicBody: objectId });
     } else {
         const error = new Error("Invalid user type");
         error.statusCode = 400;

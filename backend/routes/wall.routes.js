@@ -20,6 +20,14 @@ router.get("/nearby", wallController.getWallsByLocation);
 // Get wall leaderboard
 router.get("/:id/leaderboard", wallController.getWallLeaderboard);
 
+// Get walls owned by the current authenticated Facility/PublicBody
+router.get(
+    "/owned",
+    authenticateJwt,
+    restrictTo("Facility", "PublicBody"),
+    wallController.getUserWalls,
+);
+
 // Get a single wall by ID (🚨 MUST be the last GET route!)
 router.get("/:id", wallController.getWallById);
 
@@ -31,13 +39,6 @@ router.post(
     authenticateJwt,
     restrictTo("Facility", "PublicBody"),
     wallController.createWall,
-);
-
-router.get(
-    "/",
-    authenticateJwt,
-    restrictTo("Facility", "PublicBody"),
-    wallController.getUserWalls,
 );
 
 // Delete a wall

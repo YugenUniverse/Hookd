@@ -878,7 +878,7 @@ describe("sessions.routes", () => {
 
         expect(response.status).toBe(400);
         expect(response.body).toEqual({
-            error: "At least one field (wall_id, date, or time) must be provided to update",
+            error: "At least one field (wall_id, date, time, or isSend) must be provided to update",
         });
     });
 
