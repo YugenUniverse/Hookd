@@ -605,9 +605,6 @@ class _CreateWallDialog extends StatefulWidget {
 class _CreateWallDialogState extends State<_CreateWallDialog> {
   final _nameController = TextEditingController();
   final _descriptionController = TextEditingController();
-  final _addressController = TextEditingController();
-  final _longitudeController = TextEditingController();
-  final _latitudeController = TextEditingController();
   String _difficulty = 'UNKNOWN';
   bool _saving = false;
 
@@ -619,39 +616,23 @@ class _CreateWallDialogState extends State<_CreateWallDialog> {
   void dispose() {
     _nameController.dispose();
     _descriptionController.dispose();
-    _addressController.dispose();
-    _longitudeController.dispose();
-    _latitudeController.dispose();
     super.dispose();
   }
 
   Future<void> _save() async {
     final name = _nameController.text.trim();
-    final description = _descriptionController.text.trim();
-    final address = _addressController.text.trim();
-    final lng = double.tryParse(_longitudeController.text.trim());
-    final lat = double.tryParse(_latitudeController.text.trim());
 
     if (name.isEmpty) {
       ScaffoldMessenger.of(context)
           .showSnackBar(const SnackBar(content: Text('Name cannot be empty')));
       return;
     }
-    if (lng == null || lat == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Longitude and latitude are required')),
-      );
-      return;
-    }
 
     setState(() => _saving = true);
     final ok = await ApiService().createWall(
       name: name,
-      description: description,
+      description: _descriptionController.text.trim(),
       difficulty: _difficulty,
-      longitude: lng,
-      latitude: lat,
-      address: address.isNotEmpty ? address : null,
     );
     if (!mounted) return;
     Navigator.of(context).pop(ok);
@@ -693,35 +674,8 @@ class _CreateWallDialogState extends State<_CreateWallDialog> {
                     },
             ),
             const SizedBox(height: 12),
-            TextField(
-              controller: _addressController,
-              decoration: const InputDecoration(labelText: 'Address (optional)'),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _longitudeController,
-                    keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true, signed: true),
-                    decoration: const InputDecoration(labelText: 'Longitude'),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: TextField(
-                    controller: _latitudeController,
-                    keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true, signed: true),
-                    decoration: const InputDecoration(labelText: 'Latitude'),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
             Text(
-              'Coordinates place the wall on the map inside your facility.',
+              'The wall will be placed at your facility\'s location.',
               style: theme.textTheme.bodySmall?.copyWith(
                 color: colorScheme.onSurfaceVariant,
               ),

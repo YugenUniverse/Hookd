@@ -6,7 +6,7 @@ const mongoose = require("mongoose");
 const issueRoutes = require("../../routes/issue.routes");
 const errorMiddleware = require("../../middleware/error.middleware");
 const { Issue } = require("../../models/Issue");
-const { User, Climber, Facility, PublicBody } = require("../../models/User");
+const { User, Climber, FacilityOwner, PublicBody } = require("../../models/User");
 const { Wall, IndoorWall, OutdoorWall } = require("../../models/Wall");
 
 process.env.JWT_SECRET = process.env.JWT_SECRET || "test-jwt-secret";
@@ -65,7 +65,7 @@ describe("issue.routes", () => {
             const facility = await User.create({
                 email: "facility@example.com",
                 username: "facilityuser",
-                userType: "Facility",
+                userType: "FacilityOwner",
                 name: "Test Facility",
                 authMethods: ["local"],
             });
@@ -252,7 +252,7 @@ describe("issue.routes", () => {
             const facility = await User.create({
                 email: "facility@example.com",
                 username: "facilityuser",
-                userType: "Facility",
+                userType: "FacilityOwner",
                 name: "Test Facility",
                 authMethods: ["local"],
             });
@@ -291,7 +291,7 @@ describe("issue.routes", () => {
             const facility = await User.create({
                 email: "facility@example.com",
                 username: "facilityuser",
-                userType: "Facility",
+                userType: "FacilityOwner",
                 name: "Test Facility",
                 authMethods: ["local"],
             });
@@ -368,7 +368,7 @@ describe("issue.routes", () => {
             const facility = await User.create({
                 email: "facility@example.com",
                 username: "facilityuser",
-                userType: "Facility",
+                userType: "FacilityOwner",
                 name: "Test Facility",
                 authMethods: ["local"],
             });
@@ -401,7 +401,7 @@ describe("issue.routes", () => {
             const facility1 = await User.create({
                 email: "facility1@example.com",
                 username: "facility1user",
-                userType: "Facility",
+                userType: "FacilityOwner",
                 name: "Test Facility 1",
                 authMethods: ["local"],
             });
@@ -409,7 +409,7 @@ describe("issue.routes", () => {
             const facility2 = await User.create({
                 email: "facility2@example.com",
                 username: "facility2user",
-                userType: "Facility",
+                userType: "FacilityOwner",
                 name: "Test Facility 2",
                 authMethods: ["local"],
             });
@@ -444,7 +444,7 @@ describe("issue.routes", () => {
             const facility = await User.create({
                 email: "facility@example.com",
                 username: "facilityuser",
-                userType: "Facility",
+                userType: "FacilityOwner",
                 name: "Test Facility",
                 authMethods: ["local"],
             });
@@ -482,7 +482,7 @@ describe("issue.routes", () => {
             const facility = await User.create({
                 email: "facility@example.com",
                 username: "facilityuser",
-                userType: "Facility",
+                userType: "FacilityOwner",
                 name: "Test Facility",
                 authMethods: ["local"],
             });
@@ -504,7 +504,7 @@ describe("issue.routes", () => {
             const facility = await User.create({
                 email: "facility@example.com",
                 username: "facilityuser",
-                userType: "Facility",
+                userType: "FacilityOwner",
                 name: "Test Facility",
                 authMethods: ["local"],
             });
@@ -534,7 +534,7 @@ describe("issue.routes", () => {
             const facility = await User.create({
                 email: "facility@example.com",
                 username: "facilityuser",
-                userType: "Facility",
+                userType: "FacilityOwner",
                 name: "Test Facility",
                 authMethods: ["local"],
             });
@@ -640,7 +640,7 @@ describe("issue.routes", () => {
             const facility = await User.create({
                 email: "facility@example.com",
                 username: "facilityuser",
-                userType: "Facility",
+                userType: "FacilityOwner",
                 name: "Test Facility",
                 authMethods: ["local"],
             });
@@ -701,7 +701,7 @@ describe("issue.routes", () => {
             const facility = await User.create({
                 email: "facility@example.com",
                 username: "facilityuser",
-                userType: "Facility",
+                userType: "FacilityOwner",
                 name: "Test Facility",
                 authMethods: ["local"],
             });

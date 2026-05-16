@@ -10,6 +10,7 @@ class Wall {
   final String difficulty;
   final String wallType;
   final String? ownerName;
+  final String? ownerAccountId;
   final List<ClimbingSession> sessions;
   final double rating;
   final int totalSessions;
@@ -24,6 +25,7 @@ class Wall {
     required this.difficulty,
     required this.wallType,
     this.ownerName,
+    this.ownerAccountId,
     required this.sessions,
     this.rating = 0.0,
     this.totalSessions = 0,
@@ -46,10 +48,13 @@ class Wall {
     final wallType = (json['wallType'] ?? json['type'] ?? 'OutdoorWall').toString();
 
     String? owner;
+    String? ownerAccountId;
     if (json['facility'] is Map) {
       owner = json['facility']['username']?.toString();
+      ownerAccountId = json['facility']['ownerAccount']?.toString();
     } else if (json['publicBody'] is Map) {
       owner = json['publicBody']['username']?.toString();
+      ownerAccountId = (json['publicBody']['_id'] ?? json['publicBody']['id'])?.toString();
     }
 
     final sessionsRaw = json['sessions'];
@@ -108,6 +113,7 @@ class Wall {
       difficulty: (json['difficulty'] ?? 'UNKNOWN').toString(),
       wallType: wallType,
       ownerName: owner,
+      ownerAccountId: ownerAccountId,
       sessions: sessions,
       rating: rating,
       totalSessions: totalSessions,

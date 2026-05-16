@@ -140,12 +140,14 @@ class _WallDetailsDialogState extends State<WallDetailsDialog> {
   }
 
   bool get _isOwner {
-    final userType = AuthService().userType;
-    if (userType == 'FacilityOwner' && _wall.wallType == 'IndoorWall')
-      return true;
-    if (userType == 'PublicBody' && _wall.wallType == 'OutdoorWall')
-      return true;
-    return false;
+    final userId = AuthService().currentUserId;
+    if (userId == null || _wall.ownerAccountId == null) return false;
+    return userId == _wall.ownerAccountId;
+  }
+
+  bool get _isOwnerType {
+    final t = AuthService().userType;
+    return t == 'FacilityOwner' || t == 'PublicBody';
   }
 
   Future<void> _showEditDialog() async {
@@ -242,6 +244,7 @@ class _WallDetailsDialogState extends State<WallDetailsDialog> {
     final Color typeColor = isIndoor ? Colors.blueGrey : Colors.green;
     final bool isAuthenticated = AuthService().isAuthenticated;
     final bool isOwner = _isOwner;
+    final bool isOwnerType = _isOwnerType;
 
     return SafeArea(
       child: DefaultTabController(
@@ -286,30 +289,32 @@ class _WallDetailsDialogState extends State<WallDetailsDialog> {
                           color: Theme.of(context).colorScheme.error,
                         ),
                       ],
-                      IconButton(
-                        tooltip: isAuthenticated
-                            ? 'Log session'
-                            : 'Log session (login required)',
-                        onPressed: () => _handleLogSession(context),
-                        icon: Stack(
-                          clipBehavior: Clip.none,
-                          children: [
-                            const Icon(Icons.edit_calendar_outlined),
-                            if (!isAuthenticated)
-                              Positioned(
-                                right: -2,
-                                bottom: -2,
-                                child: Icon(
-                                  Icons.lock_outline,
-                                  size: 11,
-                                  color: Theme.of(context).colorScheme.primary,
+                      if (!isOwnerType)
+                        IconButton(
+                          tooltip: isAuthenticated
+                              ? 'Log session'
+                              : 'Log session (login required)',
+                          onPressed: () => _handleLogSession(context),
+                          icon: Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              const Icon(Icons.edit_calendar_outlined),
+                              if (!isAuthenticated)
+                                Positioned(
+                                  right: -2,
+                                  bottom: -2,
+                                  child: Icon(
+                                    Icons.lock_outline,
+                                    size: 11,
+                                    color: Theme.of(context).colorScheme.primary,
+                                  ),
                                 ),
-                              ),
-                          ],
+                            ],
+                          ),
+                          color: Theme.of(context).colorScheme.primary,
                         ),
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                      IconButton(
+                      if (!isOwnerType)
+                        IconButton(
                         tooltip: 'Report an issue',
                         onPressed: () {
                           final TextEditingController issueController =

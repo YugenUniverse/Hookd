@@ -102,6 +102,8 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   Widget build(BuildContext context) {
     final isAuthenticated = AuthService().isAuthenticated;
+    final userType = AuthService().userType;
+    final isOwnerType = userType == 'FacilityOwner' || userType == 'PublicBody';
     return Scaffold(
       body: POIMap(controller: _mapController),
       bottomNavigationBar: SafeArea(
@@ -132,30 +134,32 @@ class _MyHomePageState extends State<MyHomePage> {
                   label: 'Rank',
                   onTap: _openGlobalLeaderboard,
                 ),
+                if (!isOwnerType)
+                  _NavItem(
+                    tooltip: 'Log session',
+                    icon: Icons.edit_calendar_outlined,
+                    label: 'Log',
+                    hint: isAuthenticated ? null : 'Login',
+                    onTap: _openLogSessionSheet,
+                  ),
                 _NavItem(
-                  tooltip: 'Log session',
-                  icon: Icons.edit_calendar_outlined,
-                  label: 'Log',
-                  hint: isAuthenticated ? null : 'Login',
-                  onTap: _openLogSessionSheet,
-                ),
-                _NavItem(
-                  tooltip: 'Account',
-                  icon: Icons.person_outline,
-                  label: 'Me',
-                  hint: isAuthenticated ? null : 'Login',
-                  onPressed: () {
-                    _runProtectedAction(() async {
-                      final userType = AuthService().userType;
-                      final Widget page = switch (userType) {
-                        'FacilityOwner' => const FacilityOwnerPage(),
-                        'PublicBody' => const PublicBodyPage(),
-                        _ => const UserPage(),
-                      };
-                      await Navigator.of(
-                        context,
-                      ).push(MaterialPageRoute(builder: (_) => page));
-                    });
+                  tooltip: isAuthenticated ? 'Account' : 'Login',
+                  icon: isAuthenticated ? Icons.person_outline : Icons.login,
+                  label: isAuthenticated ? 'Me' : 'Login',
+                  onPressed: () async {
+                    if (!isAuthenticated) {
+                      await _ensureAuthenticated();
+                      return;
+                    }
+                    final userType = AuthService().userType;
+                    final Widget page = switch (userType) {
+                      'FacilityOwner' => const FacilityOwnerPage(),
+                      'PublicBody' => const PublicBodyPage(),
+                      _ => const UserPage(),
+                    };
+                    await Navigator.of(
+                      context,
+                    ).push(MaterialPageRoute(builder: (_) => page));
                   },
                 ),
               ],

@@ -29,7 +29,10 @@ class _FacilityDetailsDialogState extends State<FacilityDetailsDialog> {
     _walls = List.of(widget.facility.walls);
   }
 
-  bool get _isOwner => AuthService().userType == 'FacilityOwner';
+  bool get _isOwner =>
+      AuthService().userType == 'FacilityOwner' &&
+      widget.facility.ownerAccountId != null &&
+      AuthService().currentUserId == widget.facility.ownerAccountId;
 
   Future<void> _showCreateDialog() async {
     final ok = await showDialog<bool>(
@@ -361,9 +364,6 @@ class _CreateWallDialog extends StatefulWidget {
 class _CreateWallDialogState extends State<_CreateWallDialog> {
   final _nameCtrl = TextEditingController();
   final _descCtrl = TextEditingController();
-  final _addressCtrl = TextEditingController();
-  final _lngCtrl = TextEditingController();
-  final _latCtrl = TextEditingController();
   String _difficulty = 'UNKNOWN';
   bool _saving = false;
 
@@ -375,26 +375,14 @@ class _CreateWallDialogState extends State<_CreateWallDialog> {
   void dispose() {
     _nameCtrl.dispose();
     _descCtrl.dispose();
-    _addressCtrl.dispose();
-    _lngCtrl.dispose();
-    _latCtrl.dispose();
     super.dispose();
   }
 
   Future<void> _save() async {
     final name = _nameCtrl.text.trim();
-    final lng = double.tryParse(_lngCtrl.text.trim());
-    final lat = double.tryParse(_latCtrl.text.trim());
-
     if (name.isEmpty) {
       ScaffoldMessenger.of(context)
           .showSnackBar(const SnackBar(content: Text('Name cannot be empty')));
-      return;
-    }
-    if (lng == null || lat == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Longitude and latitude are required')),
-      );
       return;
     }
 
@@ -403,9 +391,6 @@ class _CreateWallDialogState extends State<_CreateWallDialog> {
       name: name,
       description: _descCtrl.text.trim(),
       difficulty: _difficulty,
-      longitude: lng,
-      latitude: lat,
-      address: _addressCtrl.text.trim().isNotEmpty ? _addressCtrl.text.trim() : null,
     );
     if (!mounted) return;
     Navigator.of(context).pop(ok);
@@ -442,34 +427,9 @@ class _CreateWallDialogState extends State<_CreateWallDialog> {
                   .toList(),
               onChanged: _saving ? null : (v) { if (v != null) setState(() => _difficulty = v); },
             ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _addressCtrl,
-              decoration: const InputDecoration(labelText: 'Address (optional)'),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _lngCtrl,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
-                    decoration: const InputDecoration(labelText: 'Longitude'),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: TextField(
-                    controller: _latCtrl,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
-                    decoration: const InputDecoration(labelText: 'Latitude'),
-                  ),
-                ),
-              ],
-            ),
             const SizedBox(height: 8),
             Text(
-              'Coordinates are required to place the wall on the map.',
+              'The wall will be placed at your facility\'s location.',
               style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
             ),
           ],

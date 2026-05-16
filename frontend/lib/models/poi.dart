@@ -104,6 +104,7 @@ class IndoorWallSummary {
 class FacilityPoi extends Poi {
   final List<IndoorWallSummary> walls;
   final String? address;
+  final String? ownerAccountId;
 
   const FacilityPoi({
     required super.id,
@@ -113,6 +114,7 @@ class FacilityPoi extends Poi {
     required super.description,
     required this.walls,
     this.address,
+    this.ownerAccountId,
   });
 
   factory FacilityPoi.fromJson(Map<String, dynamic> json) {
@@ -136,6 +138,7 @@ class FacilityPoi extends Poi {
       description: (json['description'] ?? '').toString(),
       walls: walls,
       address: json['address']?.toString(),
+      ownerAccountId: json['ownerAccountId']?.toString(),
     );
   }
 }

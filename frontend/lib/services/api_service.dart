@@ -491,8 +491,8 @@ class ApiService {
     required String name,
     required String description,
     required String difficulty,
-    required double longitude,
-    required double latitude,
+    double? longitude,
+    double? latitude,
     String? address,
   }) async {
     try {
@@ -500,11 +500,12 @@ class ApiService {
         'name': name,
         'description': description,
         'difficulty': difficulty,
-        'location': {
-          'type': 'Point',
-          'coordinates': [longitude, latitude],
-          if (address != null && address.isNotEmpty) 'address': address,
-        },
+        if (longitude != null && latitude != null)
+          'location': {
+            'type': 'Point',
+            'coordinates': [longitude, latitude],
+            if (address != null && address.isNotEmpty) 'address': address,
+          },
       });
       return true;
     } catch (_) {

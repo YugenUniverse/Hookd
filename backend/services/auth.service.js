@@ -183,14 +183,21 @@ exports.register = async ({
     return { id: user._id, email: user.email };
 };
 
-exports.login = async ({ email, password }) => {
-    if (!email || !password) {
-        const error = new Error("Missing fields");
+exports.login = async ({ email, username, password }) => {
+    if (!password || (!email && !username)) {
+        const error = new Error("Missing fields: provide either email or username, and password");
         error.statusCode = 400;
         throw error;
     }
 
-    const user = await User.findOne({ email }).select("+password");
+    const query = {};
+    if (email) {
+        query.email = email;
+    } else if (username) {
+        query.username = username;
+    }
+
+    const user = await User.findOne(query).select("+password");
 
     if (!user) {
         const error = new Error("Invalid credentials");

@@ -18,7 +18,10 @@ exports.createWall = async (wallData, userId, userType) => {
             throw error;
         }
 
-        wall = await IndoorWall.create({ ...wallData, facility: facility._id });
+        // Fall back to the facility's own location when the request omits one
+        const location = wallData.location ?? facility.location;
+
+        wall = await IndoorWall.create({ ...wallData, location, facility: facility._id });
 
         await Facility.findByIdAndUpdate(facility._id, {
             $push: { walls: wall._id },
@@ -76,7 +79,7 @@ exports.updateWall = async (id, updates, userId, userType) => {
 
 exports.getAllWalls = async () => {
     const walls = await Wall.find()
-        .populate("facility", "username email avatar")
+        .populate("facility", "username email avatar ownerAccount")
         .populate("publicBody", "username email avatar")
         .populate("sessions");
 
@@ -96,7 +99,7 @@ exports.getAllWalls = async () => {
 
 exports.getWallById = async (id) => {
     const wall = await Wall.findById(id)
-        .populate("facility", "username email avatar")
+        .populate("facility", "username email avatar ownerAccount")
         .populate("publicBody", "username email avatar")
         .populate("sessions");
 
@@ -125,7 +128,7 @@ exports.searchWalls = async (searchQuery) => {
     const walls = await Wall.find({
         name: { $regex: `.*${escaped}.*`, $options: "i" },
     })
-        .populate("facility", "username email avatar")
+        .populate("facility", "username email avatar ownerAccount")
         .populate("publicBody", "username email avatar");
 
     for (const wall of walls) {

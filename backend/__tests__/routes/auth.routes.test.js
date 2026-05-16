@@ -248,6 +248,47 @@ describe("auth.routes", () => {
                 error: expect.stringContaining("Invalid credentials"),
             });
         });
+
+        it("POST /auth/login with username succeeds", async () => {
+            await request(app).post("/auth/register").send(registerPayload);
+
+            const response = await request(app).post("/auth/login").send({
+                username: registerPayload.username,
+                password: registerPayload.password,
+            });
+
+            expect(response.status).toBe(200);
+            expect(response.body).toEqual({
+                message: "Login successful",
+                accessToken: expect.any(String),
+                refreshToken: expect.any(String),
+            });
+        });
+
+        it("POST /auth/login with username fails when password is wrong", async () => {
+            await request(app).post("/auth/register").send(registerPayload);
+
+            const response = await request(app).post("/auth/login").send({
+                username: registerPayload.username,
+                password: "WrongPassword123!",
+            });
+
+            expect(response.status).toBe(401);
+            expect(response.body).toEqual({
+                error: expect.stringContaining("Invalid credentials"),
+            });
+        });
+
+        it("POST /auth/login fails when neither email nor username provided", async () => {
+            const response = await request(app)
+                .post("/auth/login")
+                .send({ password: "Celli123!" });
+
+            expect(response.status).toBe(400);
+            expect(response.body).toEqual({
+                error: expect.stringContaining("Missing fields"),
+            });
+        });
     });
 
     describe("Refresh token validation", () => {

@@ -25,6 +25,7 @@ const toFacilityPoi = (facility) => ({
     description: facility.description || "",
     location: facility.location,
     address: facility.location?.address || null,
+    ownerAccountId: facility.ownerAccount?.toString() ?? null,
     walls: (facility.walls || []).map((w) => ({
         id: w._id.toString(),
         name: w.name,

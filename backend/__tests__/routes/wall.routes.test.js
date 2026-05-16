@@ -151,18 +151,32 @@ describe("Wall Routes", () => {
     // ── FacilityOwner operations ─────────────────────────────────────────────
 
     describe("POST /walls (FacilityOwner)", () => {
-        it("creates a wall and adds it to the facility's walls array", async () => {
+        it("creates a wall using the facility's location when none is provided", async () => {
             const res = await request(app).post("/walls").send({
                 name: "New Gym Wall",
                 difficulty: "BEGINNER",
-                location: { coordinates: [12, 45], address: "123 Street" },
             });
 
             expect(res.status).toBe(201);
             expect(res.body.wall.name).toBe("New Gym Wall");
+            // Location should inherit from the facility
+            expect(res.body.wall.location.coordinates).toEqual(
+                testFacility.location.coordinates,
+            );
 
             const updatedFacility = await Facility.findById(testFacility._id);
             expect(updatedFacility.walls.length).toBe(1);
+        });
+
+        it("uses a provided location when one is given", async () => {
+            const res = await request(app).post("/walls").send({
+                name: "Custom Loc Wall",
+                difficulty: "ADVANCED",
+                location: { coordinates: [12, 45] },
+            });
+
+            expect(res.status).toBe(201);
+            expect(res.body.wall.location.coordinates).toEqual([12, 45]);
         });
     });
 

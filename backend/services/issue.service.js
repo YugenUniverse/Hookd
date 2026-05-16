@@ -56,9 +56,9 @@ exports.getIssuesForWall = async (userId, userType, wallId) => {
         throw error;
     }
 
-    if (userType !== "PublicBody" && userType !== "Facility") {
+    if (userType !== "PublicBody" && userType !== "FacilityOwner") {
         const error = new Error(
-            "Only public bodies or facilities can access issues for a wall",
+            "Only public bodies or facility owners can access issues for a wall",
         );
         error.statusCode = 403;
         throw error;
