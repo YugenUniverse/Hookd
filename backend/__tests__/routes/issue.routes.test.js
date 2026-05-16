@@ -67,10 +67,10 @@ describe("issue.routes", () => {
                 username: "facilityuser",
                 userType: "Facility",
                 name: "Test Facility",
-                    location: {
-                        type: "Point",
-                        coordinates: [10.5, 20.5],
-                    },
+                location: {
+                    type: "Point",
+                    coordinates: [10.5, 20.5],
+                },
                 authMethods: ["local"],
             });
 
@@ -110,9 +110,9 @@ describe("issue.routes", () => {
 
             const updatedWall = await IndoorWall.findById(wall._id);
             expect(updatedWall).not.toBeNull();
-            expect(
-                updatedWall.issues.map((id) => id.toString()),
-            ).toContain(response.body.issue.id);
+            expect(updatedWall.issues.map((id) => id.toString())).toContain(
+                response.body.issue.id,
+            );
         });
 
         it("should return 400 when wall_id is missing", async () => {
@@ -258,10 +258,10 @@ describe("issue.routes", () => {
                 username: "facilityuser",
                 userType: "Facility",
                 name: "Test Facility",
-                    location: {
-                        type: "Point",
-                        coordinates: [10.5, 20.5],
-                    },
+                location: {
+                    type: "Point",
+                    coordinates: [10.5, 20.5],
+                },
                 authMethods: ["local"],
             });
 
@@ -301,10 +301,10 @@ describe("issue.routes", () => {
                 username: "facilityuser",
                 userType: "Facility",
                 name: "Test Facility",
-                    location: {
-                        type: "Point",
-                        coordinates: [10.5, 20.5],
-                    },
+                location: {
+                    type: "Point",
+                    coordinates: [10.5, 20.5],
+                },
                 authMethods: ["local"],
             });
 
@@ -382,10 +382,10 @@ describe("issue.routes", () => {
                 username: "facilityuser",
                 userType: "Facility",
                 name: "Test Facility",
-                    location: {
-                        type: "Point",
-                        coordinates: [10.5, 20.5],
-                    },
+                location: {
+                    type: "Point",
+                    coordinates: [10.5, 20.5],
+                },
                 authMethods: ["local"],
             });
 
@@ -419,10 +419,10 @@ describe("issue.routes", () => {
                 username: "facility1user",
                 userType: "Facility",
                 name: "Test Facility 1",
-                    location: {
-                        type: "Point",
-                        coordinates: [10.5, 20.5],
-                    },
+                location: {
+                    type: "Point",
+                    coordinates: [10.5, 20.5],
+                },
                 authMethods: ["local"],
             });
 
@@ -431,10 +431,10 @@ describe("issue.routes", () => {
                 username: "facility2user",
                 userType: "Facility",
                 name: "Test Facility 2",
-                    location: {
-                        type: "Point",
-                        coordinates: [10.5, 20.5],
-                    },
+                location: {
+                    type: "Point",
+                    coordinates: [10.5, 20.5],
+                },
                 authMethods: ["local"],
             });
 
@@ -470,10 +470,10 @@ describe("issue.routes", () => {
                 username: "facilityuser",
                 userType: "Facility",
                 name: "Test Facility",
-                    location: {
-                        type: "Point",
-                        coordinates: [10.5, 20.5],
-                    },
+                location: {
+                    type: "Point",
+                    coordinates: [10.5, 20.5],
+                },
                 authMethods: ["local"],
             });
 
@@ -512,10 +512,10 @@ describe("issue.routes", () => {
                 username: "facilityuser",
                 userType: "Facility",
                 name: "Test Facility",
-                    location: {
-                        type: "Point",
-                        coordinates: [10.5, 20.5],
-                    },
+                location: {
+                    type: "Point",
+                    coordinates: [10.5, 20.5],
+                },
                 authMethods: ["local"],
             });
 
@@ -538,10 +538,10 @@ describe("issue.routes", () => {
                 username: "facilityuser",
                 userType: "Facility",
                 name: "Test Facility",
-                    location: {
-                        type: "Point",
-                        coordinates: [10.5, 20.5],
-                    },
+                location: {
+                    type: "Point",
+                    coordinates: [10.5, 20.5],
+                },
                 authMethods: ["local"],
             });
 
@@ -554,7 +554,6 @@ describe("issue.routes", () => {
             expect(response.status).toBe(400);
         });
     });
-
     describe("GET /issues/my-issues - Get Issues by Climber", () => {
         it("should return all issues created by the climber", async () => {
             const climber = await User.create({
@@ -572,10 +571,10 @@ describe("issue.routes", () => {
                 username: "facilityuser",
                 userType: "Facility",
                 name: "Test Facility",
-                    location: {
-                        type: "Point",
-                        coordinates: [10.5, 20.5],
-                    },
+                location: {
+                    type: "Point",
+                    coordinates: [10.5, 20.5],
+                },
                 authMethods: ["local"],
             });
 
@@ -649,6 +648,230 @@ describe("issue.routes", () => {
             });
 
             const accessToken = createAuthToken(climber);
+
+            const response = await request(app)
+                .get("/issues/my-issues")
+                .set("Authorization", `Bearer ${accessToken}`);
+
+            expect(response.status).toBe(200);
+            expect(response.body).toEqual({ issues: [] });
+        });
+
+        it("should return 401 when no authentication token is provided", async () => {
+            const response = await request(app).get("/issues/my-issues");
+
+            expect(response.status).toBe(401);
+        });
+    });
+
+    describe("GET /issues/my-issues - Get Issues by Facility", () => {
+        it("should return all issues created by the facility", async () => {
+            const climber = await User.create({
+                email: "climber@example.com",
+                username: "climberuser",
+                userType: "Climber",
+                name: "Climber",
+                surname: "User",
+                birthdate: new Date("1990-01-01"),
+                authMethods: ["local"],
+            });
+
+            const facility = await User.create({
+                email: "facility@example.com",
+                username: "facilityuser",
+                userType: "Facility",
+                name: "Test Facility",
+                location: {
+                    type: "Point",
+                    coordinates: [10.5, 20.5],
+                },
+                authMethods: ["local"],
+            });
+
+            const wall1 = await IndoorWall.create({
+                facility: facility._id,
+                name: "Test Wall 1",
+                location: {
+                    type: "Point",
+                    coordinates: [10.5, 20.5],
+                },
+                difficulty: "INTERMEDIATE",
+            });
+
+            const wall2 = await IndoorWall.create({
+                facility: facility._id,
+                name: "Test Wall 2",
+                location: {
+                    type: "Point",
+                    coordinates: [11.5, 21.5],
+                },
+                difficulty: "ADVANCED",
+            });
+
+            await User.findByIdAndUpdate(facility._id, {
+                $push: { walls: [wall1._id, wall2._id] },
+            });
+
+            await Issue.create({
+                climber_id: climber._id,
+                wall_id: wall1._id,
+                body: "First report",
+            });
+
+            await Issue.create({
+                climber_id: climber._id,
+                wall_id: wall2._id,
+                body: "Second report",
+            });
+
+            const accessToken = createAuthToken(facility);
+
+            const response = await request(app)
+                .get("/issues/my-issues")
+                .set("Authorization", `Bearer ${accessToken}`);
+
+            expect(response.status).toBe(200);
+            expect(response.body).toEqual({
+                issues: expect.arrayContaining([
+                    expect.objectContaining({
+                        id: expect.any(String),
+                        body: "First report",
+                    }),
+                    expect.objectContaining({
+                        id: expect.any(String),
+                        body: "Second report",
+                    }),
+                ]),
+            });
+            expect(response.body.issues).toHaveLength(2);
+        });
+
+        it("should return empty array when facility has no issues", async () => {
+            const facility = await User.create({
+                email: "facility@example.com",
+                username: "facilityuser",
+                userType: "Facility",
+                name: "Test Facility",
+                location: {
+                    type: "Point",
+                    coordinates: [10.5, 20.5],
+                },
+                authMethods: ["local"],
+            });
+
+            const accessToken = createAuthToken(facility);
+
+            const response = await request(app)
+                .get("/issues/my-issues")
+                .set("Authorization", `Bearer ${accessToken}`);
+
+            expect(response.status).toBe(200);
+            expect(response.body).toEqual({ issues: [] });
+        });
+
+        it("should return 401 when no authentication token is provided", async () => {
+            const response = await request(app).get("/issues/my-issues");
+
+            expect(response.status).toBe(401);
+        });
+    });
+
+    describe("GET /issues/my-issues - Get Issues by PublicBody", () => {
+        it("should return all issues created by the public body", async () => {
+            const climber = await User.create({
+                email: "climber@example.com",
+                username: "climberuser",
+                userType: "Climber",
+                name: "Climber",
+                surname: "User",
+                birthdate: new Date("1990-01-01"),
+                authMethods: ["local"],
+            });
+
+            const publicBody = await User.create({
+                email: "publicbody@example.com",
+                username: "publicbodyuser",
+                userType: "PublicBody",
+                name: "Test Public Body",
+                location: {
+                    type: "Point",
+                    coordinates: [10.5, 20.5],
+                },
+                authMethods: ["local"],
+            });
+
+            const wall1 = await OutdoorWall.create({
+                publicBody: publicBody._id,
+                name: "Test Wall 1",
+                location: {
+                    type: "Point",
+                    coordinates: [10.5, 20.5],
+                },
+                difficulty: "INTERMEDIATE",
+            });
+
+            const wall2 = await OutdoorWall.create({
+                publicBody: publicBody._id,
+                name: "Test Wall 2",
+                location: {
+                    type: "Point",
+                    coordinates: [11.5, 21.5],
+                },
+                difficulty: "ADVANCED",
+            });
+
+            await User.findByIdAndUpdate(publicBody._id, {
+                $push: { walls: [wall1._id, wall2._id] },
+            });
+
+            await Issue.create({
+                climber_id: climber._id,
+                wall_id: wall1._id,
+                body: "First report",
+            });
+
+            await Issue.create({
+                climber_id: climber._id,
+                wall_id: wall2._id,
+                body: "Second report",
+            });
+
+            const accessToken = createAuthToken(publicBody);
+
+            const response = await request(app)
+                .get("/issues/my-issues")
+                .set("Authorization", `Bearer ${accessToken}`);
+
+            expect(response.status).toBe(200);
+            expect(response.body).toEqual({
+                issues: expect.arrayContaining([
+                    expect.objectContaining({
+                        id: expect.any(String),
+                        body: "First report",
+                    }),
+                    expect.objectContaining({
+                        id: expect.any(String),
+                        body: "Second report",
+                    }),
+                ]),
+            });
+            expect(response.body.issues).toHaveLength(2);
+        });
+
+        it("should return empty array when public body has no issues", async () => {
+            const publicBody = await User.create({
+                email: "publicbody@example.com",
+                username: "publicbodyuser",
+                userType: "PublicBody",
+                name: "Test Public Body",
+                location: {
+                    type: "Point",
+                    coordinates: [10.5, 20.5],
+                },
+                authMethods: ["local"],
+            });
+
+            const accessToken = createAuthToken(publicBody);
 
             const response = await request(app)
                 .get("/issues/my-issues")
@@ -748,10 +971,10 @@ describe("issue.routes", () => {
                 username: "facilityuser",
                 userType: "Facility",
                 name: "Test Facility",
-                    location: {
-                        type: "Point",
-                        coordinates: [10.5, 20.5],
-                    },
+                location: {
+                    type: "Point",
+                    coordinates: [10.5, 20.5],
+                },
                 authMethods: ["local"],
             });
 
@@ -813,10 +1036,10 @@ describe("issue.routes", () => {
                 username: "facilityuser",
                 userType: "Facility",
                 name: "Test Facility",
-                    location: {
-                        type: "Point",
-                        coordinates: [10.5, 20.5],
-                    },
+                location: {
+                    type: "Point",
+                    coordinates: [10.5, 20.5],
+                },
                 authMethods: ["local"],
             });
 
