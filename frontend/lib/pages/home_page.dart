@@ -5,6 +5,8 @@ import '../dialogs/login_dialog.dart';
 import '../pages/log_session_page.dart';
 import '../pages/global_leaderboard_page.dart';
 import '../pages/user_page.dart';
+import '../pages/report_list_page.dart';
+import '../services/report_service.dart';
 import '../services/auth_service.dart';
 import '../services/wall_service.dart';
 import '../models/wall.dart';
@@ -98,6 +100,19 @@ class _MyHomePageState extends State<MyHomePage> {
     );
   }
 
+  Future<void> _openReports() async {
+    await _runProtectedAction(() async {
+      final token = AuthService().jwt ?? '';
+      final reportService = ReportService(token: token);
+
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => ReportListPage(reportService: reportService),
+        ),
+      );
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final isAuthenticated = AuthService().isAuthenticated;
@@ -127,7 +142,7 @@ class _MyHomePageState extends State<MyHomePage> {
                 ),
                 _NavItem(
                   tooltip: 'Global Rankings',
-                  icon: Icons.leaderboard_outlined, // A sleek podium icon
+                  icon: Icons.leaderboard_outlined,
                   label: 'Rank',
                   onTap: _openGlobalLeaderboard,
                 ),
@@ -139,6 +154,13 @@ class _MyHomePageState extends State<MyHomePage> {
                   onTap: _openLogSessionSheet,
                 ),
                 _NavItem(
+                  tooltip: 'Wall Reports',
+                  icon: Icons.analytics_outlined,
+                  label: 'Reports',
+                  hint: isAuthenticated ? null : 'Login',
+                  onTap: _openReports,
+                ),
+                _NavItem(
                   tooltip: 'Account',
                   icon: Icons.person_outline,
                   label: 'Me',
@@ -146,9 +168,7 @@ class _MyHomePageState extends State<MyHomePage> {
                   onPressed: () {
                     _runProtectedAction(() async {
                       await Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => const UserPage(),
-                        ),
+                        MaterialPageRoute(builder: (_) => const UserPage()),
                       );
                     });
                   },
@@ -302,7 +322,7 @@ class _WallSearchSheetState extends State<_WallSearchSheet> {
               Expanded(
                 child: ListView.separated(
                   itemCount: _results.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 8),
+                  separatorBuilder: (_, _) => const SizedBox(height: 8),
                   itemBuilder: (context, index) {
                     final wall = _results[index];
                     return Card(
@@ -322,7 +342,11 @@ class _WallSearchSheetState extends State<_WallSearchSheet> {
                             const SizedBox(height: 4),
                             Row(
                               children: [
-                                Icon(Icons.star, size: 14, color: Colors.amber[600]),
+                                Icon(
+                                  Icons.star,
+                                  size: 14,
+                                  color: Colors.amber[600],
+                                ),
                                 const SizedBox(width: 6),
                                 Text(
                                   wall.rating.toStringAsFixed(1),

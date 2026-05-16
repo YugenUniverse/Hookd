@@ -244,7 +244,7 @@ class _LogSessionPageState extends State<LogSessionPage> {
                     height: 220,
                     child: ListView.separated(
                       itemCount: _searchResults.length,
-                      separatorBuilder: (_, __) => const Divider(height: 1),
+                      separatorBuilder: (_, _) => const Divider(height: 1),
                       itemBuilder: (context, index) {
                         final wall = _searchResults[index];
                         return ListTile(
@@ -290,7 +290,7 @@ class _LogSessionPageState extends State<LogSessionPage> {
               ),
               const SizedBox(height: 16),
               DropdownButtonFormField<int>(
-                value: _selectedRating,
+                initialValue: _selectedRating,
                 decoration: const InputDecoration(
                   labelText: 'Rating (optional)',
                   border: OutlineInputBorder(),

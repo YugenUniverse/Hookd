@@ -22,14 +22,16 @@ class WallService {
 
   Future<List<Wall>> searchWalls(String query) async {
     try {
-      final uri = Uri.parse('$baseUrl/walls/search').replace(
-        queryParameters: {'q': query},
-      );
+      final uri = Uri.parse(
+        '$baseUrl/walls/search',
+      ).replace(queryParameters: {'q': query});
       final response = await http.get(uri);
 
       if (response.statusCode == 200) {
         final jsonResponse = json.decode(response.body) as List<dynamic>;
-        return jsonResponse.map((data) => Wall.fromJson(data as Map<String, dynamic>)).toList();
+        return jsonResponse
+            .map((data) => Wall.fromJson(data as Map<String, dynamic>))
+            .toList();
       } else {
         throw Exception('Failed to search walls: ${response.statusCode}');
       }
