@@ -23,6 +23,9 @@ dependencies:
     firebase_core: ^4.7.0
     firebase_auth: ^6.4.0
     flutter_map: ^8.1.1
+    flutter_map_cache: ^2.1.0
+    dio_cache_interceptor: ^4.0.0
+    http_cache_file_store: ^2.0.0
     latlong2: ^0.9.1
     geolocator: ^9.0.2
     fl_chart: ^1.2.0

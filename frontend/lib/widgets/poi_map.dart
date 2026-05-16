@@ -1,18 +1,22 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:flutter_map_cache/flutter_map_cache.dart';
+import 'package:dio_cache_interceptor/dio_cache_interceptor.dart';
+import 'package:http_cache_file_store/http_cache_file_store.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:path_provider/path_provider.dart';
 
 import '../models/poi.dart';
 import '../models/wall.dart';
 import '../services/api_service.dart';
 import '../dialogs/wall_details_dialog.dart';
 import '../dialogs/facility_details_dialog.dart';
-// Conditional web geolocation helper. Uses browser API on web, stub elsewhere.
 import 'web_geo_stub.dart'
     if (dart.library.html) 'web_geo_html.dart'
     as web_geo;
@@ -55,12 +59,23 @@ class _POIMapState extends State<POIMap> {
   bool _locating = true;
   LatLng? _userLocation;
   List<Poi> _pois = [];
+
+  // Initialized once per app session. Static so every rebuild reuses the same
+  // resolved future — no tile-provider swaps mid-render.
+  static final Future<CacheStore> _cacheStoreFuture = _initCacheStore();
+
+  static Future<CacheStore> _initCacheStore() async {
+    if (kIsWeb) return MemCacheStore();
+    // Application support dir persists across sessions; temp dir may be cleared by the OS.
+    final dir = await getApplicationSupportDirectory();
+    return FileCacheStore('${dir.path}/map_tiles');
+  }
+
   static const double _defaultZoom = 11;
-  static const double _poiLoadRadius = 30000;
+  static const double _focusZoom = 16.0;
   double _currentZoom = _defaultZoom;
   LatLng? _lastMapCenter;
   static const double _mapMoveThreshold = 2000;
-  static const double _focusZoom = 16.0;
   bool _skipNextMoveFetch = false;
 
   void _handleControllerCommand() {
@@ -112,9 +127,10 @@ class _POIMapState extends State<POIMap> {
     super.dispose();
   }
 
+  // Only fires when the user stops moving the map (pan end / fling end).
   void _setupMapListener() {
     _mapController.mapEventStream.listen((event) {
-      if (event is MapEventMove) {
+      if (event is MapEventMoveEnd) {
         _onMapMoved();
       }
     });
@@ -148,8 +164,24 @@ class _POIMapState extends State<POIMap> {
     return distance > _mapMoveThreshold;
   }
 
+  // Exponential radius: zoom 16 → ~1km, zoom 12 → ~16km, zoom 11 → ~23km.
   double _radiusForZoom(double zoom) {
-    return (_poiLoadRadius * (12 / zoom)).clamp(1500.0, 80000.0);
+    return (1000.0 * pow(2.0, 16.0 - zoom.clamp(8.0, 16.0)))
+        .clamp(1000.0, 50000.0);
+  }
+
+  // Merges incoming POIs into existing set (newer data wins on ID collision).
+  // Caps total at 500 to bound memory usage.
+  static List<Poi> _mergePois(List<Poi> existing, List<Poi> incoming) {
+    final merged = <String, Poi>{for (final p in existing) p.id: p};
+    for (final p in incoming) {
+      merged[p.id] = p;
+    }
+    const maxPois = 500;
+    if (merged.length > maxPois) {
+      return merged.values.skip(merged.length - maxPois).toList();
+    }
+    return merged.values.toList();
   }
 
   Future<void> _fetchPoisForLocation(
@@ -163,7 +195,7 @@ class _POIMapState extends State<POIMap> {
       final pois = await ApiService().getNearbyPois(lng, lat, radius: radius);
       if (mounted) {
         setState(() {
-          _pois = pois;
+          _pois = _mergePois(_pois, pois);
         });
       }
     } catch (e) {
@@ -177,7 +209,7 @@ class _POIMapState extends State<POIMap> {
         final pois = await ApiService().getAllPois();
         if (mounted) {
           setState(() {
-            _pois = pois;
+            _pois = _mergePois(_pois, pois);
           });
         }
       } catch (e) {
@@ -339,7 +371,6 @@ class _POIMapState extends State<POIMap> {
         );
       }
 
-      // OutdoorWallPoi
       final wall = poi as OutdoorWallPoi;
       final markerColor = _getDifficultyColor(wall.difficulty);
       return Marker(
@@ -398,7 +429,6 @@ class _POIMapState extends State<POIMap> {
     }
   }
 
-  // Used by WallMapController (search-driven selection) — always shows wall details directly.
   void _showWallDetails(Wall wall) {
     showModalBottomSheet(
       isScrollControlled: true,
@@ -412,7 +442,6 @@ class _POIMapState extends State<POIMap> {
 
   @override
   Widget build(BuildContext context) {
-    final center = _userLocation ?? const LatLng(46.067, 11.117);
     final maptilerKey = dotenv.env['MAPTILER_KEY'];
     final maptilerStyle = (dotenv.env['MAPTILER_STYLE'] ?? 'basic-v2').trim();
     final useMapTiler = maptilerKey != null && maptilerKey.isNotEmpty;
@@ -420,31 +449,45 @@ class _POIMapState extends State<POIMap> {
         ? 'https://api.maptiler.com/maps/$maptilerStyle/{z}/{x}/{y}.png?key=$maptilerKey'
         : 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
 
-    return Stack(
-      children: [
-        FlutterMap(
-          mapController: _mapController,
-          options: MapOptions(
-            initialCenter: center,
-            initialZoom: _defaultZoom,
-            onPositionChanged: (position, hasGesture) {
-              _currentZoom = position.zoom;
-            },
-          ),
+    final userMarker = _buildUserMarker();
+
+    // _cacheStoreFuture is static: after the first resolution it returns
+    // immediately on every rebuild, so FutureBuilder never falls through to the
+    // no-TileLayer branch after the very first frame.
+    return FutureBuilder<CacheStore>(
+      future: _cacheStoreFuture,
+      builder: (context, snapshot) {
+        final cacheStore = snapshot.data;
+        return Stack(
           children: [
-            TileLayer(
-              urlTemplate: tileUrl,
-              subdomains: const [],
-              tileProvider: NetworkTileProvider(),
-            ),
-            MarkerLayer(
-              markers: [
-                if (_buildUserMarker() != null) _buildUserMarker()!,
-                ..._buildPoiMarkers(),
+            FlutterMap(
+              mapController: _mapController,
+              options: const MapOptions(
+                initialCenter: LatLng(46.067, 11.117),
+                initialZoom: _defaultZoom,
+                // Prevents zooming out past the Trentino Alto Adige scale (~220km visible).
+                minZoom: 8,
+              ),
+              children: [
+                // TileLayer is withheld until the cache store is ready so that
+                // no tile is ever fetched outside the cached provider.
+                if (cacheStore != null)
+                  TileLayer(
+                    urlTemplate: tileUrl,
+                    subdomains: const [],
+                    tileProvider: CachedTileProvider(
+                      store: cacheStore,
+                      maxStale: const Duration(days: 30),
+                    ),
+                  ),
+                MarkerLayer(
+                  markers: [
+                    ?userMarker,
+                    ..._buildPoiMarkers(),
+                  ],
+                ),
               ],
             ),
-          ],
-        ),
 
         if (_locating)
           Positioned(
@@ -482,5 +525,7 @@ class _POIMapState extends State<POIMap> {
         ),
       ],
     );
+  },
+  );
   }
 }
