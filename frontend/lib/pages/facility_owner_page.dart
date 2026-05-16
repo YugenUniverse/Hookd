@@ -427,16 +427,119 @@ class _FacilityCard extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 20),
+        _FacilityWallsSection(facility: facility, onRefresh: onRefresh),
+      ],
+    );
+  }
+}
+
+// ─── Facility walls section (search + create + list) ─────────────────────────
+
+class _FacilityWallsSection extends StatefulWidget {
+  const _FacilityWallsSection({
+    required this.facility,
+    required this.onRefresh,
+  });
+
+  final FacilityProfile facility;
+  final VoidCallback onRefresh;
+
+  @override
+  State<_FacilityWallsSection> createState() => _FacilityWallsSectionState();
+}
+
+class _FacilityWallsSectionState extends State<_FacilityWallsSection> {
+  final _searchCtrl = TextEditingController();
+  String _query = '';
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  List<IndoorWallSummary> get _filtered {
+    final walls = widget.facility.walls;
+    if (_query.isEmpty) return walls;
+    return walls
+        .where((w) => w.name.toLowerCase().contains(_query.toLowerCase()))
+        .toList();
+  }
+
+  Future<void> _showCreateDialog() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => const _CreateWallDialog(),
+    );
+    if (confirmed == true) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) widget.onRefresh();
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Wall created successfully')),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final allWalls = widget.facility.walls;
+    final filtered = _filtered;
+    final isSearching = _query.isNotEmpty;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
         Row(
           children: [
-            Text(
-              'Walls (${facility.walls.length})',
-              style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+            Expanded(
+              child: Text(
+                'Walls (${allWalls.length})',
+                style: theme.textTheme.titleLarge
+                    ?.copyWith(fontWeight: FontWeight.w700),
+              ),
+            ),
+            FilledButton.tonal(
+              onPressed: _showCreateDialog,
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.add, size: 18),
+                  SizedBox(width: 6),
+                  Text('Add wall'),
+                ],
+              ),
             ),
           ],
         ),
+        if (allWalls.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          TextField(
+            controller: _searchCtrl,
+            onChanged: (q) => setState(() => _query = q),
+            decoration: InputDecoration(
+              hintText: 'Search walls…',
+              prefixIcon: const Icon(Icons.search),
+              suffixIcon: _query.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.clear),
+                      onPressed: () {
+                        _searchCtrl.clear();
+                        setState(() => _query = '');
+                      },
+                    )
+                  : null,
+              border: const OutlineInputBorder(),
+              isDense: true,
+            ),
+          ),
+        ],
         const SizedBox(height: 12),
-        if (facility.walls.isEmpty)
+        if (allWalls.isEmpty)
           Container(
             padding: const EdgeInsets.all(18),
             decoration: BoxDecoration(
@@ -444,18 +547,27 @@ class _FacilityCard extends StatelessWidget {
               borderRadius: BorderRadius.circular(20),
             ),
             child: Text(
-              'No walls registered yet. Add walls from the map.',
+              'No walls yet. Tap "Add wall" to create one.',
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: colorScheme.onSurfaceVariant,
               ),
             ),
           )
+        else if (filtered.isEmpty)
+          Text(
+            'No walls match "$_query".',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+            ),
+          )
         else ...[
-          ...facility.walls.take(_kMaxPreviewWalls).map((wall) => Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: _WallTile(wall: wall, onRefresh: onRefresh),
-              )),
-          if (facility.walls.length > _kMaxPreviewWalls)
+          ...filtered
+              .take(isSearching ? filtered.length : _kMaxPreviewWalls)
+              .map((wall) => Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: _WallTile(wall: wall, onRefresh: widget.onRefresh),
+                  )),
+          if (!isSearching && allWalls.length > _kMaxPreviewWalls)
             Padding(
               padding: const EdgeInsets.only(top: 4),
               child: OutlinedButton.icon(
@@ -463,18 +575,16 @@ class _FacilityCard extends StatelessWidget {
                   await Navigator.of(context).push(
                     MaterialPageRoute(
                       builder: (_) => AllWallsPage(
-                        title: 'All walls — ${facility.name}',
-                        walls: facility.walls,
+                        title: 'All walls — ${widget.facility.name}',
+                        walls: allWalls,
                         canDelete: false,
                       ),
                     ),
                   );
-                  onRefresh();
+                  widget.onRefresh();
                 },
                 icon: const Icon(Icons.list, size: 18),
-                label: Text(
-                  'View all ${facility.walls.length} walls',
-                ),
+                label: Text('View all ${allWalls.length} walls'),
               ),
             ),
         ],
@@ -482,6 +592,165 @@ class _FacilityCard extends StatelessWidget {
     );
   }
 }
+
+// ─── Create wall dialog ───────────────────────────────────────────────────────
+
+class _CreateWallDialog extends StatefulWidget {
+  const _CreateWallDialog();
+
+  @override
+  State<_CreateWallDialog> createState() => _CreateWallDialogState();
+}
+
+class _CreateWallDialogState extends State<_CreateWallDialog> {
+  final _nameController = TextEditingController();
+  final _descriptionController = TextEditingController();
+  final _addressController = TextEditingController();
+  final _longitudeController = TextEditingController();
+  final _latitudeController = TextEditingController();
+  String _difficulty = 'UNKNOWN';
+  bool _saving = false;
+
+  static const _difficultyOptions = [
+    'UNKNOWN', 'BEGINNER', 'INTERMEDIATE', 'ADVANCED', 'EXPERT',
+  ];
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _descriptionController.dispose();
+    _addressController.dispose();
+    _longitudeController.dispose();
+    _latitudeController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    final name = _nameController.text.trim();
+    final description = _descriptionController.text.trim();
+    final address = _addressController.text.trim();
+    final lng = double.tryParse(_longitudeController.text.trim());
+    final lat = double.tryParse(_latitudeController.text.trim());
+
+    if (name.isEmpty) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Name cannot be empty')));
+      return;
+    }
+    if (lng == null || lat == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Longitude and latitude are required')),
+      );
+      return;
+    }
+
+    setState(() => _saving = true);
+    final ok = await ApiService().createWall(
+      name: name,
+      description: description,
+      difficulty: _difficulty,
+      longitude: lng,
+      latitude: lat,
+      address: address.isNotEmpty ? address : null,
+    );
+    if (!mounted) return;
+    Navigator.of(context).pop(ok);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return AlertDialog(
+      title: const Text('Add indoor wall'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: _nameController,
+              decoration: const InputDecoration(labelText: 'Name'),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _descriptionController,
+              minLines: 3,
+              maxLines: 5,
+              decoration: const InputDecoration(labelText: 'Description'),
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              initialValue: _difficulty,
+              decoration: const InputDecoration(labelText: 'Difficulty'),
+              items: _difficultyOptions
+                  .map((d) => DropdownMenuItem(value: d, child: Text(d)))
+                  .toList(),
+              onChanged: _saving
+                  ? null
+                  : (v) {
+                      if (v != null) setState(() => _difficulty = v);
+                    },
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _addressController,
+              decoration: const InputDecoration(labelText: 'Address (optional)'),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _longitudeController,
+                    keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true, signed: true),
+                    decoration: const InputDecoration(labelText: 'Longitude'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextField(
+                    controller: _latitudeController,
+                    keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true, signed: true),
+                    decoration: const InputDecoration(labelText: 'Latitude'),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Coordinates place the wall on the map inside your facility.',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _saving ? null : () => Navigator.of(context).pop(false),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: _saving ? null : _save,
+          child: _saving
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2, color: Colors.white),
+                )
+              : const Text('Create'),
+        ),
+      ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 class _EditFacilityDialog extends StatefulWidget {
   const _EditFacilityDialog({required this.facility});

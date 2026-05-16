@@ -15,8 +15,9 @@ import '../widgets/leaderboard_list.dart';
 
 class WallDetailsDialog extends StatefulWidget {
   final Wall wall;
+  final VoidCallback? onChanged;
 
-  const WallDetailsDialog({super.key, required this.wall});
+  const WallDetailsDialog({super.key, required this.wall, this.onChanged});
 
   @override
   State<WallDetailsDialog> createState() => _WallDetailsDialogState();
@@ -138,6 +139,89 @@ class _WallDetailsDialogState extends State<WallDetailsDialog> {
     );
   }
 
+  bool get _isOwner {
+    final userType = AuthService().userType;
+    if (userType == 'FacilityOwner' && _wall.wallType == 'IndoorWall') return true;
+    if (userType == 'PublicBody' && _wall.wallType == 'OutdoorWall') return true;
+    return false;
+  }
+
+  Future<void> _showEditDialog() async {
+    final wall = _wall;
+    final result = await showDialog<({String name, String description, String difficulty})>(
+      context: context,
+      builder: (_) => _EditWallDialog(wall: wall),
+    );
+    if (result == null || !mounted) return;
+
+    final ok = await ApiService().updateWall(
+      wall.id,
+      name: result.name,
+      description: result.description,
+      difficulty: result.difficulty,
+    );
+    if (!mounted) return;
+
+    if (ok) {
+      setState(() {
+        _wall = Wall(
+          id: wall.id,
+          name: result.name,
+          description: result.description,
+          difficulty: result.difficulty,
+          wallType: wall.wallType,
+          latitude: wall.latitude,
+          longitude: wall.longitude,
+          ownerName: wall.ownerName,
+          sessions: wall.sessions,
+          rating: wall.rating,
+          totalSessions: wall.totalSessions,
+        );
+      });
+      widget.onChanged?.call();
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Wall updated')));
+    } else {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Failed to update wall')));
+    }
+  }
+
+  Future<void> _confirmDelete() async {
+    final messenger = ScaffoldMessenger.of(context);
+    final errorColor = Theme.of(context).colorScheme.error;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete wall?'),
+        content: Text('This will permanently delete "${_wall.name}". This cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: errorColor),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    final ok = await ApiService().deleteWall(_wall.id);
+    if (!mounted) return;
+
+    if (ok) {
+      widget.onChanged?.call();
+      Navigator.of(context).pop();
+      messenger.showSnackBar(const SnackBar(content: Text('Wall deleted')));
+    } else {
+      messenger.showSnackBar(const SnackBar(content: Text('Failed to delete wall')));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final wall = _wall;
@@ -145,6 +229,7 @@ class _WallDetailsDialogState extends State<WallDetailsDialog> {
     final IconData typeIcon = isIndoor ? Icons.domain : Icons.landscape;
     final Color typeColor = isIndoor ? Colors.blueGrey : Colors.green;
     final bool isAuthenticated = AuthService().isAuthenticated;
+    final bool isOwner = _isOwner;
 
     return SafeArea(
       child: DefaultTabController(
@@ -175,6 +260,20 @@ class _WallDetailsDialogState extends State<WallDetailsDialog> {
                         ),
                       ),
                       const SizedBox(width: 8),
+                      if (isOwner) ...[
+                        IconButton(
+                          tooltip: 'Edit wall',
+                          onPressed: _showEditDialog,
+                          icon: const Icon(Icons.edit_outlined),
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                        IconButton(
+                          tooltip: 'Delete wall',
+                          onPressed: _confirmDelete,
+                          icon: const Icon(Icons.delete_outline),
+                          color: Theme.of(context).colorScheme.error,
+                        ),
+                      ],
                       IconButton(
                         tooltip: isAuthenticated
                             ? 'Log session'
@@ -533,7 +632,7 @@ class _WallDetailsDialogState extends State<WallDetailsDialog> {
                   width: double.infinity,
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.blue.withOpacity(0.1),
+                    color: Colors.blue.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
@@ -646,6 +745,101 @@ class _WallDetailsDialogState extends State<WallDetailsDialog> {
     if (days >= 45) return Colors.greenAccent.shade400;
     if (days >= 15) return Colors.orangeAccent;
     return Colors.redAccent;
+  }
+}
+
+// ─── Edit wall dialog ─────────────────────────────────────────────────────────
+
+class _EditWallDialog extends StatefulWidget {
+  const _EditWallDialog({required this.wall});
+  final Wall wall;
+
+  @override
+  State<_EditWallDialog> createState() => _EditWallDialogState();
+}
+
+class _EditWallDialogState extends State<_EditWallDialog> {
+  late final TextEditingController _nameCtrl;
+  late final TextEditingController _descCtrl;
+  late String _difficulty;
+
+  static const _options = [
+    'UNKNOWN', 'BEGINNER', 'INTERMEDIATE', 'ADVANCED', 'EXPERT',
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _nameCtrl = TextEditingController(text: widget.wall.name);
+    _descCtrl = TextEditingController(text: widget.wall.description);
+    _difficulty = _options.contains(widget.wall.difficulty.toUpperCase())
+        ? widget.wall.difficulty.toUpperCase()
+        : 'UNKNOWN';
+  }
+
+  @override
+  void dispose() {
+    _nameCtrl.dispose();
+    _descCtrl.dispose();
+    super.dispose();
+  }
+
+  void _confirm() {
+    final name = _nameCtrl.text.trim();
+    if (name.isEmpty) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Name cannot be empty')));
+      return;
+    }
+    Navigator.of(context).pop((
+      name: name,
+      description: _descCtrl.text.trim(),
+      difficulty: _difficulty,
+    ));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Edit wall'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: _nameCtrl,
+              decoration: const InputDecoration(labelText: 'Name'),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _descCtrl,
+              minLines: 2,
+              maxLines: 4,
+              decoration: const InputDecoration(labelText: 'Description'),
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              initialValue: _difficulty,
+              decoration: const InputDecoration(labelText: 'Difficulty'),
+              items: _options
+                  .map((d) => DropdownMenuItem(value: d, child: Text(d)))
+                  .toList(),
+              onChanged: (v) { if (v != null) setState(() => _difficulty = v); },
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(null),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: _confirm,
+          child: const Text('Apply'),
+        ),
+      ],
+    );
   }
 }
 

@@ -167,6 +167,113 @@ describe("POI Routes", () => {
         });
     });
 
+    // ─── GET /pois/search ───────────────────────────────────────────────────
+
+    describe("GET /pois/search", () => {
+        it("returns 400 when query is missing", async () => {
+            const res = await request(app).get("/pois/search");
+            expect(res.status).toBe(400);
+        });
+
+        it("returns 400 when query is shorter than 2 characters", async () => {
+            const res = await request(app).get("/pois/search?q=a");
+            expect(res.status).toBe(400);
+        });
+
+        it("returns matching Facility POIs by name", async () => {
+            await Facility.create({
+                name: "Climb Gym Trento",
+                location: { type: "Point", coordinates: [TRENTO.lng, TRENTO.lat] },
+            });
+            await Facility.create({
+                name: "Unrelated Gym",
+                location: { type: "Point", coordinates: [TRENTO.lng, TRENTO.lat] },
+            });
+
+            const res = await request(app).get("/pois/search?q=Climb");
+            expect(res.status).toBe(200);
+            expect(res.body).toHaveLength(1);
+            expect(res.body[0].poiType).toBe("Facility");
+            expect(res.body[0].name).toBe("Climb Gym Trento");
+        });
+
+        it("returns matching OutdoorWall POIs by name", async () => {
+            const publicBody = await PublicBody.create({
+                email: "pb@test.com",
+                username: "pbody",
+                name: "Parks Dept",
+                location: { type: "Point", coordinates: [TRENTO.lng, TRENTO.lat] },
+            });
+            await OutdoorWall.create({
+                name: "Falesie del Lago",
+                difficulty: "ADVANCED",
+                location: { type: "Point", coordinates: [TRENTO.lng, TRENTO.lat] },
+                publicBody: publicBody._id,
+            });
+
+            const res = await request(app).get("/pois/search?q=Falesie");
+            expect(res.status).toBe(200);
+            expect(res.body).toHaveLength(1);
+            expect(res.body[0].poiType).toBe("OutdoorWall");
+            expect(res.body[0].name).toBe("Falesie del Lago");
+        });
+
+        it("does NOT return IndoorWalls as top-level results", async () => {
+            const facility = await Facility.create({
+                name: "Boulder Palace",
+                location: { type: "Point", coordinates: [TRENTO.lng, TRENTO.lat] },
+            });
+            await IndoorWall.create({
+                name: "The Slab",
+                difficulty: "BEGINNER",
+                location: { type: "Point", coordinates: [TRENTO.lng, TRENTO.lat] },
+                facility: facility._id,
+            });
+
+            // Searching for the indoor wall name returns nothing
+            const res = await request(app).get("/pois/search?q=Slab");
+            expect(res.status).toBe(200);
+            expect(res.body).toHaveLength(0);
+        });
+
+        it("returns both Facilities and OutdoorWalls when both match", async () => {
+            const publicBody = await PublicBody.create({
+                email: "pb2@test.com",
+                username: "pbody2",
+                name: "Parks Dept 2",
+                location: { type: "Point", coordinates: [TRENTO.lng, TRENTO.lat] },
+            });
+            await OutdoorWall.create({
+                name: "Dolomiti Crag",
+                difficulty: "EXPERT",
+                location: { type: "Point", coordinates: [TRENTO.lng, TRENTO.lat] },
+                publicBody: publicBody._id,
+            });
+            await Facility.create({
+                name: "Dolomiti Gym",
+                location: { type: "Point", coordinates: [TRENTO.lng, TRENTO.lat] },
+            });
+
+            const res = await request(app).get("/pois/search?q=Dolomiti");
+            expect(res.status).toBe(200);
+            expect(res.body).toHaveLength(2);
+            const types = res.body.map((p) => p.poiType).sort();
+            expect(types).toEqual(["Facility", "OutdoorWall"]);
+        });
+
+        it("is case-insensitive", async () => {
+            await Facility.create({
+                name: "Rock City Gym",
+                location: { type: "Point", coordinates: [TRENTO.lng, TRENTO.lat] },
+            });
+
+            const res = await request(app).get("/pois/search?q=rock city");
+            expect(res.status).toBe(200);
+            expect(res.body).toHaveLength(1);
+            expect(res.body[0].name).toBe("Rock City Gym");
+        });
+    });
+
     // ─── GET /pois/nearby ───────────────────────────────────────────────────
 
     describe("GET /pois/nearby", () => {

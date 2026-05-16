@@ -300,11 +300,31 @@ class _AccountCard extends StatelessWidget {
 
 // ─── Walls section ────────────────────────────────────────────────────────────
 
-class _WallsSection extends StatelessWidget {
+class _WallsSection extends StatefulWidget {
   const _WallsSection({required this.walls, required this.onRefresh});
 
   final List<IndoorWallSummary> walls;
   final VoidCallback onRefresh;
+
+  @override
+  State<_WallsSection> createState() => _WallsSectionState();
+}
+
+class _WallsSectionState extends State<_WallsSection> {
+  final _searchCtrl = TextEditingController();
+  String _query = '';
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  List<IndoorWallSummary> get _filtered => _query.isEmpty
+      ? widget.walls
+      : widget.walls
+          .where((w) => w.name.toLowerCase().contains(_query.toLowerCase()))
+          .toList();
 
   Future<void> _showCreateDialog(BuildContext context) async {
     final confirmed = await showDialog<bool>(
@@ -314,7 +334,7 @@ class _WallsSection extends StatelessWidget {
 
     if (confirmed == true) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (context.mounted) onRefresh();
+        if (context.mounted) widget.onRefresh();
       });
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -328,6 +348,8 @@ class _WallsSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final filtered = _filtered;
+    final isSearching = _query.isNotEmpty;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -336,7 +358,7 @@ class _WallsSection extends StatelessWidget {
           children: [
             Expanded(
               child: Text(
-                'Walls (${walls.length})',
+                'Walls (${widget.walls.length})',
                 style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
               ),
             ),
@@ -353,8 +375,30 @@ class _WallsSection extends StatelessWidget {
             ),
           ],
         ),
+        if (widget.walls.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          TextField(
+            controller: _searchCtrl,
+            onChanged: (q) => setState(() => _query = q),
+            decoration: InputDecoration(
+              hintText: 'Search walls…',
+              prefixIcon: const Icon(Icons.search),
+              suffixIcon: _query.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.clear),
+                      onPressed: () {
+                        _searchCtrl.clear();
+                        setState(() => _query = '');
+                      },
+                    )
+                  : null,
+              border: const OutlineInputBorder(),
+              isDense: true,
+            ),
+          ),
+        ],
         const SizedBox(height: 12),
-        if (walls.isEmpty)
+        if (widget.walls.isEmpty)
           Container(
             padding: const EdgeInsets.all(18),
             decoration: BoxDecoration(
@@ -368,14 +412,35 @@ class _WallsSection extends StatelessWidget {
               ),
             ),
           )
-        else ...[
-          ...walls.take(_kMaxPreviewWalls).map(
+        else if (isSearching && filtered.isEmpty)
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.55),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Text(
+              'No walls match "$_query".',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+          )
+        else if (isSearching) ...[
+          ...filtered.map(
+            (wall) => Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: _WallTile(wall: wall, onRefresh: widget.onRefresh),
+            ),
+          ),
+        ] else ...[
+          ...widget.walls.take(_kMaxPreviewWalls).map(
                 (wall) => Padding(
                   padding: const EdgeInsets.only(bottom: 10),
-                  child: _WallTile(wall: wall, onRefresh: onRefresh),
+                  child: _WallTile(wall: wall, onRefresh: widget.onRefresh),
                 ),
               ),
-          if (walls.length > _kMaxPreviewWalls)
+          if (widget.walls.length > _kMaxPreviewWalls)
             Padding(
               padding: const EdgeInsets.only(top: 4),
               child: OutlinedButton.icon(
@@ -384,15 +449,15 @@ class _WallsSection extends StatelessWidget {
                     MaterialPageRoute(
                       builder: (_) => AllWallsPage(
                         title: 'All walls',
-                        walls: walls,
+                        walls: widget.walls,
                         canDelete: true,
                       ),
                     ),
                   );
-                  onRefresh();
+                  widget.onRefresh();
                 },
                 icon: const Icon(Icons.list, size: 18),
-                label: Text('View all ${walls.length} walls'),
+                label: Text('View all ${widget.walls.length} walls'),
               ),
             ),
         ],

@@ -62,6 +62,27 @@ exports.getNearbyPois = async (lng, lat, radius) => {
     ];
 };
 
+exports.searchPois = async (query) => {
+    const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const regex = { $regex: `.*${escaped}.*`, $options: "i" };
+
+    const [outdoorWalls, facilities] = await Promise.all([
+        Wall.find({ name: regex, ...OUTDOOR_WALL_FILTER }).populate(
+            "publicBody",
+            "name username",
+        ),
+        Facility.find({ name: regex }).populate(
+            "walls",
+            "name difficulty rating status",
+        ),
+    ]);
+
+    return [
+        ...outdoorWalls.map(toOutdoorWallPoi),
+        ...facilities.map(toFacilityPoi),
+    ];
+};
+
 exports.getAllPois = async () => {
     const [outdoorWalls, facilities] = await Promise.all([
         Wall.find(OUTDOOR_WALL_FILTER).populate("publicBody", "name username"),

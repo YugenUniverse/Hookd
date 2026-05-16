@@ -20,13 +20,23 @@ import 'web_geo_stub.dart'
 class WallMapController extends ChangeNotifier {
   LatLng? _target;
   Wall? _selectedWall;
+  FacilityPoi? _selectedFacility;
 
   LatLng? get target => _target;
   Wall? get selectedWall => _selectedWall;
+  FacilityPoi? get selectedFacility => _selectedFacility;
 
   void focusOnWall(Wall wall) {
     _selectedWall = wall;
+    _selectedFacility = null;
     _target = LatLng(wall.latitude, wall.longitude);
+    notifyListeners();
+  }
+
+  void focusOnFacility(FacilityPoi facility) {
+    _selectedFacility = facility;
+    _selectedWall = null;
+    _target = LatLng(facility.latitude, facility.longitude);
     notifyListeners();
   }
 }
@@ -56,7 +66,6 @@ class _POIMapState extends State<POIMap> {
   void _handleControllerCommand() {
     final controller = widget.controller;
     final target = controller?.target;
-    final wall = controller?.selectedWall;
     if (controller == null || target == null) return;
 
     _skipNextMoveFetch = true;
@@ -69,11 +78,15 @@ class _POIMapState extends State<POIMap> {
       zoom: _currentZoom,
     );
 
-    if (wall != null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final wall = controller.selectedWall;
+      final facility = controller.selectedFacility;
+      if (wall != null) {
         _showWallDetails(wall);
-      });
-    }
+      } else if (facility != null) {
+        _showPoiInfo(facility);
+      }
+    });
   }
 
   @override
@@ -363,7 +376,10 @@ class _POIMapState extends State<POIMap> {
         useSafeArea: true,
         showDragHandle: true,
         context: context,
-        builder: (context) => FacilityDetailsDialog(facility: poi),
+        builder: (context) => FacilityDetailsDialog(
+          facility: poi,
+          onChanged: _fetchPois,
+        ),
       );
     } else if (poi is OutdoorWallPoi) {
       _showWallDetails(Wall(
@@ -388,7 +404,7 @@ class _POIMapState extends State<POIMap> {
       useSafeArea: true,
       showDragHandle: true,
       context: context,
-      builder: (context) => WallDetailsDialog(wall: wall),
+      builder: (context) => WallDetailsDialog(wall: wall, onChanged: _fetchPois),
     );
   }
 

@@ -21,11 +21,19 @@ class AllWallsPage extends StatefulWidget {
 
 class _AllWallsPageState extends State<AllWallsPage> {
   late List<IndoorWallSummary> _walls;
+  final _searchCtrl = TextEditingController();
+  String _query = '';
 
   @override
   void initState() {
     super.initState();
     _walls = List.of(widget.walls);
+  }
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
   }
 
   void _onUpdated(int index, IndoorWallSummary updated) {
@@ -36,51 +44,86 @@ class _AllWallsPageState extends State<AllWallsPage> {
     setState(() => _walls.removeAt(index));
   }
 
+  List<IndoorWallSummary> get _filtered => _query.isEmpty
+      ? _walls
+      : _walls
+          .where((w) => w.name.toLowerCase().contains(_query.toLowerCase()))
+          .toList();
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final filtered = _filtered;
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.title),
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(28),
-          child: Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Text(
-              '${_walls.length} wall${_walls.length == 1 ? '' : 's'}',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: colorScheme.onSurfaceVariant,
+      appBar: AppBar(title: Text(widget.title)),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+            child: TextField(
+              controller: _searchCtrl,
+              onChanged: (q) => setState(() => _query = q),
+              decoration: InputDecoration(
+                hintText: 'Search walls…',
+                prefixIcon: const Icon(Icons.search),
+                suffixIcon: _query.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear),
+                        onPressed: () {
+                          _searchCtrl.clear();
+                          setState(() => _query = '');
+                        },
+                      )
+                    : null,
+                border: const OutlineInputBorder(),
+                isDense: true,
               ),
             ),
           ),
-        ),
-      ),
-      body: _walls.isEmpty
-          ? Center(
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            child: Align(
+              alignment: Alignment.centerLeft,
               child: Text(
-                'No walls.',
-                style: theme.textTheme.bodyLarge?.copyWith(
+                '${filtered.length} wall${filtered.length == 1 ? '' : 's'}',
+                style: theme.textTheme.bodySmall?.copyWith(
                   color: colorScheme.onSurfaceVariant,
                 ),
               ),
-            )
-          : ListView.builder(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
-              itemCount: _walls.length,
-              itemBuilder: (context, index) {
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: _WallTile(
-                    wall: _walls[index],
-                    canDelete: widget.canDelete,
-                    onUpdated: (updated) => _onUpdated(index, updated),
-                    onDeleted: () => _onDeleted(index),
-                  ),
-                );
-              },
             ),
+          ),
+          Expanded(
+            child: filtered.isEmpty
+                ? Center(
+                    child: Text(
+                      _query.isEmpty ? 'No walls.' : 'No walls match "$_query".',
+                      style: theme.textTheme.bodyLarge?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  )
+                : ListView.builder(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+                    itemCount: filtered.length,
+                    itemBuilder: (context, index) {
+                      final wall = filtered[index];
+                      final realIndex = _walls.indexOf(wall);
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: _WallTile(
+                          wall: wall,
+                          canDelete: widget.canDelete,
+                          onUpdated: (updated) => _onUpdated(realIndex, updated),
+                          onDeleted: () => _onDeleted(realIndex),
+                        ),
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
     );
   }
 }

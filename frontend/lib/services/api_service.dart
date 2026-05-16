@@ -314,6 +314,24 @@ class ApiService {
     }
   }
 
+  Future<List<Poi>> searchPois(String query) async {
+    try {
+      final response = await _dio.get(
+        '/pois/search',
+        queryParameters: {'q': query},
+      );
+      final data = response.data;
+      if (data is! List) return [];
+      return data
+          .whereType<Map>()
+          .map((e) => Poi.fromJson(Map<String, dynamic>.from(e)))
+          .toList();
+    } catch (e) {
+      print('Error searching POIs: $e');
+      return [];
+    }
+  }
+
   Future<Wall?> getWallById(String wallId) async {
     try {
       final response = await _dio.get('/walls/$wallId');
