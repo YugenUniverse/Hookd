@@ -1,9 +1,19 @@
 class Issue {
+  final String? id;
+  final String? climberId;
   final String wall_id;
   final String body;
+  final String status;
   final DateTime? submittedAt;
 
-  Issue({required this.wall_id, required this.body, this.submittedAt});
+  Issue({
+    this.id,
+    this.climberId,
+    required this.wall_id,
+    required this.body,
+    this.status = 'OPEN',
+    this.submittedAt,
+  });
 
   factory Issue.fromJson(Map<String, dynamic> json) {
     final submittedAtRaw = json['submitted_at'] ?? json['submittedAt'];
@@ -13,8 +23,11 @@ class Issue {
     }
 
     return Issue(
-      wall_id: (json['wall_id'] ?? 'Unknown Wall').toString(),
+      id: (json['id'] ?? json['_id'])?.toString(),
+      climberId: (json['climber_id'] ?? json['climberId'])?.toString(),
+      wall_id: (json['wall_id'] ?? json['wallId'] ?? 'Unknown Wall').toString(),
       body: (json['body'] ?? '').toString(),
+      status: (json['status'] ?? 'OPEN').toString(),
       submittedAt: submittedAt,
     );
   }
@@ -24,6 +37,15 @@ class Issue {
 
     if (submittedAt != null) {
       data['submitted_at'] = submittedAt!.toIso8601String();
+    }
+    if (climberId != null) {
+      data['climber_id'] = climberId!;
+    }
+    if (status.isNotEmpty) {
+      data['status'] = status;
+    }
+    if (id != null) {
+      data['id'] = id!;
     }
 
     return data;

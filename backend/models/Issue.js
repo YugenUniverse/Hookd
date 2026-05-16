@@ -2,6 +2,8 @@ const mongoose = require("mongoose");
 const { Climber } = require("../models/User");
 const { Wall } = require("../models/Wall");
 
+const STATUS_ENUM = ["OPEN", "IN_PROGRESS", "RESOLVED", "CLOSED"];
+
 const baseTransform = (doc, ret) => {
     ret.id = ret._id;
     delete ret._id;
@@ -26,6 +28,11 @@ const issueSchema = new mongoose.Schema(
             required: true,
             trim: true,
             maxlength: [500, "Issue body cannot exceed 500 characters"],
+        },
+        status: {
+            type: String,
+            enum: STATUS_ENUM,
+            default: "OPEN",
         },
     },
     {
