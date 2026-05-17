@@ -1,120 +1,1725 @@
-swagger: '2.0'
+swagger: "2.0"
 info:
-  version: '1.0'
-  title: "hookd"
-  description: Polls is a simple API allowing consumers to view polls and vote in them.
-  license:
-    name: MIT
-    url: https://github.com/apiaryio/polls-api/blob/master/LICENSE
-host: polls.apiblueprint.org
+    version: "1.0.0"
+    title: Hookd API
+    description: >-
+        The official API documentation for Hookd Climbing App. Includes authentication,
+        wall management, climbing sessions, issues, user profiles, reviews, facilities,
+        points of interest, and reports.
+    license:
+        name: MIT
+
 basePath: /
+
 schemes:
-- https
-consumes:
-- application/json
-produces:
-- application/json
+    - https
+    - http
+
+securityDefinitions:
+    BearerAuth:
+        type: apiKey
+        name: Authorization
+        in: header
+        description: Enter your JWT token in the format **Bearer <token>**
+
 paths:
-  /questions:
-    x-summary: Questions Collection
-    get:
-      summary: List All Questions
-      responses:
-        200:
-          description: Successful Response
-          schema:
-            type: array
-            items:
-              $ref: '#/definitions/Question'
-          examples:
-            application/json:
-              - question: Favourite programming language?
-                published_at: '2015-08-05T08:40:51.620Z'
-                choices:
-                  - choice: Swift
-                    votes: 2048
-                  - choice: Python
-                    votes: 1024
-                  - choice: Objective-C
-                    votes: 512
-                  - choice: Ruby
-                    votes: 256
-    post:
-      description: >-
-        You may create your own question using this action. It takes a JSON
-        object containing a question and a collection of answers in the
-        form of choices.
-      summary: Create a New Question
-      parameters:
-        - name: body
-          in: body
-          required: true
-          schema:
-            $ref: '#/definitions/QuestionRequest'
-      responses:
-        201:
-          description: ''
-          schema:
-            $ref: '#/definitions/Question'
-          examples:
-            application/json:
-                question: Favourite programming language?
-                published_at: '2015-08-05T08:40:51.620Z'
-                choices:
-                  - choice: Swift
-                    votes: 0
-                  - choice: Python
-                    votes: 0
-                  - choice: Objective-C
-                    votes: 0
-                  - choice: Ruby
-                    votes: 0
+    # ================= AUTHENTICATION =================
+    /auth/register:
+        post:
+            tags:
+                - Authentication
+            summary: Register a new user
+            description: Creates a new user account (Climber, Facility, or PublicBody).
+            parameters:
+                - in: body
+                  name: body
+                  required: true
+                  schema:
+                      type: object
+                      required:
+                          - email
+                          - username
+                          - password
+                      properties:
+                          email:
+                              type: string
+                              example: climber@hookd.com
+                          username:
+                              type: string
+                              example: hookd_user
+                          password:
+                              type: string
+                              example: secretpassword
+                          userType:
+                              type: string
+                              enum: [Climber, Facility, PublicBody]
+                              default: Climber
+                          name:
+                              type: string
+                          surname:
+                              type: string
+                          birthdate:
+                              type: string
+                              format: date
+            responses:
+                201:
+                    description: User successfully created
+                400:
+                    description: Missing or invalid fields
+                409:
+                    description: User already exists with that email
+
+    /auth/login:
+        post:
+            tags:
+                - Authentication
+            summary: User Login
+            description: Authenticates a user using email and password, returning JWT tokens.
+            parameters:
+                - in: body
+                  name: body
+                  required: true
+                  schema:
+                      type: object
+                      required:
+                          - email
+                          - password
+                      properties:
+                          email:
+                              type: string
+                              example: climber@hookd.com
+                          password:
+                              type: string
+                              example: secretpassword
+            responses:
+                200:
+                    description: Successful authentication
+                    schema:
+                        $ref: "#/definitions/AuthResponse"
+                400:
+                    description: Missing fields
+                401:
+                    description: Invalid credentials
+
+    /auth/refresh:
+        post:
+            tags:
+                - Authentication
+            summary: Refresh Access Token
+            description: Exchanges a valid refresh token for a new access token and refresh token pair.
+            parameters:
+                - in: body
+                  name: body
+                  required: true
+                  schema:
+                      type: object
+                      required:
+                          - refreshToken
+                      properties:
+                          refreshToken:
+                              type: string
+            responses:
+                200:
+                    description: Tokens successfully refreshed
+                    schema:
+                        $ref: "#/definitions/AuthResponse"
+                400:
+                    description: Refresh token is required
+                401:
+                    description: Refresh token revoked or expired
+
+    /auth/logout:
+        post:
+            tags:
+                - Authentication
+            summary: Logout
+            description: Revokes the submitted refresh token.
+            parameters:
+                - in: body
+                  name: body
+                  required: true
+                  schema:
+                      type: object
+                      required:
+                          - refreshToken
+                      properties:
+                          refreshToken:
+                              type: string
+            responses:
+                200:
+                    description: Logged out successfully
+                400:
+                    description: Invalid request
+
+    /auth/google:
+        post:
+            tags:
+                - Authentication
+            summary: Google login
+            description: Authenticates a user using a Firebase ID token.
+            parameters:
+                - in: body
+                  name: body
+                  required: true
+                  schema:
+                      type: object
+                      required:
+                          - idToken
+                      properties:
+                          idToken:
+                              type: string
+            responses:
+                200:
+                    description: Google login successful
+                    schema:
+                        $ref: "#/definitions/AuthResponse"
+                400:
+                    description: Firebase ID token is required
+                401:
+                    description: Invalid Firebase ID token
+
+    # ================= USERS =================
+    /users:
+        get:
+            tags:
+                - Users
+            summary: Get all users
+            description: Returns all users. Requires authentication.
+            security:
+                - BearerAuth: []
+            responses:
+                200:
+                    description: List of all users
+                    schema:
+                        type: array
+                        items:
+                            $ref: "#/definitions/UserProfile"
+                401:
+                    description: Unauthorized
+
+    /users/me:
+        get:
+            tags:
+                - Users
+            summary: Get current logged-in user
+            description: Returns the full profile of the currently authenticated user.
+            security:
+                - BearerAuth: []
+            responses:
+                200:
+                    description: Full user profile returned.
+                    schema:
+                        $ref: "#/definitions/UserProfile"
+                401:
+                    description: Unauthorized.
+                404:
+                    description: User not found.
+
+    /users/{id}:
+        get:
+            tags:
+                - Users
+            summary: Get public user profile
+            description: Returns limited public information for a specific user.
+            parameters:
+                - in: path
+                  name: id
+                  required: true
+                  type: string
+                  description: The 24-character MongoDB ObjectId of the user.
+            responses:
+                200:
+                    description: Public profile data.
+                    schema:
+                        $ref: "#/definitions/PublicUser"
+                400:
+                    description: Invalid user ID.
+                404:
+                    description: User not found.
+
+    # ================= CLIMBERS =================
+    /climbers/leaderboard:
+        get:
+            tags:
+                - Climbers
+            summary: Get the global gym leaderboard
+            description: Returns a gamified ranking of all climbers based on their total ascents across all walls.
+            parameters:
+                - in: query
+                  name: limit
+                  type: integer
+                  default: 50
+                  description: Maximum number of climbers to return
+            responses:
+                200:
+                    description: A successfully generated global leaderboard.
+                    schema:
+                        type: array
+                        items:
+                            $ref: "#/definitions/LeaderboardEntry"
+
+    # ================= FACILITIES =================
+    /facilities/search:
+        get:
+            tags:
+                - Facilities
+            summary: Search unclaimed facilities
+            description: Returns unclaimed facilities matching the search query (minimum 2 characters).
+            parameters:
+                - in: query
+                  name: q
+                  required: true
+                  type: string
+                  description: Search query for facility name
+            responses:
+                200:
+                    description: List of matching unclaimed facilities
+                    schema:
+                        type: array
+                        items:
+                            $ref: "#/definitions/FacilityOutput"
+                400:
+                    description: Query must be at least 2 characters
+
+    /facilities/{id}/claim:
+        post:
+            tags:
+                - Facilities
+            summary: Claim a facility
+            description: Links an unclaimed facility to the authenticated FacilityOwner account.
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: id
+                  required: true
+                  type: string
+                  description: The 24-character MongoDB ObjectId of the facility to claim.
+            responses:
+                200:
+                    description: Facility claimed successfully
+                    schema:
+                        type: object
+                        properties:
+                            message:
+                                type: string
+                            facility:
+                                $ref: "#/definitions/FacilityOutput"
+                401:
+                    description: Unauthorized
+                403:
+                    description: Only FacilityOwner accounts can claim facilities
+                404:
+                    description: Facility not found
+                409:
+                    description: Facility already has an owner
+
+    /facilities/{id}:
+        put:
+            tags:
+                - Facilities
+            summary: Update a facility
+            description: Updates facility details. Only the owner can update their facility.
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: id
+                  required: true
+                  type: string
+                  description: The 24-character MongoDB ObjectId of the facility.
+                - in: body
+                  name: body
+                  required: true
+                  schema:
+                      $ref: "#/definitions/FacilityInput"
+            responses:
+                200:
+                    description: Facility updated successfully
+                    schema:
+                        type: object
+                        properties:
+                            message:
+                                type: string
+                            facility:
+                                $ref: "#/definitions/FacilityOutput"
+                401:
+                    description: Unauthorized
+                403:
+                    description: You are not the owner of this facility
+                404:
+                    description: Facility not found
+                400:
+                    description: Validation error
+
+    /facilities/{id}/unpair:
+        post:
+            tags:
+                - Facilities
+            summary: Unpair facility from owner
+            description: Removes the link between a FacilityOwner and their facility.
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: id
+                  required: true
+                  type: string
+                  description: The 24-character MongoDB ObjectId of the facility to unpair.
+            responses:
+                200:
+                    description: Facility unpaired successfully
+                    schema:
+                        type: object
+                        properties:
+                            message:
+                                type: string
+                            facility:
+                                $ref: "#/definitions/FacilityOutput"
+                401:
+                    description: Unauthorized
+                403:
+                    description: You are not the owner of this facility
+                404:
+                    description: Facility not found
+
+    # ================= WALLS =================
+    /walls:
+        get:
+            tags:
+                - Walls
+            summary: Get all walls
+            description: Returns all walls, including indoor and outdoor entries.
+            responses:
+                200:
+                    description: A list of walls.
+                    schema:
+                        type: array
+                        items:
+                            $ref: "#/definitions/WallOutput"
+        post:
+            tags:
+                - Walls
+            summary: Create a new wall
+            security:
+                - BearerAuth: []
+            description: Creates a new wall for the authenticated Facility or PublicBody.
+            parameters:
+                - in: body
+                  name: body
+                  required: true
+                  schema:
+                      $ref: "#/definitions/WallInput"
+            responses:
+                201:
+                    description: Wall created successfully
+                    schema:
+                        type: object
+                        properties:
+                            message:
+                                type: string
+                            wall:
+                                $ref: "#/definitions/WallOutput"
+                400:
+                    description: Validation error or missing fields.
+                401:
+                    description: Unauthorized.
+                403:
+                    description: User is not allowed to create walls.
+
+    /walls/owned:
+        get:
+            tags:
+                - Walls
+            summary: Get owned walls
+            description: Returns walls owned by the authenticated Facility or PublicBody.
+            security:
+                - BearerAuth: []
+            responses:
+                200:
+                    description: List of owned walls
+                    schema:
+                        type: array
+                        items:
+                            $ref: "#/definitions/WallOutput"
+                401:
+                    description: Unauthorized
+                403:
+                    description: Only Facility or PublicBody can access owned walls
+
+    /walls/search:
+        get:
+            tags:
+                - Walls
+            summary: Search walls
+            description: Returns walls whose name contains the provided query text.
+            parameters:
+                - in: query
+                  name: q
+                  required: true
+                  type: string
+                  description: Search keyword
+            responses:
+                200:
+                    description: Matching walls.
+                    schema:
+                        type: array
+                        items:
+                            $ref: "#/definitions/WallOutput"
+                400:
+                    description: Missing or invalid search query.
+
+    /walls/nearby:
+        get:
+            tags:
+                - Walls
+            summary: Find nearby walls
+            description: Returns walls within the requested radius from the provided longitude and latitude.
+            parameters:
+                - in: query
+                  name: lng
+                  required: true
+                  type: number
+                  description: Longitude of the search point
+                - in: query
+                  name: lat
+                  required: true
+                  type: number
+                  description: Latitude of the search point
+                - in: query
+                  name: radius
+                  type: integer
+                  default: 10000
+                  description: Radius in meters
+            responses:
+                200:
+                    description: Nearby walls.
+                    schema:
+                        type: array
+                        items:
+                            $ref: "#/definitions/WallOutput"
+                400:
+                    description: Missing or invalid lng/lat parameters.
+
+    /walls/{id}:
+        get:
+            tags:
+                - Walls
+            summary: Get wall by ID
+            description: Returns the wall details for a specific wall.
+            parameters:
+                - in: path
+                  name: id
+                  required: true
+                  type: string
+                  description: The 24-character MongoDB ObjectId of the wall.
+            responses:
+                200:
+                    description: Wall details returned.
+                    schema:
+                        $ref: "#/definitions/WallOutput"
+                404:
+                    description: Wall not found.
+        put:
+            tags:
+                - Walls
+            summary: Update a wall
+            description: Updates a wall owned by the authenticated Facility or PublicBody.
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: id
+                  required: true
+                  type: string
+                  description: The 24-character MongoDB ObjectId of the wall.
+                - in: body
+                  name: body
+                  required: true
+                  schema:
+                      $ref: "#/definitions/WallInput"
+            responses:
+                200:
+                    description: Wall updated successfully
+                    schema:
+                        type: object
+                        properties:
+                            message:
+                                type: string
+                            wall:
+                                $ref: "#/definitions/WallOutput"
+                401:
+                    description: Unauthorized
+                403:
+                    description: Forbidden. User is not the owner of this wall.
+                404:
+                    description: Wall not found
+        delete:
+            tags:
+                - Walls
+            summary: Delete a wall
+            description: Deletes a wall owned by the authenticated Facility or PublicBody.
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: id
+                  required: true
+                  type: string
+                  description: The 24-character MongoDB ObjectId of the wall.
+            responses:
+                200:
+                    description: Wall deleted successfully.
+                401:
+                    description: Unauthorized.
+                403:
+                    description: Forbidden. User is not the owner of this wall.
+                404:
+                    description: Wall not found.
+
+    /walls/{id}/leaderboard:
+        get:
+            tags:
+                - Walls
+            summary: Get a wall-specific leaderboard
+            parameters:
+                - in: path
+                  name: id
+                  required: true
+                  type: string
+                - in: query
+                  name: limit
+                  type: integer
+                  default: 50
+                  description: Maximum number of leaderboard entries to return
+                - in: query
+                  name: offset
+                  type: integer
+                  default: 0
+                  description: 0 for current season, negative values for historical seasons
+            responses:
+                200:
+                    description: Seasonal leaderboard.
+                    schema:
+                        $ref: "#/definitions/WallLeaderboardResponse"
+                400:
+                    description: Invalid pagination values.
+                404:
+                    description: Wall not found.
+
+    # ================= POIS =================
+    /pois:
+        get:
+            tags:
+                - Points of Interest
+            summary: Get all POIs
+            description: Returns all points of interest.
+            responses:
+                200:
+                    description: A list of all POIs
+                    schema:
+                        type: array
+                        items:
+                            $ref: "#/definitions/POIOutput"
+
+    /pois/search:
+        get:
+            tags:
+                - Points of Interest
+            summary: Search POIs
+            description: Returns POIs matching the search query.
+            parameters:
+                - in: query
+                  name: q
+                  required: true
+                  type: string
+                  description: Search keyword
+            responses:
+                200:
+                    description: Matching POIs
+                    schema:
+                        type: array
+                        items:
+                            $ref: "#/definitions/POIOutput"
+                400:
+                    description: Missing search query
+
+    /pois/nearby:
+        get:
+            tags:
+                - Points of Interest
+            summary: Find nearby POIs
+            description: Returns POIs within the requested radius from the provided coordinates.
+            parameters:
+                - in: query
+                  name: lng
+                  required: true
+                  type: number
+                  description: Longitude of the search point
+                - in: query
+                  name: lat
+                  required: true
+                  type: number
+                  description: Latitude of the search point
+                - in: query
+                  name: radius
+                  type: integer
+                  default: 10000
+                  description: Radius in meters
+            responses:
+                200:
+                    description: Nearby POIs
+                    schema:
+                        type: array
+                        items:
+                            $ref: "#/definitions/POIOutput"
+                400:
+                    description: Missing or invalid lng/lat parameters
+
+    # ================= REPORTS =================
+    /reports/wall/{wallId}:
+        get:
+            tags:
+                - Reports
+            summary: Get wall report
+            description: Retrieves live dynamic data for a specific wall.
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: wallId
+                  required: true
+                  type: string
+                  description: The 24-character MongoDB ObjectId of the wall.
+            responses:
+                200:
+                    description: Wall report data
+                    schema:
+                        $ref: "#/definitions/ReportOutput"
+                401:
+                    description: Unauthorized
+                403:
+                    description: Only FacilityOwner or PublicBody can access reports
+                404:
+                    description: Wall not found
+
+    /reports/wall/{wallId}/save:
+        post:
+            tags:
+                - Reports
+            summary: Save report snapshot
+            description: Generates and saves a snapshot of wall data.
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: wallId
+                  required: true
+                  type: string
+                  description: The 24-character MongoDB ObjectId of the wall.
+            responses:
+                201:
+                    description: Report saved successfully
+                    schema:
+                        $ref: "#/definitions/ReportOutput"
+                401:
+                    description: Unauthorized
+                403:
+                    description: Only FacilityOwner or PublicBody can save reports
+                404:
+                    description: Wall not found
+
+    /reports/saved:
+        get:
+            tags:
+                - Reports
+            summary: List saved reports
+            description: Returns a lightweight list of all saved reports.
+            security:
+                - BearerAuth: []
+            responses:
+                200:
+                    description: List of saved reports
+                    schema:
+                        type: array
+                        items:
+                            $ref: "#/definitions/ReportOutput"
+                401:
+                    description: Unauthorized
+                403:
+                    description: Only FacilityOwner or PublicBody can access saved reports
+
+    /reports/saved/{id}:
+        get:
+            tags:
+                - Reports
+            summary: Get a specific saved report
+            description: Returns a specific saved report with full data.
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: id
+                  required: true
+                  type: string
+                  description: The 24-character MongoDB ObjectId of the saved report.
+            responses:
+                200:
+                    description: Saved report details
+                    schema:
+                        $ref: "#/definitions/ReportOutput"
+                401:
+                    description: Unauthorized
+                403:
+                    description: Only FacilityOwner or PublicBody can access saved reports
+                404:
+                    description: Report not found
+        delete:
+            tags:
+                - Reports
+            summary: Delete a saved report
+            description: Permanently deletes a saved report.
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: id
+                  required: true
+                  type: string
+                  description: The 24-character MongoDB ObjectId of the saved report.
+            responses:
+                200:
+                    description: Report deleted successfully
+                401:
+                    description: Unauthorized
+                403:
+                    description: Only FacilityOwner or PublicBody can delete saved reports
+                404:
+                    description: Report not found
+
+    # ================= REVIEWS =================
+    /reviews/wall/{wallId}:
+        get:
+            tags:
+                - Reviews
+            summary: Get reviews for a wall
+            description: >-
+                Returns all public reviews for a wall. If authenticated, private
+                reviews belonging to the requester are included.
+            parameters:
+                - in: path
+                  name: wallId
+                  required: true
+                  type: string
+            responses:
+                200:
+                    description: List of filtered reviews.
+                    schema:
+                        type: object
+                        properties:
+                            reviews:
+                                type: array
+                                items:
+                                    $ref: "#/definitions/ReviewOutput"
+
+    /reviews/user/{userId}:
+        get:
+            tags:
+                - Reviews
+            summary: Get reviews by a specific user
+            description: >-
+                Returns public reviews written by a user. If authenticated, the
+                user's own private reviews are included.
+            parameters:
+                - in: path
+                  name: userId
+                  required: true
+                  type: string
+            responses:
+                200:
+                    description: List of filtered reviews.
+                    schema:
+                        type: object
+                        properties:
+                            reviews:
+                                type: array
+                                items:
+                                    $ref: "#/definitions/ReviewOutput"
+
+    # ================= SESSIONS =================
+    /sessions:
+        get:
+            tags:
+                - Sessions
+            summary: Get logged user's sessions
+            description: >-
+                **Climber only.**
+                Returns all climbing sessions belonging to the currently
+                authenticated climber.
+            security:
+                - BearerAuth: []
+            responses:
+                200:
+                    description: A list of sessions.
+                    schema:
+                        type: object
+                        properties:
+                            sessions:
+                                type: array
+                                items:
+                                    $ref: "#/definitions/SessionOutput"
+                401:
+                    description: Unauthorized.
+                403:
+                    description: Only climbers can view climbing sessions.
+        post:
+            tags:
+                - Sessions
+            summary: Create a new climbing session
+            description: >-
+                **Climber only.**
+                Creates a climbing session and optionally attaches an inline
+                review. If `review` is provided, `review.rating` is mandatory.
+                The response always contains `session`; `review` is present only
+                when an inline review was supplied.
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: body
+                  name: body
+                  required: true
+                  schema:
+                      $ref: "#/definitions/SessionInput"
+            responses:
+                201:
+                    description: Session (and optional review) created successfully.
+                    schema:
+                        type: object
+                        properties:
+                            session:
+                                $ref: "#/definitions/SessionOutput"
+                            review:
+                                $ref: "#/definitions/ReviewOutput"
+                400:
+                    description: Validation error — missing or invalid fields.
+                401:
+                    description: Unauthorized.
+                403:
+                    description: Only climbers can create climbing sessions.
+
+    /sessions/{sessionId}:
+        get:
+            tags:
+                - Sessions
+            summary: Get a specific session by ID
+            description: >-
+                **Climber only.**
+                Returns the session if it exists and belongs to the authenticated
+                user. Returns 403 if the session belongs to a different climber.
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: sessionId
+                  required: true
+                  type: string
+                  description: MongoDB ObjectId of the climbing session.
+            responses:
+                200:
+                    description: Session returned.
+                    schema:
+                        type: object
+                        properties:
+                            session:
+                                $ref: "#/definitions/SessionOutput"
+                400:
+                    description: Invalid sessionId format.
+                401:
+                    description: Unauthorized.
+                403:
+                    description: Only climbers can view climbing sessions.
+                404:
+                    description: Session not found.
+        put:
+            tags:
+                - Sessions
+            summary: Update a climbing session
+            description: >-
+                **Climber only.**
+                Partially updates a session. At least one of `wall_id`, `date`,
+                `time`, or `isSend` must be supplied. Ownership is enforced — only the
+                session's original climber may update it.
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: sessionId
+                  required: true
+                  type: string
+                  description: MongoDB ObjectId of the climbing session.
+                - in: body
+                  name: body
+                  required: true
+                  schema:
+                      $ref: "#/definitions/SessionUpdateInput"
+            responses:
+                200:
+                    description: Session updated successfully.
+                    schema:
+                        type: object
+                        properties:
+                            session:
+                                $ref: "#/definitions/SessionOutput"
+                400:
+                    description: >-
+                        Validation error — no fields provided, or invalid
+                        wall_id / date / time / isSend value.
+                401:
+                    description: Unauthorized.
+                403:
+                    description: Only climbers can update climbing sessions.
+                404:
+                    description: Session not found.
+        delete:
+            tags:
+                - Sessions
+            summary: Delete a climbing session
+            description: >-
+                **Climber only.**
+                Permanently deletes the session and removes its reference from
+                both the Wall and Climber documents. Ownership is enforced.
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: sessionId
+                  required: true
+                  type: string
+                  description: MongoDB ObjectId of the climbing session.
+            responses:
+                204:
+                    description: Session deleted successfully — no content returned.
+                401:
+                    description: Unauthorized.
+                403:
+                    description: Only climbers can delete climbing sessions.
+                404:
+                    description: Session not found.
+
+    /sessions/{sessionId}/reviews:
+        post:
+            tags:
+                - Sessions
+            summary: Add a review to an existing session
+            description: >-
+                **Climber only.**
+                Attaches a review to a session that does not already have one.
+                Returns 409 if a review is already linked (`review_id` is set on
+                the session document).
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: sessionId
+                  required: true
+                  type: string
+                  description: MongoDB ObjectId of the climbing session.
+                - in: body
+                  name: body
+                  required: true
+                  schema:
+                      $ref: "#/definitions/ReviewInput"
+            responses:
+                201:
+                    description: Review added and linked to the session.
+                    schema:
+                        type: object
+                        properties:
+                            session:
+                                $ref: "#/definitions/SessionOutput"
+                            review:
+                                $ref: "#/definitions/ReviewOutput"
+                400:
+                    description: Validation error — rating is missing or not a number.
+                401:
+                    description: Unauthorized.
+                403:
+                    description: Only climbers can add reviews to climbing sessions.
+                404:
+                    description: Session not found.
+                409:
+                    description: Climbing session already has a review.
+
+    # ================= ISSUES =================
+    /issues:
+        post:
+            tags:
+                - Issues
+            summary: Create a new issue on a wall
+            description: >-
+                **Climber only.**
+                Reports an issue (e.g. a damaged hold) on a specific wall.
+                `body` must be a non-empty string of at most 500 characters.
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: body
+                  name: body
+                  required: true
+                  schema:
+                      $ref: "#/definitions/IssueInput"
+            responses:
+                201:
+                    description: Issue created successfully.
+                    schema:
+                        type: object
+                        properties:
+                            issue:
+                                $ref: "#/definitions/IssueOutput"
+                400:
+                    description: >-
+                        Validation error — wall_id or body missing, wall_id is
+                        not a valid ObjectId, body is empty or exceeds 500 chars.
+                401:
+                    description: Unauthorized.
+                403:
+                    description: Only climbers can create issues.
+
+    /issues/my-issues:
+        get:
+            tags:
+                - Issues
+            summary: Get issues relevant to the authenticated user
+            description: >-
+                Returns issues scoped to the caller's `userType`:
+
+                - **Climber** — all issues the climber has personally filed.
+                - **Facility** — all issues across every wall owned by the facility
+                  (resolved via `IndoorWall.facility` field and the user's `walls` array).
+                - **PublicBody** — all issues across every wall owned by the public body
+                  (resolved via `OutdoorWall.publicBody` field and the user's `walls` array).
+
+                Any other `userType` results in `400 Invalid user type`.
+            security:
+                - BearerAuth: []
+            responses:
+                200:
+                    description: List of issues for the authenticated user.
+                    schema:
+                        type: object
+                        properties:
+                            issues:
+                                type: array
+                                items:
+                                    $ref: "#/definitions/IssueOutput"
+                400:
+                    description: Invalid user type.
+                401:
+                    description: Unauthorized.
+
+    /issues/walls/{wallId}:
+        get:
+            tags:
+                - Issues
+            summary: Get all issues for a specific wall
+            description: >-
+                **PublicBody / Facility only.**
+                Returns all issues reported on the given wall.
+                The authenticated user must own the wall — i.e. `wallId` is in
+                their `walls` array, or the wall's `facility` field matches
+                their id.
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: wallId
+                  required: true
+                  type: string
+                  description: MongoDB ObjectId of the wall.
+            responses:
+                200:
+                    description: List of issues for the wall.
+                    schema:
+                        type: object
+                        properties:
+                            issues:
+                                type: array
+                                items:
+                                    $ref: "#/definitions/IssueOutput"
+                400:
+                    description: wallId is not a valid ObjectId.
+                401:
+                    description: Unauthorized.
+                403:
+                    description: >-
+                        Only public bodies or facilities can access wall issues,
+                        or user does not own the requested wall.
+                404:
+                    description: Wall or user not found.
+
+    /issues/{issueId}/status:
+        patch:
+            tags:
+                - Issues
+            summary: Update the status of an issue
+            description: >-
+                **PublicBody / Facility only.**
+                Transitions an issue to a new status. The caller must own the
+                wall the issue belongs to (ownership resolved via
+                `getOwnedWallIds` — checks both the discriminator field
+                `facility` / `publicBody` on the Wall model and the user's
+                explicit `walls` array).
+
+                Valid status transitions: `OPEN` → `IN_PROGRESS` → `RESOLVED` → `CLOSED`
+                (any value from the enum is accepted regardless of current state).
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: issueId
+                  required: true
+                  type: string
+                  description: MongoDB ObjectId of the issue.
+                - in: body
+                  name: body
+                  required: true
+                  schema:
+                      $ref: "#/definitions/IssueStatusUpdateInput"
+            responses:
+                200:
+                    description: Issue status updated successfully.
+                    schema:
+                        type: object
+                        properties:
+                            issue:
+                                $ref: "#/definitions/IssueOutput"
+                400:
+                    description: >-
+                        issueId is not a valid ObjectId, or status is missing /
+                        not a string / not one of the valid enum values.
+                401:
+                    description: Unauthorized.
+                403:
+                    description: >-
+                        Only public bodies or facilities can update issue status,
+                        or the caller does not own the wall the issue belongs to.
+                404:
+                    description: Issue not found.
+
+    /issues/{issueId}:
+        delete:
+            tags:
+                - Issues
+            summary: Delete an issue
+            description: >-
+                **Climber only.**
+                Permanently deletes the issue. The authenticated user must be
+                the original reporter (`climber_id` must match the caller's id).
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: issueId
+                  required: true
+                  type: string
+                  description: MongoDB ObjectId of the issue to delete.
+            responses:
+                204:
+                    description: Issue deleted — no content returned.
+                400:
+                    description: issueId is not a valid ObjectId.
+                401:
+                    description: Unauthorized.
+                403:
+                    description: You can only delete your own issues.
+                404:
+                    description: Issue not found.
+
 definitions:
-  Question:
-    title: Question
-    type: object
-    properties:
-      question:
-        type: string
-      published_at:
-        type: string
-      choices:
-        type: array
-        items:
-          $ref: '#/definitions/Choice'
-    required:
-      - question
-      - published_at
-      - choices
-  Choice:
-    title: Choice
-    type: object
-    properties:
-      votes:
-        type: integer
-        format: int32
-      choice:
-        type: string
-    required:
-      - votes
-      - choice
-  QuestionRequest:
-    title: Question Request
-    type: object
-    properties:
-      question:
-        type: string
-      choices:
-        type: array
-        items:
-          type: string
-    required:
-      - question
-      - choices
-    example:
-      question: Favourite programming language?
-      choices:
-        - Swift
-        - Python
-        - Objective-C
-        - Ruby
+    # ─── Auth ────────────────────────────────────────────────────────────────
+    AuthResponse:
+        type: object
+        properties:
+            message:
+                type: string
+            accessToken:
+                type: string
+            refreshToken:
+                type: string
+
+    # ─── Users ───────────────────────────────────────────────────────────────
+    PublicUser:
+        type: object
+        properties:
+            id:
+                type: string
+            username:
+                type: string
+            avatar:
+                type: string
+            userType:
+                type: string
+            profile:
+                type: object
+                properties:
+                    bio:
+                        type: string
+                    description:
+                        type: string
+                    location:
+                        type: object
+                        properties:
+                            type:
+                                type: string
+                            coordinates:
+                                type: array
+                                items:
+                                    type: number
+                            address:
+                                type: string
+
+    UserProfile:
+        type: object
+        properties:
+            id:
+                type: string
+            email:
+                type: string
+            username:
+                type: string
+            avatar:
+                type: string
+            userType:
+                type: string
+            authMethods:
+                type: array
+                items:
+                    type: string
+            createdAt:
+                type: string
+                format: date-time
+            updatedAt:
+                type: string
+                format: date-time
+
+    # ─── Facilities ───────────────────────────────────────────────────────────
+    FacilityInput:
+        type: object
+        properties:
+            name:
+                type: string
+            description:
+                type: string
+            location:
+                type: object
+                properties:
+                    type:
+                        type: string
+                        enum: [Point]
+                        default: Point
+                    coordinates:
+                        type: array
+                        items:
+                            type: number
+                    address:
+                        type: string
+
+    FacilityOutput:
+        type: object
+        properties:
+            id:
+                type: string
+            name:
+                type: string
+            description:
+                type: string
+            location:
+                type: object
+                properties:
+                    type:
+                        type: string
+                    coordinates:
+                        type: array
+                        items:
+                            type: number
+                    address:
+                        type: string
+            ownerAccount:
+                type: string
+                description: ObjectId of the FacilityOwner who owns this facility
+            createdAt:
+                type: string
+                format: date-time
+            updatedAt:
+                type: string
+                format: date-time
+
+    # ─── POIs ────────────────────────────────────────────────────────────────
+    POIOutput:
+        type: object
+        properties:
+            id:
+                type: string
+            name:
+                type: string
+            description:
+                type: string
+            location:
+                type: object
+                properties:
+                    type:
+                        type: string
+                    coordinates:
+                        type: array
+                        items:
+                            type: number
+                    address:
+                        type: string
+            createdAt:
+                type: string
+                format: date-time
+            updatedAt:
+                type: string
+                format: date-time
+
+    # ─── Reports ─────────────────────────────────────────────────────────────
+    ReportOutput:
+        type: object
+        properties:
+            id:
+                type: string
+            wall_id:
+                type: string
+                description: ObjectId of the wall this report belongs to
+            data:
+                type: object
+                description: Report data structure
+            createdAt:
+                type: string
+                format: date-time
+            updatedAt:
+                type: string
+                format: date-time
+
+    # ─── Reviews ─────────────────────────────────────────────────────────────
+    ReviewInput:
+        type: object
+        required:
+            - rating
+        properties:
+            rating:
+                type: number
+                example: 4.5
+            body:
+                type: string
+                example: "Great session, very clean holds."
+
+    ReviewOutput:
+        type: object
+        properties:
+            id:
+                type: string
+                example: "664f1a2b3c4d5e6f7a8b9c20"
+            rating:
+                type: number
+                example: 4.5
+            body:
+                type: string
+                example: "Great session, very clean holds."
+            climbing_session_id:
+                type: object
+                properties:
+                    wall_id:
+                        type: object
+                        properties:
+                            name:
+                                type: string
+                            difficulty:
+                                type: string
+                    date:
+                        type: string
+                        format: date-time
+                    time:
+                        type: number
+                    is_private:
+                        type: boolean
+
+    # ─── Walls ───────────────────────────────────────────────────────────────
+    WallInput:
+        type: object
+        required:
+            - name
+            - location
+        properties:
+            name:
+                type: string
+            description:
+                type: string
+            difficulty:
+                type: string
+                example: BEGINNER
+            location:
+                type: object
+                required:
+                    - coordinates
+                properties:
+                    type:
+                        type: string
+                        enum: [Point]
+                        default: Point
+                    coordinates:
+                        type: array
+                        items:
+                            type: number
+                    address:
+                        type: string
+
+    WallOutput:
+        type: object
+        properties:
+            id:
+                type: string
+            name:
+                type: string
+            description:
+                type: string
+            difficulty:
+                type: string
+            status:
+                type: string
+            rating:
+                type: number
+            location:
+                type: object
+                properties:
+                    type:
+                        type: string
+                    coordinates:
+                        type: array
+                        items:
+                            type: number
+                    address:
+                        type: string
+            facility:
+                type: object
+                properties:
+                    id:
+                        type: string
+                    username:
+                        type: string
+                    email:
+                        type: string
+                    avatar:
+                        type: string
+            publicBody:
+                type: object
+                properties:
+                    id:
+                        type: string
+                    username:
+                        type: string
+                    email:
+                        type: string
+                    avatar:
+                        type: string
+            totalSessions:
+                type: integer
+            createdAt:
+                type: string
+                format: date-time
+            updatedAt:
+                type: string
+                format: date-time
+
+    WallLeaderboardResponse:
+        type: object
+        properties:
+            seasonName:
+                type: string
+            isHistorical:
+                type: boolean
+            daysRemaining:
+                type: integer
+            averageTime:
+                type: number
+            leaderboard:
+                type: array
+                items:
+                    type: object
+                    properties:
+                        id:
+                            type: string
+                        username:
+                            type: string
+                        avatar:
+                            type: string
+                        totalAscents:
+                            type: integer
+                        bestTime:
+                            type: number
+                        score:
+                            type: integer
+                        badges:
+                            type: array
+                            items:
+                                type: string
+
+    # ─── Sessions ────────────────────────────────────────────────────────────
+    SessionInput:
+        type: object
+        required:
+            - wall_id
+            - date
+            - time
+        properties:
+            wall_id:
+                type: string
+                description: Valid MongoDB ObjectId of the target wall.
+                example: "664f1a2b3c4d5e6f7a8b9c02"
+            date:
+                type: string
+                format: date-time
+                example: "2024-05-20T09:00:00.000Z"
+            time:
+                type: number
+                description: Session duration (domain-defined unit).
+                example: 90
+            is_private:
+                type: boolean
+                default: false
+            isSend:
+                type: boolean
+                default: false
+                description: Whether the session was a successful send
+            review:
+                description: Optional inline review to attach at creation time.
+                $ref: "#/definitions/ReviewInput"
+
+    SessionUpdateInput:
+        type: object
+        description: At least one of wall_id, date, time, or isSend must be provided.
+        properties:
+            wall_id:
+                type: string
+                example: "664f1a2b3c4d5e6f7a8b9c02"
+            date:
+                type: string
+                format: date-time
+                example: "2024-06-01T10:00:00.000Z"
+            time:
+                type: number
+                example: 120
+            is_private:
+                type: boolean
+            isSend:
+                type: boolean
+                description: Whether the session was a successful send
+
+    SessionOutput:
+        type: object
+        properties:
+            id:
+                type: string
+                example: "664f1a2b3c4d5e6f7a8b9c10"
+            climber_id:
+                type: string
+                example: "664f1a2b3c4d5e6f7a8b9c01"
+            wall_id:
+                type: string
+                example: "664f1a2b3c4d5e6f7a8b9c02"
+            date:
+                type: string
+                format: date-time
+            time:
+                type: number
+            is_private:
+                type: boolean
+            isSend:
+                type: boolean
+                description: Whether the session was a successful send
+            review_id:
+                type: string
+                description: ObjectId of the linked review, if any.
+                example: "664f1a2b3c4d5e6f7a8b9c20"
+            createdAt:
+                type: string
+                format: date-time
+            updatedAt:
+                type: string
+                format: date-time
+
+    # ─── Issues ──────────────────────────────────────────────────────────────
+    IssueInput:
+        type: object
+        required:
+            - wall_id
+            - body
+        properties:
+            wall_id:
+                type: string
+                description: Valid MongoDB ObjectId of the target wall.
+                example: "664f1a2b3c4d5e6f7a8b9c02"
+            body:
+                type: string
+                description: Issue description. Must be non-empty and <= 500 characters.
+                minLength: 1
+                maxLength: 500
+                example: "The left overhang hold is loose and needs inspection."
+
+    IssueOutput:
+        type: object
+        properties:
+            id:
+                type: string
+                example: "664f1a2b3c4d5e6f7a8b9c0d"
+            climber_id:
+                type: string
+                description: ObjectId of the climber who reported the issue.
+                example: "664f1a2b3c4d5e6f7a8b9c01"
+            wall_id:
+                type: string
+                description: ObjectId of the affected wall.
+                example: "664f1a2b3c4d5e6f7a8b9c02"
+            body:
+                type: string
+                example: "The left overhang hold is loose and needs inspection."
+            status:
+                type: string
+                enum: [OPEN, IN_PROGRESS, RESOLVED, CLOSED]
+                default: OPEN
+                description: Lifecycle status of the issue. Defaults to OPEN on creation.
+                example: OPEN
+            submitted_at:
+                type: string
+                format: date-time
+                description: Timestamp of when the issue was submitted (mapped from Mongoose createdAt).
+
+    IssueStatusUpdateInput:
+        type: object
+        required:
+            - status
+        properties:
+            status:
+                type: string
+                enum: [OPEN, IN_PROGRESS, RESOLVED, CLOSED]
+                description: New status to assign to the issue.
+                example: IN_PROGRESS
+
+    # ─── Leaderboard ─────────────────────────────────────────────────────────
+    LeaderboardEntry:
+        type: object
+        properties:
+            id:
+                type: string
+            username:
+                type: string
+            avatar:
+                type: string
+            totalAscents:
+                type: integer
+            score:
+                type: integer
+            badges:
+                type: array
+                items:
+                    type: string
