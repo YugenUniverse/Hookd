@@ -1,17 +1,17 @@
 info:
-    name: get-my-issues
-    type: http
-    seq: 3
+  name: get-my-issues
+  type: http
+  seq: 3
 
 http:
-    method: GET
-    url: http://localhost:3000/issues/my-issues
-    auth:
-        type: bearer
-        token:
+  method: GET
+  url: http://localhost:3000/issues/my-issues
+  auth:
+    type: bearer
+    token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2YTA4OWY0NTM0OWI2NWI2N2E1ZjQ2M2YiLCJlbWFpbCI6ImNlbGxpLndhbGxzQGhvb2tkLmludGVybmFsIiwidXNlclR5cGUiOiJGYWNpbGl0eSIsImlhdCI6MTc3ODk2MjY0MCwiZXhwIjoxNzc4OTY2MjQwLCJpc3MiOiJob29rZCJ9.zzeN-NHDoAZhFxrNV136K44y-6WWzPnsxQh9ifmnR80
 
 settings:
-    encodeUrl: true
-    timeout: 0
-    followRedirects: true
-    maxRedirects: 5
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

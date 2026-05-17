@@ -4,7 +4,7 @@ info:
     seq: 5
 
 http:
-    method: PATCH
+    method: PUT
     url: http://localhost:3000/issues/:issueId/status
     params:
         - name: issueId

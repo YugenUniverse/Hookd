@@ -10,8 +10,8 @@ http:
     type: json
     data: |-
       {
-        "email":"celli2@celli.it",
-        "password":"celli"
+        "email":"celli.walls@hookd.internal",
+        "password":"hookd_test_password"
       }
   auth: inherit
 
