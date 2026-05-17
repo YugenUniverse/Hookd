@@ -7,12 +7,13 @@ const errorMiddleware = require("../../middleware/error.middleware");
 const Report = require("../../models/Report");
 const { Wall, IndoorWall } = require("../../models/Wall");
 const Facility = require("../../models/Facility");
+const { FacilityOwner } = require("../../models/User");
 
 jest.mock("../../middleware/auth.middleware", () => ({
     authenticateJwt: (req, res, next) => {
         req.user = {
             id: "60d5ecdec021f13528e01369",
-            userType: "Facility",
+            userType: "FacilityOwner",
         };
         next();
     },
@@ -28,6 +29,7 @@ app.use("/reports", reportRoutes);
 app.use(errorMiddleware);
 
 describe("Report Routes", () => {
+    let owner;
     let facility;
     let wall;
 
@@ -38,15 +40,22 @@ describe("Report Routes", () => {
     });
 
     beforeEach(async () => {
-        facility = await Facility.create({
+        // 👇 UPDATE 2: Create the User document with the mocked ID
+        owner = await FacilityOwner.create({
             _id: "60d5ecdec021f13528e01369",
             email: "report-facility@example.com",
             username: "reportfacility",
-            name: "Report Facility",
-            location: { coordinates: [12.34, 56.78] },
-            authMethods: ["local"],
+            password: "password123",
         });
 
+        // 👇 UPDATE 3: Create the Facility profile linked to the User
+        facility = await Facility.create({
+            name: "Report Facility",
+            location: { type: "Point", coordinates: [12.34, 56.78] },
+            ownerAccount: owner._id,
+        });
+
+        // The wall attaches to the Facility profile
         wall = await IndoorWall.create({
             name: "Report Wall",
             difficulty: "BEGINNER",
@@ -59,6 +68,7 @@ describe("Report Routes", () => {
         await Report.deleteMany({});
         await Wall.deleteMany({});
         await Facility.deleteMany({});
+        await FacilityOwner.deleteMany({});
     });
 
     afterAll(async () => {
@@ -87,7 +97,7 @@ describe("Report Routes", () => {
 
     it("GET /reports/saved should return saved reports list", async () => {
         const saved = await Report.create({
-            facility_id: facility._id,
+            facility_id: owner._id, // Reports belong to the User
             wall_id: wall._id,
             title: "Saved Report",
             notes: "Report notes",
@@ -102,7 +112,7 @@ describe("Report Routes", () => {
 
     it("GET /reports/saved/:id should return a report with wall details", async () => {
         const saved = await Report.create({
-            facility_id: facility._id,
+            facility_id: owner._id,
             wall_id: wall._id,
             title: "Saved Report",
             notes: "Report notes",
@@ -117,7 +127,7 @@ describe("Report Routes", () => {
 
     it("DELETE /reports/saved/:id should remove the saved report", async () => {
         const saved = await Report.create({
-            facility_id: facility._id,
+            facility_id: owner._id,
             wall_id: wall._id,
             title: "Saved Report",
             notes: "Report notes",
@@ -145,15 +155,28 @@ describe("Report Routes", () => {
         );
     });
 
-    it("GET /reports/wall/:wallId returns 403 if Facility does not own the wall", async () => {
-        // Create a wall owned by a DIFFERENT facility (not the mocked user)
+    it("GET /reports/wall/:wallId returns 403 if FacilityOwner does not own the wall", async () => {
+        // Create an entirely separate owner, facility, and wall
+        const otherOwner = await FacilityOwner.create({
+            email: "other@example.com",
+            username: "other",
+            password: "password123",
+        });
+
+        const otherFacility = await Facility.create({
+            name: "Other Facility",
+            location: { type: "Point", coordinates: [0, 0] },
+            ownerAccount: otherOwner._id,
+        });
+
         const otherWall = await IndoorWall.create({
             name: "Someone Else's Wall",
             difficulty: "ADVANCED",
             location: { type: "Point", coordinates: [0, 0] },
-            facility: new mongoose.Types.ObjectId(), // Random facility ID
+            facility: otherFacility._id,
         });
 
+        // The mocked user tries to fetch someone else's wall
         const response = await request(app).get(
             `/reports/wall/${otherWall._id}`,
         );
@@ -164,12 +187,24 @@ describe("Report Routes", () => {
         );
     });
 
-    it("POST /reports/wall/:wallId/save returns 403 if Facility does not own the wall", async () => {
+    it("POST /reports/wall/:wallId/save returns 403 if FacilityOwner does not own the wall", async () => {
+        const otherOwner = await FacilityOwner.create({
+            email: "other2@example.com",
+            username: "other2",
+            password: "password123",
+        });
+
+        const otherFacility = await Facility.create({
+            name: "Other Facility 2",
+            location: { type: "Point", coordinates: [0, 0] },
+            ownerAccount: otherOwner._id,
+        });
+
         const otherWall = await IndoorWall.create({
-            name: "Someone Else's Wall",
+            name: "Someone Else's Wall 2",
             difficulty: "ADVANCED",
             location: { type: "Point", coordinates: [0, 0] },
-            facility: new mongoose.Types.ObjectId(),
+            facility: otherFacility._id,
         });
 
         const response = await request(app)
@@ -193,8 +228,6 @@ describe("Report Routes", () => {
             `/reports/saved/${fakeReportId}`,
         );
 
-        // Note: Your error middleware might catch this and format it differently,
-        // but it should definitely be a 404 based on your service logic.
         expect(response.status).toBe(404);
     });
 });
