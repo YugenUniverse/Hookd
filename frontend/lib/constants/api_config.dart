@@ -1,8 +1,8 @@
-const baseUrl = 'http://${String.fromEnvironment('BACKEND_URL', defaultValue: 'localhost:3000')}';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class ApiConfig {
-  // Main API base URL
-  static const String apiBaseUrl = baseUrl;
+  static String get apiBaseUrl =>
+      'http://${dotenv.env['BACKEND_URL'] ?? 'localhost:3000'}';
 
   // Auth endpoints (using /api/user)
   static const String registerPath = '/auth/register';

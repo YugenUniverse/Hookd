@@ -272,6 +272,67 @@ describe("POI Routes", () => {
             expect(res.body).toHaveLength(1);
             expect(res.body[0].name).toBe("Rock City Gym");
         });
+
+        it("filters results by poi type", async () => {
+            await Facility.create({
+                name: "Climb Indoor",
+                location: { type: "Point", coordinates: [TRENTO.lng, TRENTO.lat] },
+            });
+
+            const publicBody = await PublicBody.create({
+                email: "outdoor@test.com",
+                username: "outdoor-user",
+                name: "Outdoor Dept",
+                location: { type: "Point", coordinates: [TRENTO.lng, TRENTO.lat] },
+            });
+            await OutdoorWall.create({
+                name: "Climb Outdoor",
+                difficulty: "ADVANCED",
+                location: { type: "Point", coordinates: [TRENTO.lng, TRENTO.lat] },
+                publicBody: publicBody._id,
+            });
+
+            const res = await request(app).get("/pois/search?q=Climb&type=indoor");
+            expect(res.status).toBe(200);
+            expect(res.body).toHaveLength(1);
+            expect(res.body[0].poiType).toBe("Facility");
+            expect(res.body[0].name).toBe("Climb Indoor");
+        });
+
+        it("filters facilities by difficulty and keeps only matching walls", async () => {
+            const facility = await Facility.create({
+                name: "Difficulty Gym",
+                location: { type: "Point", coordinates: [TRENTO.lng, TRENTO.lat] },
+            });
+
+            const beginnerWall = await IndoorWall.create({
+                name: "Green Route",
+                difficulty: "BEGINNER",
+                location: { type: "Point", coordinates: [TRENTO.lng, TRENTO.lat] },
+                facility: facility._id,
+            });
+            const expertWall = await IndoorWall.create({
+                name: "Black Route",
+                difficulty: "EXPERT",
+                location: { type: "Point", coordinates: [TRENTO.lng, TRENTO.lat] },
+                facility: facility._id,
+            });
+
+            await Facility.findByIdAndUpdate(facility._id, {
+                $push: { walls: { $each: [beginnerWall._id, expertWall._id] } },
+            });
+
+            const res = await request(app).get(
+                "/pois/search?q=Difficulty&type=indoor&difficulty=BEGINNER",
+            );
+
+            expect(res.status).toBe(200);
+            expect(res.body).toHaveLength(1);
+            expect(res.body[0].poiType).toBe("Facility");
+            expect(res.body[0].walls).toHaveLength(1);
+            expect(res.body[0].walls[0].name).toBe("Green Route");
+            expect(res.body[0].walls[0].difficulty).toBe("BEGINNER");
+        });
     });
 
     // ─── GET /pois/nearby ───────────────────────────────────────────────────
