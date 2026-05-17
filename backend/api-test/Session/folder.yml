@@ -1,0 +1,9 @@
+info:
+    name: Session
+    type: folder
+    seq: 4
+
+request:
+    auth:
+        type: bearer
+        token:

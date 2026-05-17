@@ -1,0 +1,18 @@
+info:
+  name: getById
+  type: http
+  seq: 6
+
+http:
+  method: GET
+  url: http://localhost:3000/walls/:id
+  params:
+    - name: id
+      value: 6a05f2460ce2585362fa24c3
+      type: path
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

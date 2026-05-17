@@ -1,0 +1,7 @@
+info:
+  name: Report
+  type: folder
+  seq: 8
+
+request:
+  auth: inherit

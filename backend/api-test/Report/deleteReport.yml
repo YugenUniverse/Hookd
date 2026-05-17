@@ -1,0 +1,21 @@
+info:
+  name: deleteReport
+  type: http
+  seq: 5
+
+http:
+  method: DELETE
+  url: http://localhost:3000/reports/saved/:id
+  params:
+    - name: id
+      value: 6a076903defbf23fd60dde59
+      type: path
+  auth:
+    type: bearer
+    token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2YTA3NjYyNGRlZmJmMjNmZDYwZGRkZGQiLCJlbWFpbCI6Imd5bV9mYmQwYjFAdGVzdC5jb20iLCJ1c2VyVHlwZSI6IkZhY2lsaXR5IiwiaWF0IjoxNzc4ODcwMDQ3LCJleHAiOjE3Nzg4NzM2NDcsImlzcyI6Imhvb2tkIn0.hf_Bur89XIC99d7YN5ktuXAW7q_8VuUhk5P7BdhOQ2I
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

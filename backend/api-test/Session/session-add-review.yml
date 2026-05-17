@@ -1,0 +1,24 @@
+info:
+    name: add-session-review
+    type: http
+    seq: 5
+
+http:
+    method: POST
+    url: http://localhost:3000/sessions/<SESSION_ID>/reviews
+    body:
+        type: json
+        data: |-
+            {
+              "rating": 4,
+              "body": "Great progress during this session."
+            }
+    auth:
+        type: bearer
+        token:
+
+settings:
+    encodeUrl: true
+    timeout: 0
+    followRedirects: true
+    maxRedirects: 5

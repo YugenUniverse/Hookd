@@ -1,0 +1,28 @@
+info:
+  name: saveReport
+  type: http
+  seq: 2
+
+http:
+  method: POST
+  url: http://localhost:3000/reports/wall/:wallId/save
+  params:
+    - name: wallId
+      value: 6a076624defbf23fd60ddddf
+      type: path
+  body:
+    type: json
+    data: |-
+      {
+          "title": "My First Report",
+          "notes": "Testing the API!"
+      }
+  auth:
+    type: bearer
+    token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2YTA3NjYyNGRlZmJmMjNmZDYwZGRkZGQiLCJlbWFpbCI6Imd5bV9mYmQwYjFAdGVzdC5jb20iLCJ1c2VyVHlwZSI6IkZhY2lsaXR5IiwiaWF0IjoxNzc4ODcwMDQ3LCJleHAiOjE3Nzg4NzM2NDcsImlzcyI6Imhvb2tkIn0.hf_Bur89XIC99d7YN5ktuXAW7q_8VuUhk5P7BdhOQ2I
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

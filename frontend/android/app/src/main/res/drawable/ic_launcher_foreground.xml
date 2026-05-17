@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Simple foreground: white rounded square with a small inner circle -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M18,6 h72 a12,12 0 0 1 12,12 v72 a12,12 0 0 1 -12,12 h-72 a12,12 0 0 1 -12,-12 v-72 a12,12 0 0 1 12,-12 z" />
+    <path
+        android:fillColor="#FF00BCD4"
+        android:pathData="M54,30 a18,18 0 1,0 0.0001,0 z" />
+</vector>

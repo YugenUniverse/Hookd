@@ -1,0 +1,26 @@
+info:
+  name: create-session-without-review
+  type: http
+  seq: 4
+
+http:
+  method: POST
+  url: http://localhost:3000/sessions
+  body:
+    type: json
+    data: |-
+      {
+        "wall_id": "000000000000000000000001",
+        "date": "2026-07-12",
+        "time": 70,
+        "review": null
+      }
+  auth:
+    type: bearer
+    token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2YTA1ZmQ3MTJhN2UwMmMwZDA4MzYyZWEiLCJlbWFpbCI6ImNlbGxpMkBjZWxsaS5pdCIsInVzZXJUeXBlIjoiQ2xpbWJlciIsImlhdCI6MTc3ODg4MTc2MSwiZXhwIjoxNzc4ODg1MzYxLCJpc3MiOiJob29rZCJ9.bvQelFm_s1dmtfUOo3x1SOC9AOnYhRxZgO6nL_GSKFc
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
