@@ -28,6 +28,7 @@ const reviewSchema = new mongoose.Schema(
         },
     },
     {
+        timestamps: true,
         toJSON: {
             transform: baseTransform,
         },

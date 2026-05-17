@@ -1,7 +1,7 @@
 const mongoose = require("mongoose");
 const ClimbingSession = require("../models/ClimbingSession");
 const SavedReport = require("../models/Report");
-const { User } = require("../models/User");
+const { Issue } = require("../models/Issue"); // 👈 The missing Issue import!
 
 exports.getWallReport = async (wallId) => {
     if (!mongoose.Types.ObjectId.isValid(wallId)) {
@@ -82,7 +82,7 @@ exports.getWallReport = async (wallId) => {
         { $match: { wall_id: objectId } },
         {
             $lookup: {
-                from: "reviews", // Assumes your Review model exports as "reviews"
+                from: "reviews",
                 localField: "_id",
                 foreignField: "climbing_session_id",
                 as: "review",
@@ -101,12 +101,7 @@ exports.getWallReport = async (wallId) => {
                     },
                 ],
                 distribution: [
-                    {
-                        $group: {
-                            _id: "$review.rating",
-                            count: { $sum: 1 },
-                        },
-                    },
+                    { $group: { _id: "$review.rating", count: { $sum: 1 } } },
                     { $sort: { _id: 1 } },
                 ],
             },
@@ -117,45 +112,37 @@ exports.getWallReport = async (wallId) => {
     const demographicsPromise = ClimbingSession.distinct("climber_id", {
         wall_id: objectId,
     }).then(async (userIds) => {
-        // Fetch only the birthdate for these specific users
+        const User = mongoose.model("User");
         const users = await User.find({ _id: { $in: userIds } }).select(
             "birthdate",
         );
 
-        // Initialize our buckets
         const brackets = { "< 20": 0, "20-29": 0, "30-39": 0, "40+": 0 };
         const today = new Date();
 
         users.forEach((user) => {
-            if (!user.birthdate) return; // Skip if user has no birthdate set
-
+            if (!user.birthdate) return;
             const birthDate = new Date(user.birthdate);
-
-            // Calculate precise age accounting for the current month/day
             let age = today.getFullYear() - birthDate.getFullYear();
             const m = today.getMonth() - birthDate.getMonth();
             if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
                 age--;
             }
 
-            // Sort into buckets
             if (age < 20) brackets["< 20"]++;
             else if (age <= 29) brackets["20-29"]++;
             else if (age <= 39) brackets["30-39"]++;
             else brackets["40+"]++;
         });
 
-        // Convert the object into the array format our Flutter app expects
         return Object.keys(brackets).map((key) => ({
             bracket: key,
             count: brackets[key],
         }));
     });
 
+    // --- PIPELINE 5: Recent Feedback ---
     const Review = mongoose.model("Review");
-    const { User } = require("../models/User");
-
-        // Find sessions for this wall
     const sessionIds = await ClimbingSession.find({
         wall_id: objectId,
     }).distinct("_id");
@@ -167,40 +154,56 @@ exports.getWallReport = async (wallId) => {
         .limit(3)
         .select("rating body createdAt");
 
+    // --- PIPELINE 6: Recent Issues ---
+    const recentIssuesPromise = Issue.find({ wall_id: objectId })
+        .sort({ submitted_at: -1 })
+        .limit(5)
+        .select("body status submitted_at");
+
+    // Execute all queries in parallel
     const [
         sessionStats,
         temporalStatsResult,
         reviewStats,
         recentFeedback,
         demographics,
+        recentIssues,
     ] = await Promise.all([
         sessionStatsPromise,
         temporalStatsPromise,
         reviewStatsPromise,
         recentFeedbackPromise,
         demographicsPromise,
+        recentIssuesPromise,
     ]);
 
+    // --- FORMAT DATA ---
     const stats = sessionStats[0] || {
         totalSessions: 0,
         uniqueClimbersCount: 0,
         avgTime: 0,
         fastestTime: null,
     };
-
     const temporalData = temporalStatsResult[0];
     const reviews = reviewStats[0] || { overall: [], distribution: [] };
     const overallReviews = reviews.overall[0] || {
         avgRating: 0,
         totalReviews: 0,
     };
-
     const retentionRate =
         stats.uniqueClimbersCount > 0
             ? parseFloat(
                   (stats.totalSessions / stats.uniqueClimbersCount).toFixed(2),
               )
             : 0;
+
+    const formattedIssues = recentIssues.map((i) => ({
+        body: i.body,
+        status: i.status || "OPEN",
+        date: i.submitted_at
+            ? i.submitted_at.toISOString().split("T")[0]
+            : "Recent",
+    }));
 
     return {
         engagement: {
@@ -243,6 +246,7 @@ exports.getWallReport = async (wallId) => {
                 ? r.createdAt.toISOString().split("T")[0]
                 : "Recent",
         })),
+        recentIssues: formattedIssues,
         demographics: demographics,
     };
 };

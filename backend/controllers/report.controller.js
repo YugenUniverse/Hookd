@@ -1,19 +1,28 @@
 const reportService = require("../services/report.service");
 const { Wall } = require("../models/Wall");
-
+const mongoose = require("mongoose");
 exports.getWallReport = async (req, res, next) => {
     try {
         const { wallId } = req.params;
 
         const wall = await Wall.findById(wallId);
-        if (!wall) {
-            return res.status(404).json({ message: "Wall not found" });
+        if (!wall) return res.status(404).json({ message: "Wall not found" });
+
+        let isOwner = false;
+        if (req.user.userType === "FacilityOwner") {
+            const Facility = mongoose.model("Facility");
+            const facilityProfile = await Facility.findOne({
+                ownerAccount: req.user.id,
+            });
+
+            isOwner =
+                wall.facility?.toString() === facilityProfile?._id.toString() ||
+                wall.facility?.toString() === req.user.id;
+        } else if (req.user.userType === "PublicBody") {
+            isOwner = wall.publicBody?.toString() === req.user.id;
         }
 
-        if (
-            req.user.userType === "Facility" &&
-            wall.facility?.toString() !== req.user.id
-        ) {
+        if (!isOwner) {
             return res.status(403).json({
                 message:
                     "You do not have permission to view reports for this wall.",
@@ -21,7 +30,6 @@ exports.getWallReport = async (req, res, next) => {
         }
 
         const reportData = await reportService.getWallReport(wallId);
-
         res.status(200).json(reportData);
     } catch (err) {
         console.error(err);
@@ -40,14 +48,24 @@ exports.saveReport = async (req, res, next) => {
                 .json({ message: "A title is required to save a report." });
         }
 
-        // Security check: Only the owner facility can run and save a report
         const wall = await Wall.findById(wallId);
         if (!wall) return res.status(404).json({ message: "Wall not found" });
 
-        if (
-            req.user.userType === "Facility" &&
-            wall.facility?.toString() !== req.user.id
-        ) {
+        let isOwner = false;
+        if (req.user.userType === "FacilityOwner") {
+            const Facility = mongoose.model("Facility");
+            const facilityProfile = await Facility.findOne({
+                ownerAccount: req.user.id,
+            });
+
+            isOwner =
+                wall.facility?.toString() === facilityProfile?._id.toString() ||
+                wall.facility?.toString() === req.user.id;
+        } else if (req.user.userType === "PublicBody") {
+            isOwner = wall.publicBody?.toString() === req.user.id;
+        }
+
+        if (!isOwner) {
             return res.status(403).json({
                 message:
                     "You do not have permission to save reports for this wall.",

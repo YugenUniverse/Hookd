@@ -57,7 +57,9 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
                 // HEADER
                 Text(
                   report.title,
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 const SizedBox(height: 16),
 
@@ -168,6 +170,41 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
                       ),
                     ),
                   ),
+                const SizedBox(height: 40),
+
+                const Text(
+                  'Recent Issues',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 12),
+                if (data.recentIssues.isEmpty)
+                  const Text(
+                    "No reported issues for this period.",
+                    style: TextStyle(
+                      color: Colors.grey,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  )
+                else
+                  ...data.recentIssues.map((issue) {
+                    final isOpen = issue['status'] == 'OPEN';
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      child: ListTile(
+                        leading: Icon(
+                          isOpen
+                              ? Icons.warning_amber_rounded
+                              : Icons.check_circle_outline,
+                          color: isOpen ? Colors.orange : Colors.green,
+                          size: 28,
+                        ),
+                        title: Text(issue['body']),
+                        subtitle: Text(
+                          'Status: ${issue['status']} • ${issue['date']}',
+                        ),
+                      ),
+                    );
+                  }),
                 const SizedBox(height: 40),
 
                 // TRENDS SWITCHER SECTION

@@ -38,6 +38,7 @@ class ReportData {
   final List<dynamic> byHourOfDay;
   final List<dynamic> recentFeedback;
   final List<dynamic> demographics;
+  final List<dynamic> recentIssues;
 
   ReportData({
     required this.engagement,
@@ -47,6 +48,7 @@ class ReportData {
     required this.byHourOfDay,
     required this.recentFeedback,
     required this.demographics,
+    required this.recentIssues,
   });
 
   factory ReportData.fromJson(Map<String, dynamic> json) {
@@ -58,6 +60,7 @@ class ReportData {
       byHourOfDay: json['trends']?['byHourOfDay'] ?? [],
       recentFeedback: json['recentFeedback'] ?? [],
       demographics: json['demographics'] ?? [],
+      recentIssues: json['recentIssues'] ?? [],
     );
   }
 }
