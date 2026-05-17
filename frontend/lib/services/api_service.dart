@@ -450,7 +450,7 @@ class ApiService {
   }
 
   Future<void> updateIssueStatus(String issueId, String status) async {
-    await _dio.patch('/issues/$issueId/status', data: {'status': status});
+    await _dio.put('/issues/$issueId/status', data: {'status': status});
   }
 
   Future<List<Map<String, dynamic>>> searchFacilities(String query) async {
