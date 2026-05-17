@@ -70,7 +70,7 @@ router.use(authenticateJwt);
 router.post("/", validateCreateIssueInput, issueController.createIssue);
 router.get("/walls/:wallId", issueController.getIssuesForWall);
 router.get("/my-issues", issueController.getIssuesByUser);
-router.patch(
+router.put(
     "/:issueId/status",
     validateUpdateIssueStatusInput,
     issueController.updateIssueStatus,

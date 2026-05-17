@@ -972,7 +972,7 @@ describe("issue.routes", () => {
         });
     });
 
-    describe("PATCH /issues/:issueId/status - Update Issue Status", () => {
+    describe("PUT /issues/:issueId/status - Update Issue Status", () => {
         it("should update the issue status and return the updated issue in an issues array", async () => {
             const facility = await User.create({
                 email: "facility@example.com",
@@ -1019,7 +1019,7 @@ describe("issue.routes", () => {
             const accessToken = createAuthToken(facility);
 
             const response = await request(app)
-                .patch(`/issues/${issue._id.toString()}/status`)
+                .put(`/issues/${issue._id.toString()}/status`)
                 .set("Authorization", `Bearer ${accessToken}`)
                 .send({ status: "IN_PROGRESS" });
 
