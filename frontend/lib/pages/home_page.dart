@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'dart:async';
 
 import '../dialogs/login_dialog.dart';
@@ -22,6 +23,33 @@ class MyHomePage extends StatefulWidget {
 
 class _MyHomePageState extends State<MyHomePage> {
   final WallMapController _mapController = WallMapController();
+
+  bool get _isDesktopLike {
+    if (kIsWeb) return true;
+    return switch (defaultTargetPlatform) {
+      TargetPlatform.android || TargetPlatform.iOS => false,
+      TargetPlatform.fuchsia => false,
+      TargetPlatform.linux ||
+      TargetPlatform.macOS ||
+      TargetPlatform.windows => true,
+    };
+  }
+
+  void _openAccountPage() async {
+    if (!AuthService().isAuthenticated) {
+      await _ensureAuthenticated();
+      return;
+    }
+
+    final userType = AuthService().userType;
+    final Widget page = switch (userType) {
+      'FacilityOwner' => const FacilityOwnerPage(),
+      'PublicBody' => const PublicBodyPage(),
+      _ => const UserPage(),
+    };
+    if (!mounted) return;
+    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => page));
+  }
 
   @override
   void initState() {
@@ -104,6 +132,121 @@ class _MyHomePageState extends State<MyHomePage> {
     final isAuthenticated = AuthService().isAuthenticated;
     final userType = AuthService().userType;
     final isOwnerType = userType == 'FacilityOwner' || userType == 'PublicBody';
+
+    if (_isDesktopLike) {
+      return Scaffold(
+        body: SafeArea(
+          child: Row(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 12, 16),
+                child: Material(
+                  elevation: 8,
+                  borderRadius: BorderRadius.circular(22),
+                  color: Theme.of(context).colorScheme.surface,
+                  child: NavigationRail(
+                    backgroundColor: Theme.of(context).colorScheme.surface,
+                    selectedIndex: 0,
+                    useIndicator: true,
+                    labelType: NavigationRailLabelType.all,
+                    minWidth: 84,
+                    minExtendedWidth: 84,
+                    groupAlignment: -0.9,
+                    leading: const SizedBox(height: 8),
+                    trailing: const SizedBox(height: 8),
+                    destinations: [
+                      const NavigationRailDestination(
+                        icon: Icon(Icons.map_outlined),
+                        selectedIcon: Icon(Icons.map),
+                        label: Text('Map'),
+                      ),
+                      NavigationRailDestination(
+                        icon: Tooltip(
+                          message: 'Search walls',
+                          child: const Icon(Icons.search),
+                        ),
+                        label: const Text('Search'),
+                      ),
+                      NavigationRailDestination(
+                        icon: Tooltip(
+                          message: 'Global Rankings',
+                          child: const Icon(Icons.leaderboard_outlined),
+                        ),
+                        label: const Text('Rank'),
+                      ),
+                      if (!isOwnerType)
+                        NavigationRailDestination(
+                          icon: Tooltip(
+                            message: isAuthenticated
+                                ? 'Log session'
+                                : 'Log session (login required)',
+                            child: Stack(
+                              clipBehavior: Clip.none,
+                              children: [
+                                const Icon(Icons.edit_calendar_outlined),
+                                if (!isAuthenticated)
+                                  Positioned(
+                                    right: -2,
+                                    bottom: -2,
+                                    child: Icon(
+                                      Icons.lock_outline,
+                                      size: 11,
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.primary,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                          label: const Text('Log climb'),
+                        ),
+                      NavigationRailDestination(
+                        icon: Tooltip(
+                          message: isAuthenticated ? 'Account' : 'Login',
+                          child: Icon(
+                            isAuthenticated
+                                ? Icons.person_outline
+                                : Icons.login,
+                          ),
+                        ),
+                        label: Text(isAuthenticated ? 'Me' : 'Login'),
+                      ),
+                    ],
+                    onDestinationSelected: (index) {
+                      switch (index) {
+                        case 0:
+                          break;
+                        case 1:
+                          _openWallSearch();
+                          break;
+                        case 2:
+                          _openGlobalLeaderboard();
+                          break;
+                        case 3:
+                          if (!isOwnerType) {
+                            _openLogSessionSheet();
+                          } else {
+                            _openAccountPage();
+                          }
+                          break;
+                        case 4:
+                          _openAccountPage();
+                          break;
+                      }
+                    },
+                  ),
+                ),
+              ),
+              Expanded(child: POIMap(controller: _mapController)),
+            ],
+          ),
+        ),
+        floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+        floatingActionButton: const SizedBox.shrink(),
+      );
+    }
+
     return Scaffold(
       body: POIMap(controller: _mapController),
       bottomNavigationBar: SafeArea(
@@ -146,21 +289,7 @@ class _MyHomePageState extends State<MyHomePage> {
                   tooltip: isAuthenticated ? 'Account' : 'Login',
                   icon: isAuthenticated ? Icons.person_outline : Icons.login,
                   label: isAuthenticated ? 'Me' : 'Login',
-                  onPressed: () async {
-                    if (!isAuthenticated) {
-                      await _ensureAuthenticated();
-                      return;
-                    }
-                    final userType = AuthService().userType;
-                    final Widget page = switch (userType) {
-                      'FacilityOwner' => const FacilityOwnerPage(),
-                      'PublicBody' => const PublicBodyPage(),
-                      _ => const UserPage(),
-                    };
-                    await Navigator.of(
-                      context,
-                    ).push(MaterialPageRoute(builder: (_) => page));
-                  },
+                  onPressed: _openAccountPage,
                 ),
               ],
             ),
@@ -193,6 +322,16 @@ class _WallSearchSheetState extends State<_WallSearchSheet> {
   bool _loading = false;
   String? _error;
   Timer? _debounce;
+  String _selectedPoiType = 'all';
+  String _selectedDifficulty = 'all';
+
+  static const List<String> _difficultyOptions = [
+    'all',
+    'BEGINNER',
+    'INTERMEDIATE',
+    'ADVANCED',
+    'EXPERT',
+  ];
 
   Future<void> _handleLogOutdoorWall(OutdoorWallPoi poi) async {
     final wall = Wall(
@@ -233,6 +372,33 @@ class _WallSearchSheetState extends State<_WallSearchSheet> {
     _debounce = Timer(const Duration(milliseconds: 300), _search);
   }
 
+  void _setPoiType(String value) {
+    if (_selectedPoiType == value) return;
+    setState(() {
+      _selectedPoiType = value;
+    });
+    _search();
+  }
+
+  void _setDifficulty(String value) {
+    if (_selectedDifficulty == value) return;
+    setState(() {
+      _selectedDifficulty = value;
+    });
+    _search();
+  }
+
+  void _clearFilters() {
+    if (_selectedPoiType == 'all' && _selectedDifficulty == 'all') {
+      return;
+    }
+    setState(() {
+      _selectedPoiType = 'all';
+      _selectedDifficulty = 'all';
+    });
+    _search();
+  }
+
   Future<void> _search() async {
     final query = _controller.text.trim();
     if (query.isEmpty) {
@@ -249,7 +415,11 @@ class _WallSearchSheetState extends State<_WallSearchSheet> {
     });
 
     try {
-      final results = await ApiService().searchPois(query);
+      final results = await ApiService().searchPois(
+        query,
+        type: _selectedPoiType,
+        difficulty: _selectedDifficulty == 'all' ? null : _selectedDifficulty,
+      );
       if (mounted) setState(() => _results = results);
     } catch (e) {
       if (mounted) {
@@ -317,6 +487,88 @@ class _WallSearchSheetState extends State<_WallSearchSheet> {
                   onPressed: _search,
                 ),
                 border: const OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Text(
+                  'Filters',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const Spacer(),
+                TextButton(
+                  onPressed: _clearFilters,
+                  child: const Text('Clear'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Card(
+              elevation: 0,
+              color: Theme.of(context).colorScheme.surfaceContainerHighest,
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Type',
+                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        ChoiceChip(
+                          label: const Text('All'),
+                          selected: _selectedPoiType == 'all',
+                          onSelected: (_) => _setPoiType('all'),
+                        ),
+                        ChoiceChip(
+                          label: const Text('Indoor'),
+                          selected: _selectedPoiType == 'indoor',
+                          onSelected: (_) => _setPoiType('indoor'),
+                        ),
+                        ChoiceChip(
+                          label: const Text('Outdoor'),
+                          selected: _selectedPoiType == 'outdoor',
+                          onSelected: (_) => _setPoiType('outdoor'),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      value: _selectedDifficulty,
+                      decoration: const InputDecoration(
+                        labelText: 'Difficulty',
+                        border: OutlineInputBorder(),
+                      ),
+                      items: _difficultyOptions
+                          .map(
+                            (difficulty) => DropdownMenuItem<String>(
+                              value: difficulty,
+                              child: Text(
+                                difficulty == 'all'
+                                    ? 'Any difficulty'
+                                    : difficulty,
+                              ),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (value) {
+                        if (value != null) {
+                          _setDifficulty(value);
+                        }
+                      },
+                    ),
+                  ],
+                ),
               ),
             ),
             const SizedBox(height: 16),
@@ -419,6 +671,14 @@ class _NavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDesktopLike =
+        kIsWeb ||
+        switch (defaultTargetPlatform) {
+          TargetPlatform.linux ||
+          TargetPlatform.macOS ||
+          TargetPlatform.windows => true,
+          _ => false,
+        };
     final color = selected
         ? Theme.of(context).colorScheme.primary
         : Theme.of(context).colorScheme.onSurfaceVariant;
@@ -427,21 +687,25 @@ class _NavItem extends StatelessWidget {
         borderRadius: BorderRadius.circular(14),
         onTap: onTap ?? onPressed,
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 10),
+          padding: EdgeInsets.symmetric(vertical: isDesktopLike ? 6.0 : 10.0),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             mainAxisSize: MainAxisSize.min,
             children: [
               Tooltip(
                 message: tooltip ?? '',
-                child: Icon(icon, color: color, size: 28),
+                child: Icon(
+                  icon,
+                  color: color,
+                  size: isDesktopLike ? 24.0 : 28.0,
+                ),
               ),
               if (label != null) ...[
                 const SizedBox(height: 2),
                 Text(
                   label!,
                   style: TextStyle(
-                    fontSize: 12,
+                    fontSize: isDesktopLike ? 11.0 : 12.0,
                     fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
                     color: color,
                   ),

@@ -1,4 +1,4 @@
-import 'climbing_session.dart';
+  import 'climbing_session.dart';
 import 'issue.dart';
 
 class Wall {
@@ -45,16 +45,44 @@ class Wall {
       latitude = _parseDouble(coordinates[1]);
     }
 
-    final wallType = (json['wallType'] ?? json['type'] ?? 'OutdoorWall').toString();
+    final wallType = (json['wallType'] ?? json['type'] ?? 'OutdoorWall')
+        .toString();
 
     String? owner;
     String? ownerAccountId;
     if (json['facility'] is Map) {
-      owner = json['facility']['username']?.toString();
-      ownerAccountId = json['facility']['ownerAccount']?.toString();
+      owner = (json['facility']['username'] ?? json['facility']['name'])
+          ?.toString();
+      ownerAccountId =
+          (json['facility']['ownerAccount'] ??
+                  json['facility']['ownerAccountId'])
+              ?.toString();
     } else if (json['publicBody'] is Map) {
-      owner = json['publicBody']['username']?.toString();
-      ownerAccountId = (json['publicBody']['_id'] ?? json['publicBody']['id'])?.toString();
+      owner = (json['publicBody']['username'] ?? json['publicBody']['name'])
+          ?.toString();
+      ownerAccountId = (json['publicBody']['_id'] ?? json['publicBody']['id'])
+          ?.toString();
+    }
+    // Prefer explicit ownerName if provided by some endpoints
+    owner = (json['ownerName'] ?? json['owner_name'])?.toString();
+
+    if (owner == null) {
+      if (json['facility'] is Map) {
+        owner = (json['facility']['username'] ?? json['facility']['name'])
+            ?.toString();
+        ownerAccountId =
+            (json['facility']['ownerAccount'] ??
+                    json['facility']['ownerAccountId'])
+                ?.toString();
+      } else if (json['publicBody'] is Map) {
+        owner = (json['publicBody']['username'] ?? json['publicBody']['name'])
+            ?.toString();
+        ownerAccountId = (json['publicBody']['_id'] ?? json['publicBody']['id'])
+            ?.toString();
+      } else {
+        // Accept other common fallback keys for non-populated facility responses
+        owner = (json['facilityName'] ?? json['facility_name'])?.toString();
+      }
     }
 
     final sessionsRaw = json['sessions'];
@@ -98,10 +126,18 @@ class Wall {
       return 0;
     }
 
+    int parseSessionsLength(dynamic rawSessions) {
+      if (rawSessions is List) return rawSessions.length;
+      return 0;
+    }
+
     final rating = parseRating(json['rating']);
     final totalSessions = parseTotalSessions(
-      json['totalSessions'] ?? json['total_sessions'],
+      json['totalSessions'] ?? json['total_sessions'] ?? json['_totalSessions'],
     );
+    final resolvedTotalSessions = totalSessions > 0
+        ? totalSessions
+        : parseSessionsLength(json['sessions']);
 
     return Wall(
       id: (json['id'] ?? json['_id'] ?? '').toString(),
@@ -116,7 +152,7 @@ class Wall {
       ownerAccountId: ownerAccountId,
       sessions: sessions,
       rating: rating,
-      totalSessions: totalSessions,
+      totalSessions: resolvedTotalSessions,
       issues: issues,
     );
   }

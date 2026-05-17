@@ -258,6 +258,10 @@ async function seedOverpass() {
                 { upsert: true, returnDocument: "after" },
             );
 
+            await FacilityOwner.findByIdAndUpdate(userResult._id, {
+                facility: facilityResult._id,
+            });
+
             const wallResult = await IndoorWall.findOneAndUpdate(
                 wallFilter,
                 {
@@ -343,11 +347,14 @@ async function seedViaApi() {
         const facilityToken = loginRes.data.accessToken;
         const facilityHeaders = { Authorization: `Bearer ${facilityToken}` };
 
-        await FacilityModel.create({
+        const createdFacility = await FacilityModel.create({
             name: `API Test Gym ${runId}`,
             description: "High-volume seeded data for reporting UI.",
             location: { type: "Point", coordinates: [11.12, 46.06] },
             ownerAccount: facilityUserId,
+        });
+        await FacilityOwner.findByIdAndUpdate(facilityUserId, {
+            facility: createdFacility._id,
         });
         console.log("✅ Facility profile created");
 

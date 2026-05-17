@@ -55,14 +55,14 @@ class _WallDetailsDialogState extends State<WallDetailsDialog> {
     try {
       final response = await http
           .get(
-        Uri.parse(
-          '${ApiConfig.apiBaseUrl}/walls/${widget.wall.id}/leaderboard?offset=$_leaderboardOffset',
-        ),
-        headers: {
-          'Content-Type': 'application/json',
-          if (token != null) 'Authorization': 'Bearer $token',
-        },
-      )
+            Uri.parse(
+              '${ApiConfig.apiBaseUrl}/walls/${widget.wall.id}/leaderboard?offset=$_leaderboardOffset',
+            ),
+            headers: {
+              'Content-Type': 'application/json',
+              if (token != null) 'Authorization': 'Bearer $token',
+            },
+          )
           .timeout(const Duration(seconds: 12));
 
       if (response.statusCode != 200) {
@@ -71,23 +71,24 @@ class _WallDetailsDialogState extends State<WallDetailsDialog> {
 
       final decoded = jsonDecode(response.body) as Map<String, dynamic>;
       final rawList = decoded['leaderboard'];
-    final leaderboard = rawList is List
-        ? rawList
-              .whereType<Map>()
-              .map(
-                (json) =>
-                    LeaderboardEntry.fromJson(Map<String, dynamic>.from(json)),
-              )
-              .toList()
-        : <LeaderboardEntry>[];
+      final leaderboard = rawList is List
+          ? rawList
+                .whereType<Map>()
+                .map(
+                  (json) => LeaderboardEntry.fromJson(
+                    Map<String, dynamic>.from(json),
+                  ),
+                )
+                .toList()
+          : <LeaderboardEntry>[];
 
-    return _LeaderboardData(
-      seasonName: decoded['seasonName']?.toString() ?? 'Season',
-      isHistorical: decoded['isHistorical'] == true,
-      daysRemaining: _toInt(decoded['daysRemaining']),
-      averageTime: _toInt(decoded['averageTime']),
-      leaderboard: leaderboard,
-    );
+      return _LeaderboardData(
+        seasonName: decoded['seasonName']?.toString() ?? 'Season',
+        isHistorical: decoded['isHistorical'] == true,
+        daysRemaining: _toInt(decoded['daysRemaining']),
+        averageTime: _toInt(decoded['averageTime']),
+        leaderboard: leaderboard,
+      );
     } catch (e, st) {
       debugPrint('Failed to fetch leaderboard: $e\n$st');
       throw Exception('Network error while loading leaderboard');
@@ -309,7 +310,9 @@ class _WallDetailsDialogState extends State<WallDetailsDialog> {
                                   child: Icon(
                                     Icons.lock_outline,
                                     size: 11,
-                                    color: Theme.of(context).colorScheme.primary,
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.primary,
                                   ),
                                 ),
                             ],
@@ -318,69 +321,71 @@ class _WallDetailsDialogState extends State<WallDetailsDialog> {
                         ),
                       if (!isOwnerType)
                         IconButton(
-                        tooltip: 'Report an issue',
-                        onPressed: () {
-                          final TextEditingController issueController =
-                              TextEditingController();
-                          showDialog(
-                            context: context,
-                            builder: (context) => StatefulBuilder(
-                              builder: (context, setState) => AlertDialog(
-                                title: const Text('Report an issue'),
-                                content: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text('Report an issue for ${wall.name}.'),
-                                    const SizedBox(height: 12),
-                                    TextField(
-                                      controller: issueController,
-                                      maxLines: 5,
-                                      decoration: const InputDecoration(
-                                        hintText: 'Describe the issue...',
-                                        border: OutlineInputBorder(),
+                          tooltip: 'Report an issue',
+                          onPressed: () {
+                            final TextEditingController issueController =
+                                TextEditingController();
+                            showDialog(
+                              context: context,
+                              builder: (context) => StatefulBuilder(
+                                builder: (context, setState) => AlertDialog(
+                                  title: const Text('Report an issue'),
+                                  content: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text('Report an issue for ${wall.name}.'),
+                                      const SizedBox(height: 12),
+                                      TextField(
+                                        controller: issueController,
+                                        maxLines: 5,
+                                        decoration: const InputDecoration(
+                                          hintText: 'Describe the issue...',
+                                          border: OutlineInputBorder(),
+                                        ),
                                       ),
+                                    ],
+                                  ),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () =>
+                                          Navigator.of(context).pop(),
+                                      child: const Text('Cancel'),
+                                    ),
+                                    TextButton(
+                                      onPressed: () async {
+                                        final issueBody = issueController.text
+                                            .trim();
+                                        if (issueBody.isNotEmpty) {
+                                          final apiService = ApiService();
+                                          final navigator = Navigator.of(
+                                            context,
+                                          );
+                                          final messenger =
+                                              ScaffoldMessenger.of(context);
+                                          await apiService.createIssue(
+                                            wallId: wall.id,
+                                            body: issueBody,
+                                          );
+                                          navigator.pop();
+                                          messenger.showSnackBar(
+                                            const SnackBar(
+                                              content: Text('Issue submitted.'),
+                                            ),
+                                          );
+                                        }
+                                      },
+                                      child: const Text('Submit'),
                                     ),
                                   ],
                                 ),
-                                actions: [
-                                  TextButton(
-                                    onPressed: () =>
-                                        Navigator.of(context).pop(),
-                                    child: const Text('Cancel'),
-                                  ),
-                                  TextButton(
-                                    onPressed: () async {
-                                      final issueBody = issueController.text
-                                          .trim();
-                                      if (issueBody.isNotEmpty) {
-                                        final apiService = ApiService();
-                                        final navigator = Navigator.of(context);
-                                        final messenger = ScaffoldMessenger.of(
-                                          context,
-                                        );
-                                        await apiService.createIssue(
-                                          wallId: wall.id,
-                                          body: issueBody,
-                                        );
-                                        navigator.pop();
-                                        messenger.showSnackBar(
-                                          const SnackBar(
-                                            content: Text('Issue submitted.'),
-                                          ),
-                                        );
-                                      }
-                                    },
-                                    child: const Text('Submit'),
-                                  ),
-                                ],
                               ),
-                            ),
-                          );
-                        },
-                        icon: const Icon(Icons.report_problem_outlined),
-                        color: Theme.of(context).colorScheme.error,
-                      ),
+                            );
+                          },
+                          icon: const Icon(Icons.report_problem_outlined),
+                          color: Theme.of(context).colorScheme.error,
+                        ),
                     ],
                   ),
                   const SizedBox(height: 12),
@@ -392,34 +397,57 @@ class _WallDetailsDialogState extends State<WallDetailsDialog> {
                     backgroundColor: typeColor,
                   ),
                   const SizedBox(height: 16),
-                  _buildInfoRow(
-                    context,
-                    Icons.fitness_center,
-                    'Difficulty',
-                    wall.difficulty,
-                  ),
-                  const SizedBox(height: 12),
-                  _buildInfoRow(
-                    context,
-                    isIndoor ? Icons.business : Icons.account_balance,
-                    'Managed By',
-                    wall.ownerName ?? 'Unknown',
-                  ),
-                  const SizedBox(height: 12),
-                  _buildInfoRow(
-                    context,
-                    Icons.history,
-                    'Total Climbs',
-                    '${wall.totalSessions} sessions logged',
-                  ),
-                  const SizedBox(height: 12),
-                  _buildInfoRow(
-                    context,
-                    Icons.star,
-                    'Mean Rating',
-                    wall.rating > 0
-                        ? wall.rating.toStringAsFixed(1)
-                        : 'No rating yet',
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final maxTileWidth = constraints.maxWidth < 420
+                          ? constraints.maxWidth
+                          : (constraints.maxWidth - 12) / 2;
+
+                      return Wrap(
+                        spacing: 12,
+                        runSpacing: 12,
+                        children: [
+                          SizedBox(
+                            width: maxTileWidth,
+                            child: _buildInfoTile(
+                              context,
+                              Icons.fitness_center,
+                              'Difficulty',
+                              wall.difficulty,
+                            ),
+                          ),
+                          SizedBox(
+                            width: maxTileWidth,
+                            child: _buildInfoTile(
+                              context,
+                              isIndoor ? Icons.business : Icons.account_balance,
+                              'Managed By',
+                              wall.ownerName ?? 'Unknown',
+                            ),
+                          ),
+                          SizedBox(
+                            width: maxTileWidth,
+                            child: _buildInfoTile(
+                              context,
+                              Icons.history,
+                              'Total Climbs',
+                              '${wall.totalSessions} sessions logged',
+                            ),
+                          ),
+                          SizedBox(
+                            width: maxTileWidth,
+                            child: _buildInfoTile(
+                              context,
+                              Icons.star,
+                              'Mean Rating',
+                              wall.rating > 0
+                                  ? wall.rating.toStringAsFixed(1)
+                                  : 'No rating yet',
+                            ),
+                          ),
+                        ],
+                      );
+                    },
                   ),
                   const SizedBox(height: 16),
                   const Text(
@@ -656,7 +684,9 @@ class _WallDetailsDialogState extends State<WallDetailsDialog> {
                 children: [
                   Text(
                     'Error loading leaderboard.',
-                    style: TextStyle(color: Theme.of(context).colorScheme.error),
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                    ),
                   ),
                   const SizedBox(height: 8),
                   FilledButton.icon(
@@ -753,37 +783,64 @@ class _WallDetailsDialogState extends State<WallDetailsDialog> {
     );
   }
 
-  // A helper widget to keep the code clean for rows with icons and text
-  Widget _buildInfoRow(
+  Widget _buildInfoTile(
     BuildContext context,
     IconData icon,
     String label,
     String value,
   ) {
-    final textColor =
-        Theme.of(context).textTheme.bodyMedium?.color ?? Colors.black87;
-    final iconColor = Theme.of(context).iconTheme.color ?? Colors.grey;
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
 
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(icon, size: 20, color: iconColor),
-        const SizedBox(width: 8),
-        Expanded(
-          child: RichText(
-            text: TextSpan(
-              style: TextStyle(color: textColor, fontSize: 14),
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.7),
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: colorScheme.primary.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, size: 20, color: colorScheme.primary),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                TextSpan(
-                  text: '$label: ',
-                  style: const TextStyle(fontWeight: FontWeight.bold),
+                Text(
+                  label,
+                  style: textTheme.labelMedium?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.2,
+                  ),
                 ),
-                TextSpan(text: value),
+                const SizedBox(height: 4),
+                Text(
+                  value,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    height: 1.25,
+                  ),
+                ),
               ],
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 

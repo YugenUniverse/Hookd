@@ -85,7 +85,9 @@ class ApiService {
 
   Future<User> fetchCurrentUserProfile({String? bearerToken}) async {
     final options = Options(headers: {});
-    final token = (bearerToken != null && bearerToken.isNotEmpty) ? bearerToken : AuthService().jwt;
+    final token = (bearerToken != null && bearerToken.isNotEmpty)
+        ? bearerToken
+        : AuthService().jwt;
     if (token == null || token.isEmpty || !AuthService().isAuthenticated) {
       // Fail fast so callers can react (show login) instead of receiving a DioException
       throw StateError('Not authenticated');
@@ -98,7 +100,9 @@ class ApiService {
       return User.fromJson(data);
     }
 
-    throw StateError('Unexpected /users/me response shape: ${data.runtimeType}');
+    throw StateError(
+      'Unexpected /users/me response shape: ${data.runtimeType}',
+    );
   }
 
   Future<User> fetchUserProfile(String userId, {String? bearerToken}) async {
@@ -125,9 +129,10 @@ class ApiService {
 
     return sessionsRaw
         .whereType<Map>()
-        .map((session) => ClimbingSession.fromJson(
-              Map<String, dynamic>.from(session),
-            ))
+        .map(
+          (session) =>
+              ClimbingSession.fromJson(Map<String, dynamic>.from(session)),
+        )
         .toList();
   }
 
@@ -318,11 +323,19 @@ class ApiService {
     }
   }
 
-  Future<List<Poi>> searchPois(String query) async {
+  Future<List<Poi>> searchPois(
+    String query, {
+    String type = 'all',
+    String? difficulty,
+  }) async {
     try {
+      final queryParameters = <String, dynamic>{'q': query, 'type': type};
+      if (difficulty != null && difficulty.isNotEmpty) {
+        queryParameters['difficulty'] = difficulty;
+      }
       final response = await _dio.get(
         '/pois/search',
-        queryParameters: {'q': query},
+        queryParameters: queryParameters,
       );
       final data = response.data;
       if (data is! List) return [];
@@ -443,13 +456,15 @@ class ApiService {
   Future<List<Map<String, dynamic>>> searchFacilities(String query) async {
     if (query.trim().length < 2) return [];
     try {
-      final resp = await Dio(BaseOptions(baseUrl: ApiConfig.apiBaseUrl)).get(
-        '/facilities/search',
-        queryParameters: {'q': query.trim()},
-      );
+      final resp = await Dio(
+        BaseOptions(baseUrl: ApiConfig.apiBaseUrl),
+      ).get('/facilities/search', queryParameters: {'q': query.trim()});
       final data = resp.data;
       if (data is! List) return [];
-      return data.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+      return data
+          .whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
     } catch (_) {
       return [];
     }
@@ -473,11 +488,7 @@ class ApiService {
     try {
       await _dio.put(
         '/facilities/$facilityId',
-        data: {
-          'name': name,
-          'description': description,
-          'location': location,
-        },
+        data: {'name': name, 'description': description, 'location': location},
       );
       return true;
     } catch (_) {
@@ -503,17 +514,20 @@ class ApiService {
     String? address,
   }) async {
     try {
-      await _dio.post('/walls', data: {
-        'name': name,
-        'description': description,
-        'difficulty': difficulty,
-        if (longitude != null && latitude != null)
-          'location': {
-            'type': 'Point',
-            'coordinates': [longitude, latitude],
-            if (address != null && address.isNotEmpty) 'address': address,
-          },
-      });
+      await _dio.post(
+        '/walls',
+        data: {
+          'name': name,
+          'description': description,
+          'difficulty': difficulty,
+          if (longitude != null && latitude != null)
+            'location': {
+              'type': 'Point',
+              'coordinates': [longitude, latitude],
+              if (address != null && address.isNotEmpty) 'address': address,
+            },
+        },
+      );
       return true;
     } catch (_) {
       return false;

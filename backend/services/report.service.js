@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 const ClimbingSession = require("../models/ClimbingSession");
 const SavedReport = require("../models/Report");
+const { User } = require("../models/User");
 
 exports.getWallReport = async (wallId) => {
     if (!mongoose.Types.ObjectId.isValid(wallId)) {
@@ -116,8 +117,6 @@ exports.getWallReport = async (wallId) => {
     const demographicsPromise = ClimbingSession.distinct("climber_id", {
         wall_id: objectId,
     }).then(async (userIds) => {
-        const User = mongoose.model("User"); // Ensure User model is accessible
-
         // Fetch only the birthdate for these specific users
         const users = await User.find({ _id: { $in: userIds } }).select(
             "birthdate",
@@ -154,7 +153,9 @@ exports.getWallReport = async (wallId) => {
     });
 
     const Review = mongoose.model("Review");
-    // Find sessions for this wall
+    const { User } = require("../models/User");
+
+        // Find sessions for this wall
     const sessionIds = await ClimbingSession.find({
         wall_id: objectId,
     }).distinct("_id");

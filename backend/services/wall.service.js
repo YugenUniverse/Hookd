@@ -79,8 +79,8 @@ exports.updateWall = async (id, updates, userId, userType) => {
 
 exports.getAllWalls = async () => {
     const walls = await Wall.find()
-        .populate("facility", "username email avatar ownerAccount")
-        .populate("publicBody", "username email avatar")
+        .populate("facility", "name username email avatar ownerAccount")
+        .populate("publicBody", "name username email avatar")
         .populate("sessions");
 
     // Ensure rating and totalSessions are up-to-date for each wall
@@ -101,8 +101,8 @@ exports.getAllWalls = async () => {
 
 exports.getWallById = async (id) => {
     const wall = await Wall.findById(id)
-        .populate("facility", "username email avatar ownerAccount")
-        .populate("publicBody", "username email avatar")
+        .populate("facility", "name username email avatar ownerAccount")
+        .populate("publicBody", "name username email avatar")
         .populate("sessions");
 
     if (!wall) {
@@ -130,8 +130,8 @@ exports.searchWalls = async (searchQuery) => {
     const walls = await Wall.find({
         name: { $regex: `.*${escaped}.*`, $options: "i" },
     })
-        .populate("facility", "username email avatar ownerAccount")
-        .populate("publicBody", "username email avatar");
+        .populate("facility", "name username email avatar ownerAccount")
+        .populate("publicBody", "name username email avatar");
 
     for (const wall of walls) {
         try {
@@ -158,8 +158,8 @@ exports.getWallsByLocation = async (lng, lat, radius) => {
             },
         },
     })
-        .populate("facility", "username email avatar")
-        .populate("publicBody", "username email avatar");
+        .populate("facility", "name username email avatar ownerAccount")
+        .populate("publicBody", "name username email avatar");
 };
 
 exports.getOwnedWalls = async (userId, userType) => {

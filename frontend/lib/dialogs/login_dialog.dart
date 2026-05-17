@@ -6,9 +6,20 @@ import '../constants/ui_constants.dart';
 enum _AccountType { climber, facility }
 
 class LoginPage extends StatefulWidget {
-  const LoginPage({super.key});
+  const LoginPage({super.key, this.asSheet = false});
+  final bool asSheet;
   @override
   State<LoginPage> createState() => _LoginPageState();
+}
+
+bool _isDesktopLikePlatform() {
+  if (kIsWeb) return true;
+  return switch (defaultTargetPlatform) {
+    TargetPlatform.android || TargetPlatform.iOS => false,
+    TargetPlatform.fuchsia => false,
+    TargetPlatform.linux || TargetPlatform.macOS || TargetPlatform.windows =>
+      true,
+  };
 }
 
 class _LoginPageState extends State<LoginPage> {
@@ -174,9 +185,69 @@ class _LoginPageState extends State<LoginPage> {
           : _submitRegisterClimber)
       : _submitLogin;
 
+  List<Widget> _buildContent(ThemeData theme) => [
+    if (_isRegisterMode) ..._buildRegisterFields(theme),
+    if (!_isRegisterMode) ...[
+      _field(_userCtrl, 'Username or Email', focusNode: _initialFocusNode),
+      const SizedBox(height: AppSpacing.md),
+      _passwordField(
+        _passCtrl, 'Password', _obscurePassword,
+        () => setState(() => _obscurePassword = !_obscurePassword),
+      ),
+      const SizedBox(height: AppSpacing.lg),
+      _googleButton(),
+    ],
+    const SizedBox(height: AppSpacing.sm),
+    TextButton(
+      onPressed: _isLoading ? null : _toggleAuthMode,
+      child: Text(_isRegisterMode
+          ? 'Already have an account? Login'
+          : 'Create account'),
+    ),
+    const SizedBox(height: AppSpacing.lg),
+    _isLoading
+        ? const Center(child: CircularProgressIndicator())
+        : FilledButton(
+            onPressed: _submitAction,
+            child: Text(_isRegisterMode ? 'Register' : 'Login'),
+          ),
+  ];
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+
+    if (widget.asSheet) {
+      return SingleChildScrollView(
+        padding: EdgeInsets.fromLTRB(
+          24, 8, 24,
+          MediaQuery.of(context).viewInsets.bottom + 24,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    _isRegisterMode ? 'Create Account' : 'Login',
+                    style: theme.textTheme.titleLarge,
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  tooltip: 'Cancel',
+                  onPressed: _isLoading ? null : () => Navigator.pop(context, false),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.md),
+            ..._buildContent(theme),
+          ],
+        ),
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -192,35 +263,7 @@ class _LoginPageState extends State<LoginPage> {
           padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              if (_isRegisterMode) ..._buildRegisterFields(theme),
-              if (!_isRegisterMode) ...[
-                _field(_userCtrl, 'Username or Email', focusNode: _initialFocusNode),
-                const SizedBox(height: AppSpacing.md),
-                _passwordField(
-                  _passCtrl, 'Password', _obscurePassword,
-                  () => setState(() => _obscurePassword = !_obscurePassword),
-                ),
-                const SizedBox(height: AppSpacing.lg),
-                _googleButton(),
-              ],
-              const SizedBox(height: AppSpacing.sm),
-              TextButton(
-                onPressed: _isLoading ? null : _toggleAuthMode,
-                child: Text(_isRegisterMode
-                    ? 'Already have an account? Login'
-                    : 'Create account'),
-              ),
-              const SizedBox(height: AppSpacing.lg),
-              _isLoading
-                  ? const Center(
-                      child: CircularProgressIndicator(),
-                    )
-                  : FilledButton(
-                      onPressed: _submitAction,
-                      child: Text(_isRegisterMode ? 'Register' : 'Login'),
-                    ),
-            ],
+            children: _buildContent(theme),
           ),
         ),
       ),
@@ -347,6 +390,18 @@ class _LoginPageState extends State<LoginPage> {
 }
 
 Future<bool?> showLoginDialog(BuildContext context) {
+  if (_isDesktopLikePlatform()) {
+    return showModalBottomSheet<bool>(
+      context: context,
+      useRootNavigator: true,
+      isScrollControlled: true,
+      useSafeArea: true,
+      showDragHandle: true,
+      constraints: const BoxConstraints(maxWidth: 520),
+      builder: (_) => const LoginPage(asSheet: true),
+    );
+  }
+
   return Navigator.of(context, rootNavigator: true).push<bool>(
     MaterialPageRoute(fullscreenDialog: true, builder: (_) => const LoginPage()),
   );

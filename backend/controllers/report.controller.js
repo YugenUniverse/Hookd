@@ -24,6 +24,7 @@ exports.getWallReport = async (req, res, next) => {
 
         res.status(200).json(reportData);
     } catch (err) {
+        console.error(err);
         next(err);
     }
 };
@@ -65,6 +66,7 @@ exports.saveReport = async (req, res, next) => {
             report: savedReport,
         });
     } catch (err) {
+        console.error(err);
         next(err);
     }
 };

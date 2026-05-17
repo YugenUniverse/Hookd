@@ -1,5 +1,7 @@
 const mongoose = require("mongoose");
 const userService = require("../services/user.service");
+const Facility = require("../models/Facility");
+const { FacilityOwner } = require("../models/User");
 
 exports.getPublicUserById = async (req, res, next) => {
     try {
@@ -53,14 +55,23 @@ exports.getCurrentUser = async (req, res, next) => {
             throw error;
         }
 
-        if (user.userType === "FacilityOwner" && user.facility) {
-            await user.populate({
-                path: "facility",
-                populate: {
-                    path: "walls",
-                    select: "name description difficulty status rating wallType",
-                },
-            });
+        if (user.userType === "FacilityOwner") {
+            if (!user.facility) {
+                const linked = await Facility.findOne({ ownerAccount: user._id }).select("_id");
+                if (linked) {
+                    await FacilityOwner.findByIdAndUpdate(user._id, { facility: linked._id });
+                    user.facility = linked._id;
+                }
+            }
+            if (user.facility) {
+                await user.populate({
+                    path: "facility",
+                    populate: {
+                        path: "walls",
+                        select: "name description difficulty status rating wallType",
+                    },
+                });
+            }
         }
 
         if (user.userType === "PublicBody" && user.walls?.length) {

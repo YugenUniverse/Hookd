@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:dynamic_color/dynamic_color.dart';
 
 import '../pages/home_page.dart';
@@ -6,6 +7,16 @@ import '../constants/ui_constants.dart';
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
+
+  bool get _isDesktopLike {
+    if (kIsWeb) return true;
+    return switch (defaultTargetPlatform) {
+      TargetPlatform.android || TargetPlatform.iOS => false,
+      TargetPlatform.fuchsia => false,
+      TargetPlatform.linux || TargetPlatform.macOS || TargetPlatform.windows =>
+        true,
+    };
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -23,7 +34,7 @@ class MyApp extends StatelessWidget {
         return Builder(
           builder: (context) {
             final isCompact =
-                MediaQuery.sizeOf(context).shortestSide < 600;
+                _isDesktopLike || MediaQuery.sizeOf(context).shortestSide < 600;
 
             ThemeData buildTheme(ColorScheme scheme) {
               return ThemeData(

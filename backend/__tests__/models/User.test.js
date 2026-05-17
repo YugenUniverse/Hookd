@@ -133,13 +133,15 @@ describe("User model suite", () => {
             expect(found.wallet).toBe(100);
         });
 
-        it("requires name, surname, and birthdate for climber", async () => {
+        it("allows missing name/surname/birthdate for climber (fields now optional)", async () => {
             const climber = new Climber({
                 email: "fail@example.com",
                 username: "fail",
-                // missing name, surname, birthdate
+                // missing name, surname, birthdate — optional now
             });
-            await expect(climber.save()).rejects.toThrow();
+            await climber.save();
+            const found = await User.findById(climber._id);
+            expect(found.userType).toBe("Climber");
         });
     });
 
