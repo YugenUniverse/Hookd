@@ -33,6 +33,36 @@ exports.getPublicUserById = async (req, res, next) => {
             },
         };
 
+        switch (user.userType) {
+            case "FacilityOwner":
+                if (user.facility) {
+                    await mongoose.model("User").populate(user, {
+                        path: "facility",
+                        populate: {
+                            path: "walls",
+                            select: "name description difficulty status rating wallType",
+                        },
+                    });
+                    publicUser.facility = user.facility;
+                }
+                break;
+            case "PublicBody":
+                if (user.walls?.length) {
+                    await mongoose.model("User").populate(user, {
+                        path: "walls",
+                        select: "name description difficulty status rating wallType",
+                    });
+                    publicUser.walls = user.walls;
+                }
+                break;
+            case "Climber":
+                if (user.wallet) {
+                    await mongoose.model("User").populate(user, { path: "wallet.badges.badge" });
+                    publicUser.wallet = user.wallet;
+                }
+                break;
+        }
+
         res.status(200).json(publicUser);
     } catch (err) {
         next(err);
@@ -55,30 +85,38 @@ exports.getCurrentUser = async (req, res, next) => {
             throw error;
         }
 
-        if (user.userType === "FacilityOwner") {
-            if (!user.facility) {
-                const linked = await Facility.findOne({ ownerAccount: user._id }).select("_id");
-                if (linked) {
-                    await FacilityOwner.findByIdAndUpdate(user._id, { facility: linked._id });
-                    user.facility = linked._id;
+        switch (user.userType) {
+            case "FacilityOwner":
+                if (!user.facility) {
+                    const linked = await Facility.findOne({ ownerAccount: user._id }).select("_id");
+                    if (linked) {
+                        await FacilityOwner.findByIdAndUpdate(user._id, { facility: linked._id });
+                        user.facility = linked._id;
+                    }
                 }
-            }
-            if (user.facility) {
-                await user.populate({
-                    path: "facility",
-                    populate: {
+                if (user.facility) {
+                    await user.populate({
+                        path: "facility",
+                        populate: {
+                            path: "walls",
+                            select: "name description difficulty status rating wallType",
+                        },
+                    });
+                }
+                break;
+            case "PublicBody":
+                if (user.walls?.length) {
+                    await user.populate({
                         path: "walls",
                         select: "name description difficulty status rating wallType",
-                    },
-                });
-            }
-        }
-
-        if (user.userType === "PublicBody" && user.walls?.length) {
-            await user.populate({
-                path: "walls",
-                select: "name description difficulty status rating wallType",
-            });
+                    });
+                }
+                break;
+            case "Climber":
+                if (user.wallet) {
+                    await user.populate("wallet.badges.badge");
+                }
+                break;
         }
 
         res.status(200).json(user.toJSON());

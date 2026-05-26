@@ -20,6 +20,7 @@ var issueRouter = require("./routes/issue.routes");
 var poiRouter = require("./routes/poi.routes");
 var facilityRouter = require("./routes/facility.routes");
 const reportRouter = require("./routes/report.routes");
+var badgeRouter = require("./routes/badge.routes");
 
 const errorMiddleware = require("./middleware/error.middleware");
 
@@ -73,6 +74,7 @@ app.use("/pois", poiRouter);
 app.use("/facilities", facilityRouter);
 app.use("/reviews", reviewRouter);
 app.use("/climbers", climberRoutes);
+app.use("/badges", badgeRouter);
 app.use("/users", userRouter);
 
 // Everything after this point requires a valid access token.

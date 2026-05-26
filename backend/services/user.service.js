@@ -8,6 +8,9 @@ const SELECT_PUBLIC = {
     bio: 1,
     description: 1,
     location: 1,
+    wallet: 1,
+    facility: 1,
+    walls: 1,
 };
 
 async function getPublicUserById(id) {
