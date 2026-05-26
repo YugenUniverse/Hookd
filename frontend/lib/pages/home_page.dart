@@ -12,6 +12,7 @@ import '../pages/log_session_page.dart';
 import '../pages/public_body_page.dart';
 import '../pages/user_page.dart';
 import '../services/api_service.dart';
+import '../utils/image_helpers.dart';
 import 'package:geolocator/geolocator.dart';
 import '../services/auth_service.dart';
 import '../widgets/poi_map.dart';
@@ -33,6 +34,7 @@ class _MyHomePageState extends State<MyHomePage>
   void initState() {
     super.initState();
     AuthService().addListener(_onAuthChanged);
+    if (AuthService().isAuthenticated) _prefetchAvatar();
     _navExpand = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 220),
@@ -48,7 +50,26 @@ class _MyHomePageState extends State<MyHomePage>
   }
 
   void _onAuthChanged() {
+    if (AuthService().isAuthenticated && AuthService().avatar == null) {
+      _prefetchAvatar();
+    }
     setState(() {});
+  }
+
+  Widget? _buildNavAvatar(bool isAuthenticated, String? avatar, double radius) {
+    if (!isAuthenticated || avatar == null || avatar.isEmpty) return null;
+    final provider = avatarImageProvider(avatar);
+    if (provider == null) return null;
+    return CircleAvatar(radius: radius, backgroundImage: provider);
+  }
+
+  void _prefetchAvatar() {
+    ApiService().fetchCurrentUserProfile().then((user) {
+      AuthService().setCurrentUserProfile(
+        avatar: user.profilePictureUrl ?? '',
+        username: user.username,
+      );
+    }).catchError((_) {});
   }
 
   Future<bool> _ensureAuthenticated() async {
@@ -150,6 +171,7 @@ class _MyHomePageState extends State<MyHomePage>
       // Builds one nav button. Width math: 8px outer-h + 40px icon + 128*t label + 8px outer-h = 56+128*t total.
       Widget navBtn({
         required IconData icon,
+        Widget? iconWidget,
         required String label,
         required VoidCallback onTap,
         bool selected = false,
@@ -157,6 +179,7 @@ class _MyHomePageState extends State<MyHomePage>
         required double t,
       }) {
         final color = selected ? cs.primary : cs.onSurfaceVariant;
+        final iconChild = iconWidget ?? Icon(icon, size: 24, color: color);
         return Padding(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
           child: InkWell(
@@ -175,11 +198,11 @@ class _MyHomePageState extends State<MyHomePage>
                           ? Stack(
                               clipBehavior: Clip.none,
                               children: [
-                                Icon(icon, size: 24, color: color),
+                                iconChild,
                                 lockBadge,
                               ],
                             )
-                          : Icon(icon, size: 24, color: color),
+                          : iconChild,
                     ),
                   ),
                   ClipRect(
@@ -278,6 +301,7 @@ class _MyHomePageState extends State<MyHomePage>
                                 icon: isAuthenticated
                                     ? Icons.person_outline
                                     : Icons.login,
+                                iconWidget: _buildNavAvatar(isAuthenticated, AuthService().avatar, 12),
                                 label: isAuthenticated ? 'Me' : 'Login',
                                 onTap: _openAccountPage,
                                 t: t,
@@ -342,6 +366,7 @@ class _MyHomePageState extends State<MyHomePage>
                   icon: isAuthenticated ? Icons.person_outline : Icons.login,
                   label: isAuthenticated ? 'Me' : 'Login',
                   onPressed: _openAccountPage,
+                  avatarWidget: _buildNavAvatar(isAuthenticated, AuthService().avatar, 14),
                 ),
               ],
             ),
@@ -759,6 +784,7 @@ class _WallSearchSheetState extends State<_WallSearchSheet> {
 class _NavItem extends StatelessWidget {
   const _NavItem({
     this.icon,
+    this.avatarWidget,
     this.label,
     this.hint,
     this.selected = false,
@@ -768,6 +794,7 @@ class _NavItem extends StatelessWidget {
   });
 
   final IconData? icon;
+  final Widget? avatarWidget;
   final String? label;
   final String? hint;
   final bool selected;
@@ -800,11 +827,12 @@ class _NavItem extends StatelessWidget {
             children: [
               Tooltip(
                 message: tooltip ?? '',
-                child: Icon(
-                  icon,
-                  color: color,
-                  size: isDesktopLike ? 24.0 : 28.0,
-                ),
+                child: avatarWidget ??
+                    Icon(
+                      icon,
+                      color: color,
+                      size: isDesktopLike ? 24.0 : 28.0,
+                    ),
               ),
               if (label != null) ...[
                 const SizedBox(height: 2),
