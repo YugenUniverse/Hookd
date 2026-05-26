@@ -29,15 +29,22 @@ async function updateUser(id, updates) {
     const user = await User.findById(id);
     if (!user) return null;
 
-    const allowedBase = ["username", "avatar"];
-    const allowedClimber = ["name", "surname", "bio", "birthdate"];
+    const allowedBase = ["username", "avatar", "bio"];
+    const allowedNamed = ["name", "surname"]; // Climber + FacilityOwner
+    const allowedClimberOnly = ["birthdate"];
 
     for (const field of allowedBase) {
         if (updates[field] !== undefined) user[field] = updates[field];
     }
 
+    if (user.userType === "Climber" || user.userType === "FacilityOwner") {
+        for (const field of allowedNamed) {
+            if (updates[field] !== undefined) user[field] = updates[field];
+        }
+    }
+
     if (user.userType === "Climber") {
-        for (const field of allowedClimber) {
+        for (const field of allowedClimberOnly) {
             if (updates[field] !== undefined) user[field] = updates[field];
         }
     }

@@ -332,7 +332,7 @@ describe("user.routes", () => {
         expect(response.body.error).toMatch(/No valid fields to update/);
     });
 
-    it("PATCH /users/me does not apply climber fields to FacilityOwner", async () => {
+    it("PATCH /users/me updates personal fields for FacilityOwner", async () => {
         const owner = await FacilityOwner.create({
             email: "owner.patch@example.com",
             username: "facilityPatch",
@@ -343,11 +343,63 @@ describe("user.routes", () => {
         const response = await request(app)
             .patch("/users/me")
             .set("Authorization", `Bearer ${token}`)
-            .send({ username: "updatedOwner", bio: "Should be ignored" });
+            .send({
+                username: "updatedOwner",
+                name: "Anna",
+                surname: "Verdi",
+                bio: "Manages a climbing gym",
+            });
 
         expect(response.status).toBe(200);
         expect(response.body.username).toBe("updatedOwner");
-        expect(response.body.bio).toBeUndefined();
+        expect(response.body.name).toBe("Anna");
+        expect(response.body.surname).toBe("Verdi");
+        expect(response.body.bio).toBe("Manages a climbing gym");
+        expect(response.body.birthdate).toBeUndefined();
+    });
+
+    it("PATCH /users/me updates bio for PublicBody", async () => {
+        const { PublicBody } = require("../../models/User");
+        const body = await PublicBody.create({
+            email: "publicbody.patch@example.com",
+            username: "publicBodyPatch",
+            name: "City Council",
+            location: { type: "Point", coordinates: [11.0, 46.0] },
+            password: "Secret123!",
+        });
+        const token = createAuthToken(body);
+
+        const response = await request(app)
+            .patch("/users/me")
+            .set("Authorization", `Bearer ${token}`)
+            .send({ bio: "Official municipality climbing spots" });
+
+        expect(response.status).toBe(200);
+        expect(response.body.bio).toBe("Official municipality climbing spots");
+        expect(response.body.surname).toBeUndefined();
+        expect(response.body.birthdate).toBeUndefined();
+    });
+
+    it("PATCH /users/me does not apply name/surname/birthdate to PublicBody", async () => {
+        const { PublicBody } = require("../../models/User");
+        const body = await PublicBody.create({
+            email: "publicbody.ignored@example.com",
+            username: "publicBodyIgnored",
+            name: "City Hall",
+            location: { type: "Point", coordinates: [11.0, 46.0] },
+            password: "Secret123!",
+        });
+        const token = createAuthToken(body);
+
+        const response = await request(app)
+            .patch("/users/me")
+            .set("Authorization", `Bearer ${token}`)
+            .send({ username: "updatedBody", surname: "ignored", birthdate: "1990-01-01" });
+
+        expect(response.status).toBe(200);
+        expect(response.body.username).toBe("updatedBody");
+        expect(response.body.surname).toBeUndefined();
+        expect(response.body.birthdate).toBeUndefined();
     });
 
     it("GET /users/me returns facility wall descriptions for facility owners", async () => {
