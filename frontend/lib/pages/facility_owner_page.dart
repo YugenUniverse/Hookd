@@ -5,12 +5,14 @@ import 'package:flutter/material.dart';
 import '../models/poi.dart' show IndoorWallSummary;
 import '../models/user.dart';
 import '../pages/all_walls_page.dart';
+import '../pages/edit_profile_page.dart';
 import '../pages/report_list_page.dart';
 import '../pages/wall_issues_page.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
 import '../dialogs/login_dialog.dart';
 import '../services/report_service.dart';
+import '../utils/image_helpers.dart';
 
 const _kMaxPreviewWalls = 5;
 
@@ -37,7 +39,12 @@ class _FacilityOwnerPageState extends State<FacilityOwnerPage> {
         throw StateError('Not authenticated');
       }
     }
-    return ApiService().fetchCurrentUserProfile(bearerToken: AuthService().jwt);
+    final user = await ApiService().fetchCurrentUserProfile(bearerToken: AuthService().jwt);
+    AuthService().setCurrentUserProfile(
+      avatar: user.profilePictureUrl ?? '',
+      username: user.username,
+    );
+    return user;
   }
 
   void _refresh() {
@@ -168,6 +175,14 @@ class _FacilityOwnerPageState extends State<FacilityOwnerPage> {
                               isAdmin: user.isAdmin,
                               profilePictureUrl: user.profilePictureUrl,
                               memberSince: memberSince,
+                              onEditProfile: () async {
+                                final updated = await Navigator.of(context).push<User>(
+                                  MaterialPageRoute(
+                                    builder: (_) => EditProfilePage(user: user),
+                                  ),
+                                );
+                                if (updated != null) _refresh();
+                              },
                             ),
                             const SizedBox(height: 20),
                             if (user.facilityData != null)
@@ -203,6 +218,7 @@ class _AccountCard extends StatelessWidget {
     required this.isAdmin,
     required this.memberSince,
     this.profilePictureUrl,
+    this.onEditProfile,
   });
 
   final String username;
@@ -211,6 +227,7 @@ class _AccountCard extends StatelessWidget {
   final bool isAdmin;
   final String memberSince;
   final String? profilePictureUrl;
+  final VoidCallback? onEditProfile;
 
   @override
   Widget build(BuildContext context) {
@@ -233,10 +250,8 @@ class _AccountCard extends StatelessWidget {
               CircleAvatar(
                 radius: 36,
                 backgroundColor: colorScheme.primaryContainer,
-                backgroundImage: profilePictureUrl != null && profilePictureUrl!.isNotEmpty
-                    ? NetworkImage(profilePictureUrl!)
-                    : null,
-                child: profilePictureUrl == null || profilePictureUrl!.isEmpty
+                backgroundImage: avatarImageProvider(profilePictureUrl),
+                child: avatarImageProvider(profilePictureUrl) == null
                     ? Text(
                         initial,
                         style: theme.textTheme.headlineMedium?.copyWith(
@@ -276,6 +291,11 @@ class _AccountCard extends StatelessWidget {
                     ),
                   ],
                 ),
+              ),
+              IconButton(
+                tooltip: 'Edit profile',
+                icon: const Icon(Icons.edit_outlined),
+                onPressed: onEditProfile,
               ),
             ],
           ),

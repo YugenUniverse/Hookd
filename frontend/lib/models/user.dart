@@ -120,6 +120,10 @@ class User {
   final String? userType;
   final FacilityProfile? facilityData;
   final PublicBodyData? publicBodyData;
+  final String? name;
+  final String? surname;
+  final String? bio;
+  final DateTime? birthdate;
 
   User({
     required this.id,
@@ -132,6 +136,10 @@ class User {
     this.userType,
     this.facilityData,
     this.publicBodyData,
+    this.name,
+    this.surname,
+    this.bio,
+    this.birthdate,
   });
 
   factory User.fromJson(Map<String, dynamic> json) {
@@ -189,6 +197,20 @@ class User {
       publicBodyData = PublicBodyData.fromJson(json);
     }
 
+    final name = json['name']?.toString();
+    final surname = json['surname']?.toString();
+    final bio = json['bio']?.toString();
+
+    DateTime? birthdate;
+    final bd = json['birthdate'];
+    if (bd != null) {
+      if (bd is String) {
+        birthdate = DateTime.tryParse(bd);
+      } else if (bd is int) {
+        birthdate = DateTime.fromMillisecondsSinceEpoch(bd);
+      }
+    }
+
     return User(
       id: id,
       username: username,
@@ -200,6 +222,10 @@ class User {
       userType: userType,
       facilityData: facilityData,
       publicBodyData: publicBodyData,
+      name: name,
+      surname: surname,
+      bio: bio,
+      birthdate: birthdate,
     );
   }
 

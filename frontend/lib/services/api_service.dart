@@ -109,6 +109,15 @@ class ApiService {
     return fetchCurrentUserProfile(bearerToken: bearerToken);
   }
 
+  Future<User> updateCurrentUserProfile(Map<String, dynamic> updates) async {
+    final response = await _dio.patch('/users/me', data: updates);
+    final data = response.data;
+    if (data is Map<String, dynamic>) {
+      return User.fromJson(data);
+    }
+    throw StateError('Unexpected /users/me PATCH response: ${data.runtimeType}');
+  }
+
   Future<List<ClimbingSession>> fetchCurrentUserSessions({
     String? bearerToken,
   }) async {

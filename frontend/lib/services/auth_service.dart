@@ -31,6 +31,7 @@ class AuthService extends ChangeNotifier {
   String? _userType;
   bool _isAdmin = false;
   bool _keyringLocked = false;
+  String? _avatar;
 
   // public getters
   String? get jwt => _accessToken;
@@ -39,6 +40,7 @@ class AuthService extends ChangeNotifier {
   String? get username => _username;
   String? get userType => _userType;
   bool get isAdmin => _isAdmin;
+  String? get avatar => _avatar;
   bool get isAuthenticated => _accessToken != null && _accessToken!.isNotEmpty && !_isJwtExpired(_accessToken);
   
   bool get isKeyringLocked => _keyringLocked;
@@ -185,6 +187,7 @@ class AuthService extends ChangeNotifier {
     _username = null;
     _userType = null;
     _isAdmin = false;
+    _avatar = null;
     try {
       await _secure.delete(key: 'access_token');
       await _secure.delete(key: 'refresh_token');
@@ -192,7 +195,7 @@ class AuthService extends ChangeNotifier {
     notifyListeners();
   }
 
-  void setCurrentUserProfile({String? id, String? username, bool? isAdmin, String? userType}) {
+  void setCurrentUserProfile({String? id, String? username, bool? isAdmin, String? userType, String? avatar}) {
     var changed = false;
     if (id != null && id.isNotEmpty && _userId != id) {
       _userId = id;
@@ -208,6 +211,10 @@ class AuthService extends ChangeNotifier {
     }
     if (userType != null && userType.isNotEmpty && _userType != userType) {
       _userType = userType;
+      changed = true;
+    }
+    if (avatar != null && _avatar != avatar) {
+      _avatar = avatar;
       changed = true;
     }
     if (changed) notifyListeners();
