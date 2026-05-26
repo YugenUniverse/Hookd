@@ -1,6 +1,7 @@
 const reportService = require("../services/report.service");
 const { Wall } = require("../models/Wall");
 const mongoose = require("mongoose");
+
 exports.getWallReport = async (req, res, next) => {
     try {
         const { wallId } = req.params;

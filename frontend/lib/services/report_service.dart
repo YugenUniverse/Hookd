@@ -9,7 +9,7 @@ class ReportService {
 
   ReportService({required this.token});
 
-  Future<List<dynamic>> getFacilityWalls() async {
+  Future<List<dynamic>> getWalls() async {
     final response = await http.get(
       Uri.parse('$baseUrl/users/me'),
       headers: {'Authorization': 'Bearer $token'},
@@ -17,10 +17,16 @@ class ReportService {
 
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
-      final facility = data['facility'];
-      if (facility is Map) {
-        final walls = facility['walls'];
+      final userType = data['userType'];
+      if (userType == 'PublicBody') {
+        final walls = data['walls'];
         if (walls is List) return walls;
+      } else {
+        final facility = data['facility'];
+        if (facility is Map) {
+          final walls = facility['walls'];
+          if (walls is List) return walls;
+        }
       }
       return [];
     } else {

@@ -1,7 +1,7 @@
 const mongoose = require("mongoose");
 const ClimbingSession = require("../models/ClimbingSession");
 const SavedReport = require("../models/Report");
-const { Issue } = require("../models/Issue"); // 👈 The missing Issue import!
+const { Issue } = require("../models/Issue");
 
 exports.getWallReport = async (wallId) => {
     if (!mongoose.Types.ObjectId.isValid(wallId)) {

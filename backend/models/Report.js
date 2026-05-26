@@ -1,5 +1,12 @@
 const mongoose = require("mongoose");
 
+const baseTransfrom = (doc, ret) => {
+    ret.id = ret._id;
+    delete ret._id;
+    delete ret.__v;
+    return ret;
+};
+
 const reportSchema = new mongoose.Schema(
     {
         facility_id: {
@@ -90,12 +97,7 @@ const reportSchema = new mongoose.Schema(
     {
         timestamps: true,
         toJSON: {
-            transform: (doc, ret) => {
-                ret.id = ret._id;
-                delete ret._id;
-                delete ret.__v;
-                return ret;
-            },
+            base: baseTransfrom,
         },
     },
 );
