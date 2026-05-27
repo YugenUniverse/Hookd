@@ -1,4 +1,5 @@
 import 'poi.dart' show IndoorWallSummary;
+import 'badge.dart' show Wallet;
 
 class PublicBodyData {
   final String name;
@@ -124,6 +125,9 @@ class User {
   final String? surname;
   final String? bio;
   final DateTime? birthdate;
+  final Wallet? wallet;
+  final int maxStreak;
+  final int sessionCount;
 
   User({
     required this.id,
@@ -140,6 +144,9 @@ class User {
     this.surname,
     this.bio,
     this.birthdate,
+    this.wallet,
+    this.maxStreak = 0,
+    this.sessionCount = 0,
   });
 
   factory User.fromJson(Map<String, dynamic> json) {
@@ -209,6 +216,19 @@ class User {
       } else if (bd is int) {
         birthdate = DateTime.fromMillisecondsSinceEpoch(bd);
       }
+    Wallet? wallet;
+    if (json['wallet'] is Map) {
+      wallet = Wallet.fromJson(Map<String, dynamic>.from(json['wallet']));
+    }
+
+    int maxStreak = 0;
+    if (json['stats'] is Map && json['stats']['maxStreak'] != null) {
+      maxStreak = (json['stats']['maxStreak'] as num).toInt();
+    }
+
+    int sessionCount = 0;
+    if (json['sessions'] is List) {
+      sessionCount = (json['sessions'] as List).length;
     }
 
     return User(
@@ -226,6 +246,9 @@ class User {
       surname: surname,
       bio: bio,
       birthdate: birthdate,
+      wallet: wallet,
+      maxStreak: maxStreak,
+      sessionCount: sessionCount,
     );
   }
 

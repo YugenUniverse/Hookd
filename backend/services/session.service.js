@@ -2,6 +2,7 @@ const mongoose = require("mongoose");
 const ClimbingSession = require("../models/ClimbingSession");
 const { Wall } = require("../models/Wall");
 const { Climber } = require("../models/User");
+const badgeService = require("./badge.service");
 
 const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
 
@@ -85,6 +86,10 @@ exports.createSession = async (
         }
         addedReview = await climbingSession.addReview(rating, body || "");
     }
+
+    badgeService.evaluateSystemBadges(userId).catch(err => {
+        console.error("Error evaluating system badges:", err);
+    });
 
     return { session: climbingSession, review: addedReview };
 };

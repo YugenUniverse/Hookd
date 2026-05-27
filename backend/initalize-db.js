@@ -9,6 +9,7 @@ const { faker } = require("@faker-js/faker");
 const { Wall, IndoorWall, OutdoorWall } = require("./models/Wall");
 const FacilityModel = require("./models/Facility");
 const { FacilityOwner, PublicBody, Climber } = require("./models/User");
+const Badge = require("./models/Badge");
 
 const BASE_URL = process.env.BASE_URL || "http://localhost:3000";
 
@@ -312,7 +313,112 @@ async function seedOverpass() {
 }
 
 // ==========================================
-// PHASE 2: HIGH-VOLUME API SEED
+// PHASE 2: SYSTEM BADGE SEED
+// ==========================================
+
+const SYSTEM_BADGES = [
+    {
+        name: "First Ascent",
+        description: "Logged your first climbing session on Hookd.",
+        icon: "first_ascent.png",
+        score: 10,
+        type: "system",
+        reEarnable: false,
+        level: 4
+    },
+    {
+        name: "Century Club",
+        description: "Reached the massive milestone of 100 total climbing sessions.",
+        icon: "century_club.png",
+        score: 500,
+        type: "system",
+        reEarnable: false,
+        level: 1
+    },
+    {
+        name: "Weekend Warrior",
+        description: "Climbed both Saturday and Sunday in a single weekend.",
+        icon: "weekend_warrior.png",
+        score: 50,
+        type: "system",
+        reEarnable: false,
+        level: 3
+    },
+    {
+        name: "Getting Hookd",
+        description: "Logged 10 total climbing sessions.",
+        icon: "dedicated_10.png",
+        score: 50,
+        type: "system",
+        reEarnable: false,
+        level: 4
+    },
+    {
+        name: "Dedicated Climber",
+        description: "Logged 30 total climbing sessions.",
+        icon: "dedicated_30.png",
+        score: 150,
+        type: "system",
+        reEarnable: false,
+        level: 3
+    },
+    {
+        name: "Half Century",
+        description: "Logged 50 total climbing sessions.",
+        icon: "dedicated_50.png",
+        score: 250,
+        type: "system",
+        reEarnable: false,
+        level: 2
+    },
+    {
+        name: "1-Month Streak",
+        description: "Logged at least 1 session per week for 4 consecutive weeks.",
+        icon: "streak_1.png",
+        score: 100,
+        type: "system",
+        reEarnable: false,
+        level: 4
+    },
+    {
+        name: "3-Month Streak",
+        description: "Logged at least 1 session per week for 12 consecutive weeks.",
+        icon: "streak_3.png",
+        score: 300,
+        type: "system",
+        reEarnable: false,
+        level: 3
+    },
+    {
+        name: "6-Month Streak",
+        description: "Logged at least 1 session per week for 26 consecutive weeks.",
+        icon: "streak_6.png",
+        score: 600,
+        type: "system",
+        reEarnable: false,
+        level: 2
+    },
+    {
+        name: "1-Year Streak",
+        description: "Logged at least 1 session per week for 52 consecutive weeks.",
+        icon: "streak_12.png",
+        score: 1500,
+        type: "system",
+        reEarnable: false,
+        level: 1
+    }
+];
+
+async function seedSystemBadges() {
+    console.log("\n--- 🏅 STARTING PHASE 2: BADGE SEED ---");
+    for (const b of SYSTEM_BADGES) {
+        await Badge.findOneAndUpdate({ name: b.name }, b, { upsert: true, new: true });
+    }
+    console.log("✅ System badges seeded successfully!");
+}
+
+// ==========================================
+// PHASE 3: HIGH-VOLUME API SEED
 // ==========================================
 
 async function seedViaApi() {
@@ -582,6 +688,7 @@ async function runAll() {
         );
 
         await seedOverpass();
+        await seedSystemBadges();
         await seedViaApi();
 
         console.log("\n🎉 ALL SEEDING COMPLETE! Check your Flutter App! 🎉\n");

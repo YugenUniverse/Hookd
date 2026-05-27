@@ -25,7 +25,15 @@ class LeaderboardEntry {
       totalAscents: json['totalAscents'] ?? 0,
       bestTime: json['bestTime'],
       score: json['score'] ?? 0,
-      badges: List<String>.from(json['badges'] ?? []),
+      badges: (json['badges'] as List<dynamic>?)?.map((b) {
+        if (b is String) return b;
+        if (b is Map) {
+          final badgeObj = b['badge'];
+          if (badgeObj is String) return badgeObj;
+          if (badgeObj is Map && badgeObj['name'] != null) return badgeObj['name'] as String;
+        }
+        return '';
+      }).where((s) => s.isNotEmpty).toList() ?? [],
     );
   }
 }

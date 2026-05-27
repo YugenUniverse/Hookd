@@ -61,9 +61,23 @@ const climberSchema = new mongoose.Schema(
             maxlength: [200, "Bio cannot exceed 200 characters"],
         },
         wallet: {
-            type: Number,
-            default: 0,
-            min: [0, "Wallet balance cannot be negative"],
+            score: {
+                type: Number,
+                default: 0,
+                min: [0, "Score cannot be negative"],
+            },
+            badges: [
+                {
+                    badge: {
+                        type: mongoose.Schema.Types.ObjectId,
+                        ref: "Badge",
+                    },
+                    earnedAt: {
+                        type: Date,
+                        default: Date.now,
+                    },
+                },
+            ],
         },
         sessions: [
             {
@@ -71,6 +85,12 @@ const climberSchema = new mongoose.Schema(
                 ref: "ClimbingSession",
             },
         ],
+        stats: {
+            maxStreak: {
+                type: Number,
+                default: 0,
+            },
+        },
     },
     {
         toJSON: {

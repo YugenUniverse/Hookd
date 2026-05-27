@@ -1,0 +1,23 @@
+info:
+  name: acquireBadge
+  type: http
+  seq: 2
+
+http:
+  method: POST
+  url: http://localhost:3000/climbers/65432101234567890abcdef1/badges
+  auth:
+    type: bearer
+    token: ""
+  body:
+    type: json
+    json: |
+      {
+        "badgeId": "65432101234567890abcdef0"
+      }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

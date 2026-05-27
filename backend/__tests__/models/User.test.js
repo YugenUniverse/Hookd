@@ -124,13 +124,13 @@ describe("User model suite", () => {
                 surname: "Doe",
                 birthdate: new Date("1990-01-01"),
                 bio: "Passionate climber",
-                wallet: 100,
+                wallet: { score: 100, badges: [] },
             });
 
             const found = await User.findById(climber.id);
             expect(found.userType).toBe("Climber");
             expect(found.name).toBe("John");
-            expect(found.wallet).toBe(100);
+            expect(found.wallet.score).toBe(100);
         });
 
         it("allows missing name/surname/birthdate for climber (fields now optional)", async () => {
