@@ -1,0 +1,21 @@
+info:
+    name: get-events
+    type: http
+    seq: 2
+
+http:
+    method: GET
+    url: http://localhost:3000/events
+    params:
+        - name: facilityId
+          value: 6a021092a362ceb8f7bd15fd
+          type: query
+    auth:
+        type: bearer
+        token:
+
+settings:
+    encodeUrl: true
+    timeout: 0
+    followRedirects: true
+    maxRedirects: 5

@@ -8,6 +8,7 @@ import '../services/auth_service.dart';
 import 'edit_profile_page.dart';
 import '../utils/image_helpers.dart';
 import 'my_issues_page.dart';
+import 'notifications_page.dart';
 import 'wall_issues_page.dart';
 
 class _UserPageData {
@@ -304,6 +305,9 @@ class _UserPageState extends State<UserPage> {
                             ),
                             const SizedBox(height: 20),
                             _IssuesButton(userType: AuthService().userType),
+                            const SizedBox(height: 12),
+                            if (AuthService().userType == 'Climber' || AuthService().userType == null)
+                              const _NotificationsButton(),
                             const SizedBox(height: 20),
                             Text(
                               'Activity',
@@ -555,6 +559,44 @@ class _IssuesButton extends StatelessWidget {
             Expanded(
               child: Text(
                 isClimber ? 'My reports' : 'Wall issues',
+                style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
+              ),
+            ),
+            Icon(Icons.chevron_right, size: 20, color: colorScheme.onSurfaceVariant),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _NotificationsButton extends StatelessWidget {
+  const _NotificationsButton();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(20),
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const NotificationsPage()),
+      ),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.7),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.3)),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.notifications_outlined, size: 20, color: colorScheme.primary),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Notifications',
                 style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
               ),
             ),

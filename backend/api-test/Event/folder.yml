@@ -1,0 +1,9 @@
+info:
+    name: Event
+    type: folder
+    seq: 9
+
+request:
+    auth:
+        type: bearer
+        token:

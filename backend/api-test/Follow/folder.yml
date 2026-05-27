@@ -1,0 +1,9 @@
+info:
+    name: Follow
+    type: folder
+    seq: 10
+
+request:
+    auth:
+        type: bearer
+        token:
