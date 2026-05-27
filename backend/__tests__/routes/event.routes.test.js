@@ -231,6 +231,46 @@ describe("event & notification routes", () => {
         expect(await Event.findById(event._id)).toBeNull();
     });
 
+    it("DELETE /events/:id returns 403 for a different owner", async () => {
+        const other = await FacilityOwner.create({
+            email: "other2@gym.com",
+            username: "otherOwner2",
+            userType: "FacilityOwner",
+            password: "Secret123!",
+        });
+        const event = await Event.create({
+            title: "Mine",
+            facility: facility._id,
+            createdBy: owner._id,
+            startDate: new Date("2026-07-01"),
+        });
+        const res = await request(app)
+            .delete(`/events/${event._id}`)
+            .set("Authorization", `Bearer ${createAuthToken(other)}`);
+        expect(res.status).toBe(403);
+    });
+
+    it("DELETE /events/:id returns 403 for Climbers", async () => {
+        const event = await Event.create({
+            title: "Mine",
+            facility: facility._id,
+            createdBy: owner._id,
+            startDate: new Date("2026-07-01"),
+        });
+        const res = await request(app)
+            .delete(`/events/${event._id}`)
+            .set("Authorization", `Bearer ${climberToken}`);
+        expect(res.status).toBe(403);
+    });
+
+    it("GET /events/:id returns 404 for a non-existent event", async () => {
+        const fakeId = new mongoose.Types.ObjectId();
+        const res = await request(app)
+            .get(`/events/${fakeId}`)
+            .set("Authorization", `Bearer ${climberToken}`);
+        expect(res.status).toBe(404);
+    });
+
     // --- Follows ---
 
     it("POST /follows/:targetId follows a user", async () => {
@@ -357,5 +397,38 @@ describe("event & notification routes", () => {
             .patch(`/notifications/${notif._id}/read`)
             .set("Authorization", `Bearer ${climberToken}`);
         expect(res.status).toBe(403);
+    });
+
+    it("PATCH /notifications/read-all marks all notifications as read", async () => {
+        await Notification.insertMany([
+            { recipient: climber._id, type: "new_event", payload: { eventTitle: "A" } },
+            { recipient: climber._id, type: "new_event", payload: { eventTitle: "B" } },
+        ]);
+        const res = await request(app)
+            .patch("/notifications/read-all")
+            .set("Authorization", `Bearer ${climberToken}`);
+        expect(res.status).toBe(204);
+        const remaining = await Notification.find({ recipient: climber._id, read: false });
+        expect(remaining).toHaveLength(0);
+    });
+
+    // --- Followers ---
+
+    it("GET /follows/:userId/followers returns followers of a user", async () => {
+        await Follow.create({ follower: climber._id, following: owner._id });
+        const res = await request(app)
+            .get(`/follows/${owner._id}/followers`)
+            .set("Authorization", `Bearer ${ownerToken}`);
+        expect(res.status).toBe(200);
+        expect(res.body.followers).toHaveLength(1);
+        expect(res.body.followers[0].id).toBe(climber._id.toString());
+    });
+
+    it("GET /follows/:userId/followers returns empty array for a user with no followers", async () => {
+        const res = await request(app)
+            .get(`/follows/${climber._id}/followers`)
+            .set("Authorization", `Bearer ${climberToken}`);
+        expect(res.status).toBe(200);
+        expect(res.body.followers).toHaveLength(0);
     });
 });
