@@ -85,6 +85,12 @@ const climberSchema = new mongoose.Schema(
                 ref: "ClimbingSession",
             },
         ],
+        stats: {
+            maxStreak: {
+                type: Number,
+                default: 0,
+            },
+        },
     },
     {
         toJSON: {

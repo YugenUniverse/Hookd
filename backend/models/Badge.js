@@ -19,6 +19,11 @@ const badgeSchema = new mongoose.Schema(
             type: Boolean,
             default: false,
         },
+        level: {
+            type: Number,
+            enum: [1, 2, 3, 4], // 1: Gold, 2: Silver, 3: Bronze, 4: Standard
+            default: 4,
+        },
         createdBy: {
             type: mongoose.Schema.Types.ObjectId,
             ref: "User",

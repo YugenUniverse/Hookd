@@ -7,6 +7,7 @@ import '../models/poi.dart';
 import '../models/review.dart';
 import '../models/wall.dart';
 import '../models/issue.dart';
+import '../models/badge.dart';
 import '../constants/api_config.dart';
 import 'auth_service.dart';
 
@@ -190,6 +191,21 @@ class ApiService {
         'statusCode': null,
         'message': 'Unknown error: ${e.toString()}',
       };
+    }
+  }
+
+  Future<List<Badge>> getSystemBadges() async {
+    try {
+      final response = await _dio.get('/badges', queryParameters: {'type': 'system'});
+      final data = response.data;
+      if (data is! List) return [];
+      return data
+          .whereType<Map>()
+          .map((e) => Badge.fromJson(Map<String, dynamic>.from(e)))
+          .toList();
+    } catch (e) {
+      print('Error fetching system badges: $e');
+      return [];
     }
   }
 

@@ -62,17 +62,18 @@ const evaluateSystemBadges = async (userId) => {
         }
     };
 
-    // Rule 1: First Ascent
+    // Rule: First Ascent
     if (sessionCount >= 1) {
         await awardBadge("First Ascent");
     }
 
-    // Rule 2: Century Club
-    if (sessionCount >= 100) {
-        await awardBadge("Century Club");
-    }
+    // Rule: Dedicated Series (Session Counts)
+    if (sessionCount >= 10) await awardBadge("Getting Hookd");
+    if (sessionCount >= 30) await awardBadge("Dedicated Climber");
+    if (sessionCount >= 50) await awardBadge("Half Century");
+    if (sessionCount >= 100) await awardBadge("Century Club");
 
-    // Rule 3: Weekend Warrior
+    // Rule: Weekend Warrior
     if (sessions.length >= 2) {
         const lastSession = sessions[sessions.length - 1];
         const lastDate = new Date(lastSession.date);
@@ -90,6 +91,42 @@ const evaluateSystemBadges = async (userId) => {
             if (otherDaySession) {
                 await awardBadge("Weekend Warrior");
             }
+        }
+    }
+
+    // Rule: Streak Series
+    if (sessions.length > 0) {
+        const weeks = new Set();
+        sessions.forEach(s => {
+            const d = new Date(s.date);
+            // Shift by 3 days so week 0 aligns to Monday, then divide by ms in a week
+            const weekId = Math.floor((d.getTime() - 259200000) / 604800000);
+            weeks.add(weekId);
+        });
+
+        const sortedWeeks = Array.from(weeks).sort((a, b) => a - b);
+        let maxStreak = 1;
+        let currentStreak = 1;
+
+        for (let i = 1; i < sortedWeeks.length; i++) {
+            if (sortedWeeks[i] === sortedWeeks[i - 1] + 1) {
+                currentStreak++;
+                maxStreak = Math.max(maxStreak, currentStreak);
+            } else {
+                currentStreak = 1;
+            }
+        }
+
+        if (maxStreak >= 4) await awardBadge("1-Month Streak");
+        if (maxStreak >= 12) await awardBadge("3-Month Streak");
+        if (maxStreak >= 26) await awardBadge("6-Month Streak");
+        if (maxStreak >= 52) await awardBadge("1-Year Streak");
+
+        // Save maxStreak if it's a new personal record
+        if (maxStreak > (climber.stats?.maxStreak || 0)) {
+            if (!climber.stats) climber.stats = {};
+            climber.stats.maxStreak = maxStreak;
+            await climber.save();
         }
     }
 };

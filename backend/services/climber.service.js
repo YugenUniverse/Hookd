@@ -11,16 +11,21 @@ exports.getGlobalLeaderboard = async (limit = 50) => {
                 avatar: 1,
                 wallet: 1,
                 totalSessions: { $size: { $ifNull: ["$sessions", []] } },
+                computedScore: {
+                    $add: [
+                        { $multiply: [{ $size: { $ifNull: ["$sessions", []] } }, 50] },
+                        { $ifNull: ["$wallet.score", 0] }
+                    ]
+                }
             },
         },
-        { $sort: { totalSessions: -1 } },
+        { $sort: { computedScore: -1 } },
         { $limit: limit },
     ]);
 
     return rawLeaderboard.map((climber) => {
         const ascents = climber.totalSessions;
-
-        const globalScore = (ascents * 50) + (climber.wallet?.score || 0);
+        const globalScore = climber.computedScore;
 
         return {
             id: climber._id.toString(),
