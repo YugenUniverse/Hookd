@@ -20,6 +20,9 @@ var issueRouter = require("./routes/issue.routes");
 var poiRouter = require("./routes/poi.routes");
 var facilityRouter = require("./routes/facility.routes");
 const reportRouter = require("./routes/report.routes");
+const eventRouter = require("./routes/event.routes");
+const notificationRouter = require("./routes/notification.routes");
+const followRouter = require("./routes/follow.routes");
 var badgeRouter = require("./routes/badge.routes");
 
 const errorMiddleware = require("./middleware/error.middleware");
@@ -84,6 +87,9 @@ app.use("/", indexRouter);
 app.use("/sessions", sessionRouter);
 app.use("/issues", issueRouter);
 app.use("/reports", reportRouter);
+app.use("/events", eventRouter);
+app.use("/notifications", notificationRouter);
+app.use("/follows", followRouter);
 // catch 404 and forward to error handler
 app.use(function (req, res, next) {
     next(createError(404));

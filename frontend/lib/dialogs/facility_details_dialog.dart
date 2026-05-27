@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
+import '../models/event.dart';
 import '../models/poi.dart';
 import '../models/wall.dart';
+import '../pages/events_list_page.dart' show EventFormPage;
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
 import '../dialogs/wall_details_dialog.dart';
@@ -20,13 +23,27 @@ class FacilityDetailsDialog extends StatefulWidget {
   State<FacilityDetailsDialog> createState() => _FacilityDetailsDialogState();
 }
 
-class _FacilityDetailsDialogState extends State<FacilityDetailsDialog> {
+class _FacilityDetailsDialogState extends State<FacilityDetailsDialog>
+    with SingleTickerProviderStateMixin {
   late List<IndoorWallSummary> _walls;
+  List<Event> _events = [];
+  bool _eventsLoading = false;
+  bool? _isSubscribed;
+  late final TabController _tabController;
 
   @override
   void initState() {
     super.initState();
     _walls = List.of(widget.facility.walls);
+    _tabController = TabController(length: 2, vsync: this);
+    _loadEvents();
+    if (_canFollow) _loadSubscriptionStatus();
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
   }
 
   bool get _isOwner =>
@@ -34,7 +51,150 @@ class _FacilityDetailsDialogState extends State<FacilityDetailsDialog> {
       widget.facility.ownerAccountId != null &&
       AuthService().currentUserId == widget.facility.ownerAccountId;
 
-  Future<void> _showCreateDialog() async {
+  bool get _canFollow =>
+      AuthService().isAuthenticated &&
+      !_isOwner &&
+      widget.facility.ownerAccountId != null;
+
+  int get _upcomingCount {
+    final now = DateTime.now();
+    return _events.where((e) => !(e.endDate ?? e.startDate).isBefore(now)).length;
+  }
+
+  Future<void> _loadEvents() async {
+    setState(() => _eventsLoading = true);
+    try {
+      final events =
+          await ApiService().getEventsForFacility(widget.facility.id);
+      if (mounted) setState(() => _events = events);
+    } catch (_) {}
+    if (mounted) setState(() => _eventsLoading = false);
+  }
+
+  Future<void> _loadSubscriptionStatus() async {
+    try {
+      final following = await ApiService().checkFollowing(widget.facility.ownerAccountId!);
+      if (mounted) setState(() => _isSubscribed = following);
+    } catch (_) {
+      if (mounted) setState(() => _isSubscribed = false);
+    }
+  }
+
+  Future<void> _toggleSubscription() async {
+    if (_isSubscribed == null) return;
+    final was = _isSubscribed!;
+    setState(() => _isSubscribed = !was);
+    try {
+      if (was) {
+        await ApiService().unfollowUser(widget.facility.ownerAccountId!);
+      } else {
+        await ApiService().followUser(widget.facility.ownerAccountId!);
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isSubscribed = was);
+    }
+  }
+
+  Future<void> _editEvent(int index) async {
+    final updated = await Navigator.of(context).push<Event>(
+      MaterialPageRoute(
+          builder: (_) => EventFormPage(existing: _events[index])),
+    );
+    if (updated != null && mounted) {
+      setState(() => _events[index] = updated);
+    }
+  }
+
+  Future<void> _deleteEvent(int index) async {
+    final event = _events[index];
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete event?'),
+        content: Text('Delete "${event.title}"?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+                backgroundColor: Theme.of(context).colorScheme.error),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      await ApiService().deleteEvent(event.id);
+      if (mounted) setState(() => _events.removeAt(index));
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Failed to delete: $e')));
+      }
+    }
+  }
+
+  Widget _buildEventsTab() {
+    final now = DateTime.now();
+    final upcoming = <Event>[];
+    final past = <Event>[];
+    for (var i = 0; i < _events.length; i++) {
+      final e = _events[i];
+      if ((e.endDate ?? e.startDate).isBefore(now)) {
+        past.add(e);
+      } else {
+        upcoming.add(e);
+      }
+    }
+
+    if (_events.isEmpty) {
+      return const Center(child: Text('No events.'));
+    }
+
+    return ListView(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      children: [
+        if (upcoming.isEmpty)
+          const Padding(
+            padding: EdgeInsets.all(16),
+            child: Text('No upcoming events.', textAlign: TextAlign.center),
+          )
+        else
+          ...upcoming.map((e) {
+            final i = _events.indexOf(e);
+            return _EventTile(
+              event: e,
+              isOwner: _isOwner,
+              onEdit: () => _editEvent(i),
+              onDelete: () => _deleteEvent(i),
+            );
+          }),
+        if (past.isNotEmpty)
+          ExpansionTile(
+            shape: const Border(),
+            collapsedShape: const Border(),
+            leading: const Icon(Icons.history),
+            title: Text('Past events (${past.length})'),
+            children: past.map((e) {
+              final i = _events.indexOf(e);
+              return _EventTile(
+                event: e,
+                isPast: true,
+                isOwner: _isOwner,
+                onEdit: () => _editEvent(i),
+                onDelete: () => _deleteEvent(i),
+              );
+            }).toList(),
+          ),
+      ],
+    );
+  }
+
+  Future<void> _showCreateWallDialog() async {
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => const _CreateWallDialog(),
@@ -46,9 +206,10 @@ class _FacilityDetailsDialogState extends State<FacilityDetailsDialog> {
     }
   }
 
-  Future<void> _showEditDialog(int index) async {
+  Future<void> _showEditWallDialog(int index) async {
     final wall = _walls[index];
-    final result = await showDialog<({String name, String description, String difficulty})>(
+    final result = await showDialog<
+        ({String name, String description, String difficulty})>(
       context: context,
       builder: (_) => _EditWallDialog(wall: wall),
     );
@@ -77,19 +238,20 @@ class _FacilityDetailsDialogState extends State<FacilityDetailsDialog> {
       ScaffoldMessenger.of(context)
           .showSnackBar(const SnackBar(content: Text('Wall updated')));
     } else {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Failed to update wall')));
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to update wall')));
     }
   }
 
-  Future<void> _confirmDelete(int index) async {
+  Future<void> _confirmDeleteWall(int index) async {
     final wall = _walls[index];
     final messenger = ScaffoldMessenger.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Delete wall?'),
-        content: Text('This will permanently delete "${wall.name}". This cannot be undone.'),
+        content: Text(
+            'This will permanently delete "${wall.name}". This cannot be undone.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
@@ -115,123 +277,313 @@ class _FacilityDetailsDialogState extends State<FacilityDetailsDialog> {
       widget.onChanged?.call();
       messenger.showSnackBar(const SnackBar(content: Text('Wall deleted')));
     } else {
-      messenger.showSnackBar(const SnackBar(content: Text('Failed to delete wall')));
+      messenger.showSnackBar(
+          const SnackBar(content: Text('Failed to delete wall')));
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
     return SafeArea(
       child: SizedBox(
-        height: MediaQuery.of(context).size.height * 0.80,
+        height: MediaQuery.of(context).size.height * 0.85,
         width: double.infinity,
         child: Material(
-          color: Theme.of(context).colorScheme.surface,
+          color: cs.surface,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
           clipBehavior: Clip.antiAlias,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // ── Header ────────────────────────────────────────────────
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 12, 8, 0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(
-                      Icons.domain,
-                      color: Theme.of(context).colorScheme.primary,
-                      size: 28,
+                    Row(
+                      children: [
+                        Icon(Icons.domain, color: cs.primary, size: 28),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            widget.facility.name,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context)
+                                .textTheme
+                                .headlineSmall
+                                ?.copyWith(fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                        if (_canFollow)
+                          _isSubscribed == null
+                              ? const Padding(
+                                  padding: EdgeInsets.all(12),
+                                  child: SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2),
+                                  ),
+                                )
+                              : IconButton(
+                                  tooltip: _isSubscribed!
+                                      ? 'Unfollow gym'
+                                      : 'Follow gym',
+                                  icon: Icon(
+                                    _isSubscribed!
+                                        ? Icons.add_circle
+                                        : Icons.add,
+                                    color: _isSubscribed! ? cs.primary : null,
+                                  ),
+                                  onPressed: _toggleSubscription,
+                                ),
+                        if (_isOwner)
+                          IconButton(
+                            tooltip: 'Add wall',
+                            onPressed: _showCreateWallDialog,
+                            icon: const Icon(Icons.add_circle_outline),
+                            color: cs.primary,
+                          ),
+                      ],
                     ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        widget.facility.name,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.headlineSmall
-                            ?.copyWith(fontWeight: FontWeight.bold),
+                    const SizedBox(height: 8),
+                    const Chip(
+                      label: Text(
+                        'Indoor Facility',
+                        style: TextStyle(color: Colors.white, fontSize: 12),
                       ),
+                      backgroundColor: Colors.blueGrey,
                     ),
-                    if (_isOwner)
-                      IconButton(
-                        tooltip: 'Add wall',
-                        onPressed: _showCreateDialog,
-                        icon: const Icon(Icons.add_circle_outline),
-                        color: Theme.of(context).colorScheme.primary,
+                    if (widget.facility.address != null &&
+                        widget.facility.address!.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(Icons.location_on,
+                              size: 18,
+                              color: Theme.of(context).iconTheme.color),
+                          const SizedBox(width: 6),
+                          Expanded(child: Text(widget.facility.address!)),
+                        ],
                       ),
+                    ],
+                    if (widget.facility.description.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        widget.facility.description,
+                        style: Theme.of(context)
+                            .textTheme
+                            .bodyMedium
+                            ?.copyWith(height: 1.4),
+                      ),
+                    ],
+                    const SizedBox(height: 8),
                   ],
                 ),
-                const SizedBox(height: 12),
-                const Chip(
-                  label: Text(
-                    'Indoor Facility',
-                    style: TextStyle(color: Colors.white, fontSize: 12),
-                  ),
-                  backgroundColor: Colors.blueGrey,
-                ),
-                if (widget.facility.address != null &&
-                    widget.facility.address!.isNotEmpty) ...[
-                  const SizedBox(height: 12),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Icon(
-                        Icons.location_on,
-                        size: 18,
-                        color: Theme.of(context).iconTheme.color,
-                      ),
-                      const SizedBox(width: 6),
-                      Expanded(child: Text(widget.facility.address!)),
-                    ],
-                  ),
-                ],
-                if (widget.facility.description.isNotEmpty) ...[
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Description',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    widget.facility.description,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      height: 1.4,
+              ),
+              // ── Tabs ─────────────────────────────────────────────────
+              TabBar(
+                controller: _tabController,
+                tabs: [
+                  Tab(text: 'Walls (${_walls.length})'),
+                  Tab(
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text('Events'),
+                        if (_upcomingCount > 0) ...[
+                          const SizedBox(width: 6),
+                          Badge(label: Text('$_upcomingCount')),
+                        ],
+                      ],
                     ),
                   ),
                 ],
-                const SizedBox(height: 20),
-                Text(
-                  'Climbing Walls (${_walls.length})',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Expanded(
-                  child: _walls.isEmpty
-                      ? const Center(
-                          child: Text(
-                            'No walls registered for this facility yet.',
-                          ),
-                        )
-                      : ListView.separated(
-                          padding: EdgeInsets.zero,
-                          itemCount: _walls.length,
-                          separatorBuilder: (_, _) =>
-                              const SizedBox(height: 8),
-                          itemBuilder: (context, i) {
-                            return _WallTile(
+              ),
+              // ── Tab content ───────────────────────────────────────────
+              Expanded(
+                child: TabBarView(
+                  controller: _tabController,
+                  children: [
+                    // Walls tab
+                    _walls.isEmpty
+                        ? const Center(
+                            child: Text(
+                                'No walls registered for this facility yet.'),
+                          )
+                        : ListView.separated(
+                            padding: const EdgeInsets.all(12),
+                            itemCount: _walls.length,
+                            separatorBuilder: (_, _) =>
+                                const SizedBox(height: 8),
+                            itemBuilder: (context, i) => _WallTile(
                               wall: _walls[i],
                               isOwner: _isOwner,
-                              onEdit: () => _showEditDialog(i),
-                              onDelete: () => _confirmDelete(i),
-                            );
-                          },
-                        ),
+                              onEdit: () => _showEditWallDialog(i),
+                              onDelete: () => _confirmDeleteWall(i),
+                            ),
+                          ),
+                    // Events tab
+                    _eventsLoading
+                        ? const Center(child: CircularProgressIndicator())
+                        : _buildEventsTab(),
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Event tile ───────────────────────────────────────────────────────────────
+
+class _EventTile extends StatelessWidget {
+  const _EventTile({
+    required this.event,
+    required this.isOwner,
+    required this.onEdit,
+    required this.onDelete,
+    this.isPast = false,
+  });
+
+  final Event event;
+  final bool isOwner;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+  final bool isPast;
+
+  String _formatDate(DateTime d) => DateFormat('d MMM yyyy').format(d);
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final now = DateTime.now();
+    final isOngoing = !isPast &&
+        !event.startDate.isAfter(now) &&
+        (event.endDate == null || event.endDate!.isAfter(now));
+
+    final dateLabel = event.endDate != null
+        ? '${_formatDate(event.startDate)} – ${_formatDate(event.endDate!)}'
+        : _formatDate(event.startDate);
+
+    Widget? trailing;
+    if (isOwner) {
+      trailing = Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (isOngoing) _BlinkingDot(color: cs.primary),
+          IconButton(
+            icon: const Icon(Icons.edit_outlined, size: 20),
+            tooltip: 'Edit',
+            onPressed: onEdit,
+            visualDensity: VisualDensity.compact,
+          ),
+          IconButton(
+            icon: Icon(Icons.delete_outline, size: 20, color: cs.error),
+            tooltip: 'Delete',
+            onPressed: onDelete,
+            visualDensity: VisualDensity.compact,
+          ),
+        ],
+      );
+    } else if (isOngoing) {
+      trailing = _BlinkingDot(color: cs.primary);
+    }
+
+    return Card(
+      elevation: 0,
+      color: isPast
+          ? cs.surfaceContainerHighest.withValues(alpha: 0.5)
+          : cs.surfaceContainerHighest,
+      child: ListTile(
+        leading: CircleAvatar(
+          backgroundColor:
+              isOngoing ? cs.primary : cs.secondaryContainer,
+          child: Icon(
+            Icons.event,
+            color: isOngoing ? cs.onPrimary : cs.onSecondaryContainer,
+            size: 20,
+          ),
+        ),
+        title: Text(
+          event.title,
+          style: TextStyle(
+            fontWeight: FontWeight.w600,
+            color: isPast
+                ? cs.onSurface.withValues(alpha: 0.5)
+                : null,
+          ),
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(dateLabel,
+                style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
+            if (event.description != null && event.description!.isNotEmpty)
+              Text(
+                event.description!,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style:
+                    TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+              ),
+          ],
+        ),
+        trailing: trailing,
+        isThreeLine:
+            event.description != null && event.description!.isNotEmpty,
+      ),
+    );
+  }
+}
+
+// ─── Blinking live dot ───────────────────────────────────────────────────────
+
+class _BlinkingDot extends StatefulWidget {
+  const _BlinkingDot({this.color});
+  final Color? color;
+
+  @override
+  State<_BlinkingDot> createState() => _BlinkingDotState();
+}
+
+class _BlinkingDotState extends State<_BlinkingDot>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: _ctrl,
+      child: Container(
+        width: 10,
+        height: 10,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: widget.color ?? Theme.of(context).colorScheme.primary,
         ),
       ),
     );
@@ -317,10 +669,8 @@ class _WallTile extends StatelessWidget {
                   if (wall.rating > 0) ...[
                     Icon(Icons.star, size: 14, color: Colors.amber.shade700),
                     const SizedBox(width: 2),
-                    Text(
-                      wall.rating.toStringAsFixed(1),
-                      style: const TextStyle(fontSize: 13),
-                    ),
+                    Text(wall.rating.toStringAsFixed(1),
+                        style: const TextStyle(fontSize: 13)),
                     const SizedBox(width: 4),
                   ],
                   IconButton(
@@ -331,7 +681,8 @@ class _WallTile extends StatelessWidget {
                   ),
                   IconButton(
                     tooltip: 'Delete',
-                    icon: Icon(Icons.delete_outline, size: 20, color: colorScheme.error),
+                    icon: Icon(Icons.delete_outline,
+                        size: 20, color: colorScheme.error),
                     onPressed: onDelete,
                     visualDensity: VisualDensity.compact,
                   ),
@@ -343,10 +694,8 @@ class _WallTile extends StatelessWidget {
                     children: [
                       Icon(Icons.star, size: 14, color: Colors.amber.shade700),
                       const SizedBox(width: 2),
-                      Text(
-                        wall.rating.toStringAsFixed(1),
-                        style: const TextStyle(fontSize: 13),
-                      ),
+                      Text(wall.rating.toStringAsFixed(1),
+                          style: const TextStyle(fontSize: 13)),
                     ],
                   )
                 : null,
@@ -372,7 +721,11 @@ class _CreateWallDialogState extends State<_CreateWallDialog> {
   bool _saving = false;
 
   static const _difficultyOptions = [
-    'UNKNOWN', 'BEGINNER', 'INTERMEDIATE', 'ADVANCED', 'EXPERT',
+    'UNKNOWN',
+    'BEGINNER',
+    'INTERMEDIATE',
+    'ADVANCED',
+    'EXPERT',
   ];
 
   @override
@@ -429,12 +782,17 @@ class _CreateWallDialogState extends State<_CreateWallDialog> {
               items: _difficultyOptions
                   .map((d) => DropdownMenuItem(value: d, child: Text(d)))
                   .toList(),
-              onChanged: _saving ? null : (v) { if (v != null) setState(() => _difficulty = v); },
+              onChanged: _saving
+                  ? null
+                  : (v) {
+                      if (v != null) setState(() => _difficulty = v);
+                    },
             ),
             const SizedBox(height: 8),
             Text(
               'The wall will be placed at your facility\'s location.',
-              style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+              style: theme.textTheme.bodySmall
+                  ?.copyWith(color: colorScheme.onSurfaceVariant),
             ),
           ],
         ),
@@ -447,7 +805,11 @@ class _CreateWallDialogState extends State<_CreateWallDialog> {
         FilledButton(
           onPressed: _saving ? null : _save,
           child: _saving
-              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2, color: Colors.white))
               : const Text('Create'),
         ),
       ],
@@ -472,7 +834,11 @@ class _EditWallDialogState extends State<_EditWallDialog> {
   late String _difficulty;
 
   static const _difficultyOptions = [
-    'UNKNOWN', 'BEGINNER', 'INTERMEDIATE', 'ADVANCED', 'EXPERT',
+    'UNKNOWN',
+    'BEGINNER',
+    'INTERMEDIATE',
+    'ADVANCED',
+    'EXPERT',
   ];
 
   @override
@@ -480,9 +846,10 @@ class _EditWallDialogState extends State<_EditWallDialog> {
     super.initState();
     _nameCtrl = TextEditingController(text: widget.wall.name);
     _descCtrl = TextEditingController(text: widget.wall.description);
-    _difficulty = _difficultyOptions.contains(widget.wall.difficulty.toUpperCase())
-        ? widget.wall.difficulty.toUpperCase()
-        : 'UNKNOWN';
+    _difficulty =
+        _difficultyOptions.contains(widget.wall.difficulty.toUpperCase())
+            ? widget.wall.difficulty.toUpperCase()
+            : 'UNKNOWN';
   }
 
   @override
@@ -532,7 +899,9 @@ class _EditWallDialogState extends State<_EditWallDialog> {
               items: _difficultyOptions
                   .map((d) => DropdownMenuItem(value: d, child: Text(d)))
                   .toList(),
-              onChanged: (v) { if (v != null) setState(() => _difficulty = v); },
+              onChanged: (v) {
+                if (v != null) setState(() => _difficulty = v);
+              },
             ),
           ],
         ),

@@ -111,6 +111,14 @@ const Climber = User.discriminator("Climber", climberSchema);
 // lives in the standalone Facility model; this holds only the account link.
 const facilityOwnerSchema = new mongoose.Schema(
     {
+        name: { type: String, trim: true },
+        surname: { type: String, trim: true },
+        bio: {
+            type: String,
+            default: "",
+            trim: true,
+            maxlength: [200, "Bio cannot exceed 200 characters"],
+        },
         facility: {
             type: mongoose.Schema.Types.ObjectId,
             ref: "Facility",
@@ -137,6 +145,12 @@ const publicBodySchema = new mongoose.Schema(
             type: String,
             required: true,
             trim: true,
+        },
+        bio: {
+            type: String,
+            default: "",
+            trim: true,
+            maxlength: [200, "Bio cannot exceed 200 characters"],
         },
         description: {
             type: String,

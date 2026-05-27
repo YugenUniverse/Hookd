@@ -5,12 +5,15 @@ import 'package:flutter/material.dart';
 import '../models/poi.dart' show IndoorWallSummary;
 import '../models/user.dart';
 import '../pages/all_walls_page.dart';
+import '../pages/edit_profile_page.dart';
+import '../pages/events_list_page.dart';
 import '../pages/report_list_page.dart';
 import '../pages/wall_issues_page.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
 import '../dialogs/login_dialog.dart';
 import '../services/report_service.dart';
+import '../utils/image_helpers.dart';
 
 const _kMaxPreviewWalls = 5;
 
@@ -37,7 +40,12 @@ class _FacilityOwnerPageState extends State<FacilityOwnerPage> {
         throw StateError('Not authenticated');
       }
     }
-    return ApiService().fetchCurrentUserProfile(bearerToken: AuthService().jwt);
+    final user = await ApiService().fetchCurrentUserProfile(bearerToken: AuthService().jwt);
+    AuthService().setCurrentUserProfile(
+      avatar: user.profilePictureUrl ?? '',
+      username: user.username,
+    );
+    return user;
   }
 
   void _refresh() {
@@ -168,6 +176,14 @@ class _FacilityOwnerPageState extends State<FacilityOwnerPage> {
                               isAdmin: user.isAdmin,
                               profilePictureUrl: user.profilePictureUrl,
                               memberSince: memberSince,
+                              onEditProfile: () async {
+                                final updated = await Navigator.of(context).push<User>(
+                                  MaterialPageRoute(
+                                    builder: (_) => EditProfilePage(user: user),
+                                  ),
+                                );
+                                if (updated != null) _refresh();
+                              },
                             ),
                             const SizedBox(height: 20),
                             if (user.facilityData != null)
@@ -203,6 +219,7 @@ class _AccountCard extends StatelessWidget {
     required this.isAdmin,
     required this.memberSince,
     this.profilePictureUrl,
+    this.onEditProfile,
   });
 
   final String username;
@@ -211,6 +228,7 @@ class _AccountCard extends StatelessWidget {
   final bool isAdmin;
   final String memberSince;
   final String? profilePictureUrl;
+  final VoidCallback? onEditProfile;
 
   @override
   Widget build(BuildContext context) {
@@ -233,10 +251,8 @@ class _AccountCard extends StatelessWidget {
               CircleAvatar(
                 radius: 36,
                 backgroundColor: colorScheme.primaryContainer,
-                backgroundImage: profilePictureUrl != null && profilePictureUrl!.isNotEmpty
-                    ? NetworkImage(profilePictureUrl!)
-                    : null,
-                child: profilePictureUrl == null || profilePictureUrl!.isEmpty
+                backgroundImage: avatarImageProvider(profilePictureUrl),
+                child: avatarImageProvider(profilePictureUrl) == null
                     ? Text(
                         initial,
                         style: theme.textTheme.headlineMedium?.copyWith(
@@ -276,6 +292,11 @@ class _AccountCard extends StatelessWidget {
                     ),
                   ],
                 ),
+              ),
+              IconButton(
+                tooltip: 'Edit profile',
+                icon: const Icon(Icons.edit_outlined),
+                onPressed: onEditProfile,
               ),
             ],
           ),
@@ -467,6 +488,25 @@ class _FacilityCard extends StatelessWidget {
                   },
                   icon: const Icon(Icons.report_problem_outlined),
                   label: const Text('Wall issues'),
+                ),
+              ),
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => EventsListPage(
+                          facilityId: facility.id,
+                          facilityName: facility.name,
+                          canCreate: true,
+                        ),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.event),
+                  label: const Text('Events'),
                 ),
               ),
             ],
@@ -1214,6 +1254,7 @@ class _ClaimFacilityCardState extends State<_ClaimFacilityCard> {
   Timer? _debounce;
   bool _searching = false;
   bool _claiming = false;
+  String? _searchError;
 
   @override
   void initState() {
@@ -1236,20 +1277,33 @@ class _ClaimFacilityCardState extends State<_ClaimFacilityCard> {
       setState(() {
         _results = [];
         _selected = null;
+        _searchError = null;
       });
       return;
     }
-    setState(() => _searching = true);
+    setState(() {
+      _searching = true;
+      _searchError = null;
+    });
     _debounce = Timer(const Duration(milliseconds: 400), () async {
-      final res = await ApiService().searchFacilities(q);
-      if (!mounted) return;
-      setState(() {
-        _results = res;
-        _searching = false;
-        if (_selected != null && !res.any((r) => r['_id'] == _selected!['_id'])) {
-          _selected = null;
-        }
-      });
+      try {
+        final res = await ApiService().searchFacilities(q);
+        if (!mounted) return;
+        setState(() {
+          _results = res;
+          _searching = false;
+          if (_selected != null && !res.any((r) => (r['id'] ?? r['_id']) == (_selected!['id'] ?? _selected!['_id']))) {
+            _selected = null;
+          }
+        });
+      } catch (e) {
+        if (!mounted) return;
+        setState(() {
+          _results = [];
+          _searching = false;
+          _searchError = 'Search failed. Check your connection and try again.';
+        });
+      }
     });
   }
 
@@ -1427,7 +1481,16 @@ class _ClaimFacilityCardState extends State<_ClaimFacilityCard> {
                 ),
               ],
 
-              if (_results.isEmpty &&
+              if (_searchError != null) ...[
+                const SizedBox(height: 12),
+                Text(
+                  _searchError!,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: colorScheme.error,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ] else if (_results.isEmpty &&
                   _searchCtrl.text.trim().length >= 2 &&
                   !_searching &&
                   _selected == null) ...[

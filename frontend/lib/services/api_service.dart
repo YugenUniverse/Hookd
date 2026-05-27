@@ -7,6 +7,8 @@ import '../models/poi.dart';
 import '../models/review.dart';
 import '../models/wall.dart';
 import '../models/issue.dart';
+import '../models/event.dart';
+import '../models/app_notification.dart';
 import '../models/badge.dart';
 import '../constants/api_config.dart';
 import 'auth_service.dart';
@@ -84,6 +86,18 @@ class ApiService {
     );
   }
 
+  /// Fetches the current user's profile and stores avatar + username in
+  /// [AuthService] so the navbar can display the PFP immediately.
+  Future<void> loadAndCacheAvatar() async {
+    try {
+      final user = await fetchCurrentUserProfile();
+      AuthService().setCurrentUserProfile(
+        avatar: user.profilePictureUrl ?? '',
+        username: user.username,
+      );
+    } catch (_) {}
+  }
+
   Future<User> fetchCurrentUserProfile({String? bearerToken}) async {
     final options = Options(headers: {});
     final token = (bearerToken != null && bearerToken.isNotEmpty)
@@ -108,6 +122,15 @@ class ApiService {
 
   Future<User> fetchUserProfile(String userId, {String? bearerToken}) async {
     return fetchCurrentUserProfile(bearerToken: bearerToken);
+  }
+
+  Future<User> updateCurrentUserProfile(Map<String, dynamic> updates) async {
+    final response = await _dio.patch('/users/me', data: updates);
+    final data = response.data;
+    if (data is Map<String, dynamic>) {
+      return User.fromJson(data);
+    }
+    throw StateError('Unexpected /users/me PATCH response: ${data.runtimeType}');
   }
 
   Future<List<ClimbingSession>> fetchCurrentUserSessions({
@@ -471,19 +494,16 @@ class ApiService {
 
   Future<List<Map<String, dynamic>>> searchFacilities(String query) async {
     if (query.trim().length < 2) return [];
-    try {
-      final resp = await Dio(
-        BaseOptions(baseUrl: ApiConfig.apiBaseUrl),
-      ).get('/facilities/search', queryParameters: {'q': query.trim()});
-      final data = resp.data;
-      if (data is! List) return [];
-      return data
-          .whereType<Map>()
-          .map((e) => Map<String, dynamic>.from(e))
-          .toList();
-    } catch (_) {
-      return [];
-    }
+    final resp = await _dio.get(
+      '/facilities/search',
+      queryParameters: {'q': query.trim()},
+    );
+    final data = resp.data;
+    if (data is! List) return [];
+    return data
+        .whereType<Map>()
+        .map((e) => Map<String, dynamic>.from(e))
+        .toList();
   }
 
   Future<bool> claimFacility(String facilityId) async {
@@ -578,6 +598,112 @@ class ApiService {
     } catch (_) {
       return false;
     }
+  }
+
+  // Event endpoints
+
+  Future<Event> createEvent({
+    required String title,
+    String? description,
+    required DateTime startDate,
+    DateTime? endDate,
+  }) async {
+    final payload = <String, dynamic>{
+      'title': title,
+      'startDate': startDate.toIso8601String(),
+      if (description != null && description.trim().isNotEmpty)
+        'description': description.trim(),
+      if (endDate != null) 'endDate': endDate.toIso8601String(),
+    };
+    final response = await _dio.post('/events', data: payload);
+    final data = response.data;
+    if (data is Map<String, dynamic> && data['event'] is Map<String, dynamic>) {
+      return Event.fromJson(data['event'] as Map<String, dynamic>);
+    }
+    throw StateError('Unexpected /events response');
+  }
+
+  Future<List<Event>> getEventsForFacility(String facilityId) async {
+    final response = await _dio.get('/events', queryParameters: {'facilityId': facilityId});
+    final data = response.data;
+    final list = data is Map ? data['events'] : null;
+    if (list is! List) return [];
+    return list
+        .whereType<Map>()
+        .map((e) => Event.fromJson(Map<String, dynamic>.from(e)))
+        .toList();
+  }
+
+  Future<Event> updateEvent(
+    String eventId, {
+    String? title,
+    String? description,
+    DateTime? startDate,
+    DateTime? endDate,
+  }) async {
+    final body = <String, dynamic>{};
+    if (title != null) body['title'] = title;
+    if (description != null) body['description'] = description;
+    if (startDate != null) body['startDate'] = startDate.toIso8601String();
+    if (endDate != null) body['endDate'] = endDate.toIso8601String();
+    final response = await _dio.patch('/events/$eventId', data: body);
+    return Event.fromJson(Map<String, dynamic>.from(response.data['event']));
+  }
+
+  Future<void> deleteEvent(String eventId) async {
+    await _dio.delete('/events/$eventId');
+  }
+
+  // Follow endpoints
+
+  Future<void> followUser(String userId) async {
+    await _dio.post('/follows/$userId');
+  }
+
+  Future<void> unfollowUser(String userId) async {
+    await _dio.delete('/follows/$userId');
+  }
+
+  Future<bool> checkFollowing(String userId) async {
+    try {
+      final response = await _dio.get('/follows/check/$userId');
+      return response.data['following'] == true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getFollowing() async {
+    try {
+      final response = await _dio.get('/follows/me');
+      final data = response.data;
+      final list = data is Map ? data['following'] : null;
+      if (list is! List) return [];
+      return list.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  // Notification endpoints
+
+  Future<List<AppNotification>> getNotifications() async {
+    final response = await _dio.get('/notifications');
+    final data = response.data;
+    final list = data is Map ? data['notifications'] : null;
+    if (list is! List) return [];
+    return list
+        .whereType<Map>()
+        .map((e) => AppNotification.fromJson(Map<String, dynamic>.from(e)))
+        .toList();
+  }
+
+  Future<void> markNotificationRead(String notificationId) async {
+    await _dio.patch('/notifications/$notificationId/read');
+  }
+
+  Future<void> markAllNotificationsRead() async {
+    await _dio.patch('/notifications/read-all');
   }
 
   String _formatDate(DateTime date) {

@@ -161,6 +161,254 @@ describe("user.routes", () => {
         expect(response.body.password).toBeUndefined();
     });
 
+    it("PATCH /users/me requires authentication", async () => {
+        const response = await request(app)
+            .patch("/users/me")
+            .send({ username: "newname" });
+
+        expect(response.status).toBe(401);
+    });
+
+    it("PATCH /users/me updates username", async () => {
+        const climber = await Climber.create({
+            email: "update.climber@example.com",
+            username: "oldName",
+            password: "Secret123!",
+        });
+        const token = createAuthToken(climber);
+
+        const response = await request(app)
+            .patch("/users/me")
+            .set("Authorization", `Bearer ${token}`)
+            .send({ username: "newName" });
+
+        expect(response.status).toBe(200);
+        expect(response.body.username).toBe("newName");
+
+        const reloaded = await Climber.findById(climber._id);
+        expect(reloaded.username).toBe("newName");
+    });
+
+    it("PATCH /users/me updates avatar URL", async () => {
+        const climber = await Climber.create({
+            email: "avatar.climber@example.com",
+            username: "avatarUser",
+            password: "Secret123!",
+        });
+        const token = createAuthToken(climber);
+
+        const response = await request(app)
+            .patch("/users/me")
+            .set("Authorization", `Bearer ${token}`)
+            .send({ avatar: "https://example.com/new-avatar.png" });
+
+        expect(response.status).toBe(200);
+        expect(response.body.avatar).toBe("https://example.com/new-avatar.png");
+    });
+
+    it("PATCH /users/me accepts base64 data URI as avatar", async () => {
+        const climber = await Climber.create({
+            email: "avatar.base64@example.com",
+            username: "base64User",
+            password: "Secret123!",
+        });
+        const token = createAuthToken(climber);
+        const dataUri = "data:image/jpeg;base64,/9j/4AAQSkZJRgAB";
+
+        const response = await request(app)
+            .patch("/users/me")
+            .set("Authorization", `Bearer ${token}`)
+            .send({ avatar: dataUri });
+
+        expect(response.status).toBe(200);
+        expect(response.body.avatar).toBe(dataUri);
+
+        const reloaded = await Climber.findById(climber._id);
+        expect(reloaded.avatar).toBe(dataUri);
+    });
+
+    it("PATCH /users/me updates climber-specific fields", async () => {
+        const climber = await Climber.create({
+            email: "fields.climber@example.com",
+            username: "fieldsUser",
+            password: "Secret123!",
+        });
+        const token = createAuthToken(climber);
+
+        const response = await request(app)
+            .patch("/users/me")
+            .set("Authorization", `Bearer ${token}`)
+            .send({
+                name: "Mario",
+                surname: "Rossi",
+                bio: "Loves bouldering",
+                birthdate: "1995-06-15",
+            });
+
+        expect(response.status).toBe(200);
+        expect(response.body).toMatchObject({
+            name: "Mario",
+            surname: "Rossi",
+            bio: "Loves bouldering",
+        });
+        expect(new Date(response.body.birthdate).getFullYear()).toBe(1995);
+    });
+
+    it("PATCH /users/me returns 400 for username shorter than 3 characters", async () => {
+        const climber = await Climber.create({
+            email: "short.username@example.com",
+            username: "validName",
+            password: "Secret123!",
+        });
+        const token = createAuthToken(climber);
+
+        const response = await request(app)
+            .patch("/users/me")
+            .set("Authorization", `Bearer ${token}`)
+            .send({ username: "ab" });
+
+        expect(response.status).toBe(400);
+        expect(response.body.error).toMatch(/Username must be between/);
+    });
+
+    it("PATCH /users/me returns 400 for username longer than 30 characters", async () => {
+        const climber = await Climber.create({
+            email: "long.username@example.com",
+            username: "validName",
+            password: "Secret123!",
+        });
+        const token = createAuthToken(climber);
+
+        const response = await request(app)
+            .patch("/users/me")
+            .set("Authorization", `Bearer ${token}`)
+            .send({ username: "a".repeat(31) });
+
+        expect(response.status).toBe(400);
+        expect(response.body.error).toMatch(/Username must be between/);
+    });
+
+    it("PATCH /users/me returns 400 for bio exceeding 200 characters", async () => {
+        const climber = await Climber.create({
+            email: "bio.climber@example.com",
+            username: "bioUser",
+            password: "Secret123!",
+        });
+        const token = createAuthToken(climber);
+
+        const response = await request(app)
+            .patch("/users/me")
+            .set("Authorization", `Bearer ${token}`)
+            .send({ bio: "x".repeat(201) });
+
+        expect(response.status).toBe(400);
+        expect(response.body.error).toMatch(/Bio cannot exceed 200 characters/);
+    });
+
+    it("PATCH /users/me returns 400 for invalid birthdate", async () => {
+        const climber = await Climber.create({
+            email: "date.climber@example.com",
+            username: "dateUser",
+            password: "Secret123!",
+        });
+        const token = createAuthToken(climber);
+
+        const response = await request(app)
+            .patch("/users/me")
+            .set("Authorization", `Bearer ${token}`)
+            .send({ birthdate: "not-a-date" });
+
+        expect(response.status).toBe(400);
+        expect(response.body.error).toMatch(/Invalid birthdate/);
+    });
+
+    it("PATCH /users/me returns 400 when no valid fields are provided", async () => {
+        const climber = await Climber.create({
+            email: "empty.climber@example.com",
+            username: "emptyUser",
+            password: "Secret123!",
+        });
+        const token = createAuthToken(climber);
+
+        const response = await request(app)
+            .patch("/users/me")
+            .set("Authorization", `Bearer ${token}`)
+            .send({});
+
+        expect(response.status).toBe(400);
+        expect(response.body.error).toMatch(/No valid fields to update/);
+    });
+
+    it("PATCH /users/me updates personal fields for FacilityOwner", async () => {
+        const owner = await FacilityOwner.create({
+            email: "owner.patch@example.com",
+            username: "facilityPatch",
+            password: "Secret123!",
+        });
+        const token = createAuthToken(owner);
+
+        const response = await request(app)
+            .patch("/users/me")
+            .set("Authorization", `Bearer ${token}`)
+            .send({
+                username: "updatedOwner",
+                name: "Anna",
+                surname: "Verdi",
+                bio: "Manages a climbing gym",
+            });
+
+        expect(response.status).toBe(200);
+        expect(response.body.username).toBe("updatedOwner");
+        expect(response.body.name).toBe("Anna");
+        expect(response.body.surname).toBe("Verdi");
+        expect(response.body.bio).toBe("Manages a climbing gym");
+        expect(response.body.birthdate).toBeUndefined();
+    });
+
+    it("PATCH /users/me updates bio for PublicBody", async () => {
+        const { PublicBody } = require("../../models/User");
+        const body = await PublicBody.create({
+            email: "publicbody.patch@example.com",
+            username: "publicBodyPatch",
+            name: "City Council",
+            location: { type: "Point", coordinates: [11.0, 46.0] },
+            password: "Secret123!",
+        });
+        const token = createAuthToken(body);
+
+        const response = await request(app)
+            .patch("/users/me")
+            .set("Authorization", `Bearer ${token}`)
+            .send({ bio: "Official municipality climbing spots" });
+
+        expect(response.status).toBe(200);
+        expect(response.body.bio).toBe("Official municipality climbing spots");
+        expect(response.body.surname).toBeUndefined();
+        expect(response.body.birthdate).toBeUndefined();
+    });
+
+    it("PATCH /users/me does not apply name/surname/birthdate to PublicBody", async () => {
+        const { PublicBody } = require("../../models/User");
+        const body = await PublicBody.create({
+            email: "publicbody.ignored@example.com",
+            username: "publicBodyIgnored",
+            name: "City Hall",
+            location: { type: "Point", coordinates: [11.0, 46.0] },
+            password: "Secret123!",
+        });
+        const token = createAuthToken(body);
+
+        const response = await request(app)
+            .patch("/users/me")
+            .set("Authorization", `Bearer ${token}`)
+            .send({ username: "updatedBody", surname: "ignored", birthdate: "1990-01-01" });
+
+        expect(response.status).toBe(200);
+        expect(response.body.username).toBe("updatedBody");
+        expect(response.body.surname).toBeUndefined();
+        expect(response.body.birthdate).toBeUndefined();
+    });
+
     it("GET /users/me returns facility wall descriptions for facility owners", async () => {
         const facility = await Facility.create({
             name: "Private Gym",

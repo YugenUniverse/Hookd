@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -12,6 +13,7 @@ import '../pages/log_session_page.dart';
 import '../pages/public_body_page.dart';
 import '../pages/user_page.dart';
 import '../services/api_service.dart';
+import '../utils/image_helpers.dart';
 import 'package:geolocator/geolocator.dart';
 import '../services/auth_service.dart';
 import '../widgets/poi_map.dart';
@@ -38,6 +40,7 @@ class _MyHomePageState extends State<MyHomePage>
       duration: const Duration(milliseconds: 220),
     );
     _navAnim = CurvedAnimation(parent: _navExpand, curve: Curves.easeInOut);
+    if (AuthService().isAuthenticated) _loadAvatar();
   }
 
   @override
@@ -49,7 +52,12 @@ class _MyHomePageState extends State<MyHomePage>
 
   void _onAuthChanged() {
     setState(() {});
+    if (AuthService().isAuthenticated && AuthService().avatar == null) {
+      _loadAvatar();
+    }
   }
+
+  Future<void> _loadAvatar() => ApiService().loadAndCacheAvatar();
 
   Future<bool> _ensureAuthenticated() async {
     if (AuthService().isAuthenticated) {
@@ -111,6 +119,22 @@ class _MyHomePageState extends State<MyHomePage>
     );
   }
 
+  Widget? _buildAvatarWidget({double radius = 14}) {
+    final avatarUrl = AuthService().avatar;
+    if (avatarUrl == null || avatarUrl.isEmpty) return null;
+    ImageProvider? provider;
+    if (avatarUrl.startsWith('data:image')) {
+      try {
+        final base64Str = avatarUrl.split(',').last;
+        provider = MemoryImage(base64Decode(base64Str));
+      } catch (_) {}
+    } else if (avatarUrl.startsWith('http')) {
+      provider = NetworkImage(avatarUrl);
+    }
+    if (provider == null) return null;
+    return CircleAvatar(radius: radius, backgroundImage: provider);
+  }
+
   void _openAccountPage() async {
     if (!AuthService().isAuthenticated) {
       await _ensureAuthenticated();
@@ -150,13 +174,16 @@ class _MyHomePageState extends State<MyHomePage>
       // Builds one nav button. Width math: 8px outer-h + 40px icon + 128*t label + 8px outer-h = 56+128*t total.
       Widget navBtn({
         required IconData icon,
+        Widget? iconWidget,
         required String label,
         required VoidCallback onTap,
         bool selected = false,
         Widget? lockBadge,
+        Widget? customIcon,
         required double t,
       }) {
         final color = selected ? cs.primary : cs.onSurfaceVariant;
+        final iconChild = iconWidget ?? Icon(icon, size: 24, color: color);
         return Padding(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
           child: InkWell(
@@ -171,15 +198,15 @@ class _MyHomePageState extends State<MyHomePage>
                     width: 40,
                     height: 40,
                     child: Center(
-                      child: lockBadge != null
+                      child: customIcon ?? (lockBadge != null
                           ? Stack(
                               clipBehavior: Clip.none,
                               children: [
-                                Icon(icon, size: 24, color: color),
+                                iconChild,
                                 lockBadge,
                               ],
                             )
-                          : Icon(icon, size: 24, color: color),
+                          : iconChild),
                     ),
                   ),
                   ClipRect(
@@ -280,6 +307,9 @@ class _MyHomePageState extends State<MyHomePage>
                                     : Icons.login,
                                 label: isAuthenticated ? 'Me' : 'Login',
                                 onTap: _openAccountPage,
+                                customIcon: isAuthenticated
+                                    ? _buildAvatarWidget(radius: 12)
+                                    : null,
                                 t: t,
                               ),
                               const SizedBox(height: 8),
@@ -342,6 +372,7 @@ class _MyHomePageState extends State<MyHomePage>
                   icon: isAuthenticated ? Icons.person_outline : Icons.login,
                   label: isAuthenticated ? 'Me' : 'Login',
                   onPressed: _openAccountPage,
+                  customIcon: isAuthenticated ? _buildAvatarWidget() : null,
                 ),
               ],
             ),
@@ -377,6 +408,7 @@ class _WallSearchSheetState extends State<_WallSearchSheet> {
   Timer? _debounce;
   String _selectedPoiType = 'all';
   String _selectedDifficulty = 'all';
+  final Set<String> _followingIds = {};
 
   @override
   void initState() {
@@ -385,7 +417,45 @@ class _WallSearchSheetState extends State<_WallSearchSheet> {
       if (_controller.text.trim().isEmpty) {
         _fetchNearby();
       }
+      if (AuthService().isAuthenticated) _loadFollowing();
     });
+  }
+
+  Future<void> _loadFollowing() async {
+    final following = await ApiService().getFollowing();
+    if (!mounted) return;
+    setState(() {
+      _followingIds
+        ..clear()
+        ..addAll(following.map((u) => (u['id'] ?? u['_id'] ?? '').toString()));
+    });
+  }
+
+  Future<void> _toggleFollow(String userId) async {
+    final was = _followingIds.contains(userId);
+    setState(() {
+      if (was) {
+        _followingIds.remove(userId);
+      } else {
+        _followingIds.add(userId);
+      }
+    });
+    try {
+      if (was) {
+        await ApiService().unfollowUser(userId);
+      } else {
+        await ApiService().followUser(userId);
+      }
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        if (was) {
+          _followingIds.add(userId);
+        } else {
+          _followingIds.remove(userId);
+        }
+      });
+    }
   }
 
   Future<void> _fetchNearby() async {
@@ -739,7 +809,25 @@ class _WallSearchSheetState extends State<_WallSearchSheet> {
                                       onPressed: () =>
                                           _handleLogOutdoorWall(outdoorPoi),
                                     )
-                                  : null,
+                                  : (AuthService().isAuthenticated &&
+                                          facilityPoi!.ownerAccountId != null &&
+                                          facilityPoi.ownerAccountId !=
+                                              AuthService().currentUserId)
+                                      ? IconButton(
+                                          tooltip: _followingIds.contains(
+                                                  facilityPoi.ownerAccountId)
+                                              ? 'Unfollow gym'
+                                              : 'Follow gym',
+                                          icon: Icon(
+                                            _followingIds.contains(
+                                                    facilityPoi.ownerAccountId)
+                                                ? Icons.notifications_active
+                                                : Icons.notifications_none,
+                                          ),
+                                          onPressed: () => _toggleFollow(
+                                              facilityPoi.ownerAccountId!),
+                                        )
+                                      : null,
                               onTap: () => _selectPoi(poi),
                             ),
                           );
@@ -765,6 +853,7 @@ class _NavItem extends StatelessWidget {
     this.onTap,
     this.tooltip,
     this.onPressed,
+    this.customIcon,
   });
 
   final IconData? icon;
@@ -774,6 +863,7 @@ class _NavItem extends StatelessWidget {
   final VoidCallback? onTap;
   final String? tooltip;
   final VoidCallback? onPressed;
+  final Widget? customIcon;
 
   @override
   Widget build(BuildContext context) {
@@ -800,7 +890,7 @@ class _NavItem extends StatelessWidget {
             children: [
               Tooltip(
                 message: tooltip ?? '',
-                child: Icon(
+                child: customIcon ?? Icon(
                   icon,
                   color: color,
                   size: isDesktopLike ? 24.0 : 28.0,

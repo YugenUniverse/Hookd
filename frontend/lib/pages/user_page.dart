@@ -6,7 +6,10 @@ import '../models/user.dart';
 import '../services/api_service.dart';
 import '../dialogs/login_dialog.dart';
 import '../services/auth_service.dart';
+import 'edit_profile_page.dart';
+import '../utils/image_helpers.dart';
 import 'my_issues_page.dart';
+import 'notifications_page.dart';
 import 'wall_issues_page.dart';
 
 class _UserPageData {
@@ -50,8 +53,13 @@ class _UserPageState extends State<UserPage> {
       apiService.fetchCurrentUserSessions(bearerToken: bearerToken),
     ]);
 
+    final user = results[0] as User;
+    AuthService().setCurrentUserProfile(
+      avatar: user.profilePictureUrl ?? '',
+      username: user.username,
+    );
     return _UserPageData(
-      user: results[0] as User,
+      user: user,
       sessions: results[1] as List<ClimbingSession>,
     );
   }
@@ -64,6 +72,9 @@ class _UserPageState extends State<UserPage> {
   }
 
   Future<void> _logout() async {
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+
     final shouldLogout = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -82,14 +93,11 @@ class _UserPageState extends State<UserPage> {
       ),
     );
 
-    if (shouldLogout != true) {
-      return;
-    }
+    if (shouldLogout != true) return;
 
-    final messenger = ScaffoldMessenger.of(context);
     await AuthService().logout();
     if (!mounted) return;
-    Navigator.of(context).pop();
+    navigator.pop();
     messenger.showSnackBar(const SnackBar(content: Text('Logged out')));
   }
 
@@ -346,6 +354,18 @@ class _UserPageState extends State<UserPage> {
                                             .account_balance_wallet_outlined,
                                         title: 'Wallet Score',
                                         value: walletScore.toString(),
+                                      ),
+                                      IconButton(
+                                        tooltip: 'Edit profile',
+                                        icon: const Icon(Icons.edit_outlined),
+                                        onPressed: () async {
+                                          final updated = await Navigator.of(context).push<User>(
+                                            MaterialPageRoute(
+                                              builder: (_) => EditProfilePage(user: user),
+                                            ),
+                                          );
+                                          if (updated != null) _refreshProfile();
+                                        },
                                       ),
                                     ],
                                   ),
@@ -620,6 +640,44 @@ class _IssuesButton extends StatelessWidget {
               size: 20,
               color: colorScheme.onSurfaceVariant,
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _NotificationsButton extends StatelessWidget {
+  const _NotificationsButton();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(20),
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const NotificationsPage()),
+      ),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.7),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.3)),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.notifications_outlined, size: 20, color: colorScheme.primary),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Notifications',
+                style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
+              ),
+            ),
+            Icon(Icons.chevron_right, size: 20, color: colorScheme.onSurfaceVariant),
           ],
         ),
       ),

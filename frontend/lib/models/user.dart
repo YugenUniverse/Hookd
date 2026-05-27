@@ -121,6 +121,10 @@ class User {
   final String? userType;
   final FacilityProfile? facilityData;
   final PublicBodyData? publicBodyData;
+  final String? name;
+  final String? surname;
+  final String? bio;
+  final DateTime? birthdate;
   final Wallet? wallet;
   final int maxStreak;
   final int sessionCount;
@@ -136,6 +140,10 @@ class User {
     this.userType,
     this.facilityData,
     this.publicBodyData,
+    this.name,
+    this.surname,
+    this.bio,
+    this.birthdate,
     this.wallet,
     this.maxStreak = 0,
     this.sessionCount = 0,
@@ -196,6 +204,18 @@ class User {
       publicBodyData = PublicBodyData.fromJson(json);
     }
 
+    final name = json['name']?.toString();
+    final surname = json['surname']?.toString();
+    final bio = json['bio']?.toString();
+
+    DateTime? birthdate;
+    final bd = json['birthdate'];
+    if (bd != null) {
+      if (bd is String) {
+        birthdate = DateTime.tryParse(bd);
+      } else if (bd is int) {
+        birthdate = DateTime.fromMillisecondsSinceEpoch(bd);
+      }
     Wallet? wallet;
     if (json['wallet'] is Map) {
       wallet = Wallet.fromJson(Map<String, dynamic>.from(json['wallet']));
@@ -222,6 +242,10 @@ class User {
       userType: userType,
       facilityData: facilityData,
       publicBodyData: publicBodyData,
+      name: name,
+      surname: surname,
+      bio: bio,
+      birthdate: birthdate,
       wallet: wallet,
       maxStreak: maxStreak,
       sessionCount: sessionCount,
