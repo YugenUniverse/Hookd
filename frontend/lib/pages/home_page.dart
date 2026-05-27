@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -34,12 +35,12 @@ class _MyHomePageState extends State<MyHomePage>
   void initState() {
     super.initState();
     AuthService().addListener(_onAuthChanged);
-    if (AuthService().isAuthenticated) _prefetchAvatar();
     _navExpand = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 220),
     );
     _navAnim = CurvedAnimation(parent: _navExpand, curve: Curves.easeInOut);
+    if (AuthService().isAuthenticated) _loadAvatar();
   }
 
   @override
@@ -50,27 +51,13 @@ class _MyHomePageState extends State<MyHomePage>
   }
 
   void _onAuthChanged() {
-    if (AuthService().isAuthenticated && AuthService().avatar == null) {
-      _prefetchAvatar();
-    }
     setState(() {});
+    if (AuthService().isAuthenticated && AuthService().avatar == null) {
+      _loadAvatar();
+    }
   }
 
-  Widget? _buildNavAvatar(bool isAuthenticated, String? avatar, double radius) {
-    if (!isAuthenticated || avatar == null || avatar.isEmpty) return null;
-    final provider = avatarImageProvider(avatar);
-    if (provider == null) return null;
-    return CircleAvatar(radius: radius, backgroundImage: provider);
-  }
-
-  void _prefetchAvatar() {
-    ApiService().fetchCurrentUserProfile().then((user) {
-      AuthService().setCurrentUserProfile(
-        avatar: user.profilePictureUrl ?? '',
-        username: user.username,
-      );
-    }).catchError((_) {});
-  }
+  Future<void> _loadAvatar() => ApiService().loadAndCacheAvatar();
 
   Future<bool> _ensureAuthenticated() async {
     if (AuthService().isAuthenticated) {
@@ -132,6 +119,22 @@ class _MyHomePageState extends State<MyHomePage>
     );
   }
 
+  Widget? _buildAvatarWidget({double radius = 14}) {
+    final avatarUrl = AuthService().avatar;
+    if (avatarUrl == null || avatarUrl.isEmpty) return null;
+    ImageProvider? provider;
+    if (avatarUrl.startsWith('data:image')) {
+      try {
+        final base64Str = avatarUrl.split(',').last;
+        provider = MemoryImage(base64Decode(base64Str));
+      } catch (_) {}
+    } else if (avatarUrl.startsWith('http')) {
+      provider = NetworkImage(avatarUrl);
+    }
+    if (provider == null) return null;
+    return CircleAvatar(radius: radius, backgroundImage: provider);
+  }
+
   void _openAccountPage() async {
     if (!AuthService().isAuthenticated) {
       await _ensureAuthenticated();
@@ -176,6 +179,7 @@ class _MyHomePageState extends State<MyHomePage>
         required VoidCallback onTap,
         bool selected = false,
         Widget? lockBadge,
+        Widget? customIcon,
         required double t,
       }) {
         final color = selected ? cs.primary : cs.onSurfaceVariant;
@@ -194,7 +198,7 @@ class _MyHomePageState extends State<MyHomePage>
                     width: 40,
                     height: 40,
                     child: Center(
-                      child: lockBadge != null
+                      child: customIcon ?? (lockBadge != null
                           ? Stack(
                               clipBehavior: Clip.none,
                               children: [
@@ -202,7 +206,7 @@ class _MyHomePageState extends State<MyHomePage>
                                 lockBadge,
                               ],
                             )
-                          : iconChild,
+                          : iconChild),
                     ),
                   ),
                   ClipRect(
@@ -301,9 +305,11 @@ class _MyHomePageState extends State<MyHomePage>
                                 icon: isAuthenticated
                                     ? Icons.person_outline
                                     : Icons.login,
-                                iconWidget: _buildNavAvatar(isAuthenticated, AuthService().avatar, 12),
                                 label: isAuthenticated ? 'Me' : 'Login',
                                 onTap: _openAccountPage,
+                                customIcon: isAuthenticated
+                                    ? _buildAvatarWidget(radius: 12)
+                                    : null,
                                 t: t,
                               ),
                               const SizedBox(height: 8),
@@ -366,7 +372,7 @@ class _MyHomePageState extends State<MyHomePage>
                   icon: isAuthenticated ? Icons.person_outline : Icons.login,
                   label: isAuthenticated ? 'Me' : 'Login',
                   onPressed: _openAccountPage,
-                  avatarWidget: _buildNavAvatar(isAuthenticated, AuthService().avatar, 14),
+                  customIcon: isAuthenticated ? _buildAvatarWidget() : null,
                 ),
               ],
             ),
@@ -402,6 +408,7 @@ class _WallSearchSheetState extends State<_WallSearchSheet> {
   Timer? _debounce;
   String _selectedPoiType = 'all';
   String _selectedDifficulty = 'all';
+  final Set<String> _followingIds = {};
 
   @override
   void initState() {
@@ -410,7 +417,45 @@ class _WallSearchSheetState extends State<_WallSearchSheet> {
       if (_controller.text.trim().isEmpty) {
         _fetchNearby();
       }
+      if (AuthService().isAuthenticated) _loadFollowing();
     });
+  }
+
+  Future<void> _loadFollowing() async {
+    final following = await ApiService().getFollowing();
+    if (!mounted) return;
+    setState(() {
+      _followingIds
+        ..clear()
+        ..addAll(following.map((u) => (u['id'] ?? u['_id'] ?? '').toString()));
+    });
+  }
+
+  Future<void> _toggleFollow(String userId) async {
+    final was = _followingIds.contains(userId);
+    setState(() {
+      if (was) {
+        _followingIds.remove(userId);
+      } else {
+        _followingIds.add(userId);
+      }
+    });
+    try {
+      if (was) {
+        await ApiService().unfollowUser(userId);
+      } else {
+        await ApiService().followUser(userId);
+      }
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        if (was) {
+          _followingIds.add(userId);
+        } else {
+          _followingIds.remove(userId);
+        }
+      });
+    }
   }
 
   Future<void> _fetchNearby() async {
@@ -764,7 +809,25 @@ class _WallSearchSheetState extends State<_WallSearchSheet> {
                                       onPressed: () =>
                                           _handleLogOutdoorWall(outdoorPoi),
                                     )
-                                  : null,
+                                  : (AuthService().isAuthenticated &&
+                                          facilityPoi!.ownerAccountId != null &&
+                                          facilityPoi.ownerAccountId !=
+                                              AuthService().currentUserId)
+                                      ? IconButton(
+                                          tooltip: _followingIds.contains(
+                                                  facilityPoi.ownerAccountId)
+                                              ? 'Unfollow gym'
+                                              : 'Follow gym',
+                                          icon: Icon(
+                                            _followingIds.contains(
+                                                    facilityPoi.ownerAccountId)
+                                                ? Icons.notifications_active
+                                                : Icons.notifications_none,
+                                          ),
+                                          onPressed: () => _toggleFollow(
+                                              facilityPoi.ownerAccountId!),
+                                        )
+                                      : null,
                               onTap: () => _selectPoi(poi),
                             ),
                           );
@@ -784,23 +847,23 @@ class _WallSearchSheetState extends State<_WallSearchSheet> {
 class _NavItem extends StatelessWidget {
   const _NavItem({
     this.icon,
-    this.avatarWidget,
     this.label,
     this.hint,
     this.selected = false,
     this.onTap,
     this.tooltip,
     this.onPressed,
+    this.customIcon,
   });
 
   final IconData? icon;
-  final Widget? avatarWidget;
   final String? label;
   final String? hint;
   final bool selected;
   final VoidCallback? onTap;
   final String? tooltip;
   final VoidCallback? onPressed;
+  final Widget? customIcon;
 
   @override
   Widget build(BuildContext context) {
@@ -827,12 +890,11 @@ class _NavItem extends StatelessWidget {
             children: [
               Tooltip(
                 message: tooltip ?? '',
-                child: avatarWidget ??
-                    Icon(
-                      icon,
-                      color: color,
-                      size: isDesktopLike ? 24.0 : 28.0,
-                    ),
+                child: customIcon ?? Icon(
+                  icon,
+                  color: color,
+                  size: isDesktopLike ? 24.0 : 28.0,
+                ),
               ),
               if (label != null) ...[
                 const SizedBox(height: 2),

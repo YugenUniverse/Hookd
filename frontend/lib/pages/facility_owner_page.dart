@@ -6,6 +6,7 @@ import '../models/poi.dart' show IndoorWallSummary;
 import '../models/user.dart';
 import '../pages/all_walls_page.dart';
 import '../pages/edit_profile_page.dart';
+import '../pages/events_list_page.dart';
 import '../pages/report_list_page.dart';
 import '../pages/wall_issues_page.dart';
 import '../services/api_service.dart';
@@ -487,6 +488,25 @@ class _FacilityCard extends StatelessWidget {
                   },
                   icon: const Icon(Icons.report_problem_outlined),
                   label: const Text('Wall issues'),
+                ),
+              ),
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => EventsListPage(
+                          facilityId: facility.id,
+                          facilityName: facility.name,
+                          canCreate: true,
+                        ),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.event),
+                  label: const Text('Events'),
                 ),
               ),
             ],
@@ -1234,6 +1254,7 @@ class _ClaimFacilityCardState extends State<_ClaimFacilityCard> {
   Timer? _debounce;
   bool _searching = false;
   bool _claiming = false;
+  String? _searchError;
 
   @override
   void initState() {
@@ -1256,20 +1277,33 @@ class _ClaimFacilityCardState extends State<_ClaimFacilityCard> {
       setState(() {
         _results = [];
         _selected = null;
+        _searchError = null;
       });
       return;
     }
-    setState(() => _searching = true);
+    setState(() {
+      _searching = true;
+      _searchError = null;
+    });
     _debounce = Timer(const Duration(milliseconds: 400), () async {
-      final res = await ApiService().searchFacilities(q);
-      if (!mounted) return;
-      setState(() {
-        _results = res;
-        _searching = false;
-        if (_selected != null && !res.any((r) => r['_id'] == _selected!['_id'])) {
-          _selected = null;
-        }
-      });
+      try {
+        final res = await ApiService().searchFacilities(q);
+        if (!mounted) return;
+        setState(() {
+          _results = res;
+          _searching = false;
+          if (_selected != null && !res.any((r) => (r['id'] ?? r['_id']) == (_selected!['id'] ?? _selected!['_id']))) {
+            _selected = null;
+          }
+        });
+      } catch (e) {
+        if (!mounted) return;
+        setState(() {
+          _results = [];
+          _searching = false;
+          _searchError = 'Search failed. Check your connection and try again.';
+        });
+      }
     });
   }
 
@@ -1447,7 +1481,16 @@ class _ClaimFacilityCardState extends State<_ClaimFacilityCard> {
                 ),
               ],
 
-              if (_results.isEmpty &&
+              if (_searchError != null) ...[
+                const SizedBox(height: 12),
+                Text(
+                  _searchError!,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: colorScheme.error,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ] else if (_results.isEmpty &&
                   _searchCtrl.text.trim().length >= 2 &&
                   !_searching &&
                   _selected == null) ...[
