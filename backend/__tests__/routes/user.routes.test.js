@@ -8,6 +8,7 @@ const errorMiddleware = require("../../middleware/error.middleware");
 const { User, Climber, FacilityOwner } = require("../../models/User");
 const Facility = require("../../models/Facility");
 const { IndoorWall } = require("../../models/Wall");
+require("../../models/Badge");
 
 const app = express();
 app.use(express.json());
@@ -83,6 +84,9 @@ describe("user.routes", () => {
         });
 
         const response = await request(app).get(`/users/${climber.id}`);
+        if (response.status === 500) {
+            console.log("500 ERROR BODY:", response.body);
+        }
 
         expect(response.status).toBe(200);
         expect(response.body).toEqual({
@@ -95,13 +99,16 @@ describe("user.routes", () => {
                 description: "",
                 location: null,
             },
+            wallet: {
+                score: 0,
+                badges: [],
+            },
         });
 
         expect(response.body.email).toBeUndefined();
         expect(response.body.password).toBeUndefined();
         expect(response.body.googleId).toBeUndefined();
         expect(response.body.authMethods).toBeUndefined();
-        expect(response.body.wallet).toBeUndefined();
         expect(response.body.profile.name).toBeUndefined();
         expect(response.body.profile.surname).toBeUndefined();
     });
