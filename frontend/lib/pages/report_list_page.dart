@@ -164,9 +164,6 @@ class _ReportListPageState extends State<ReportListPage> {
             padding: const EdgeInsets.symmetric(vertical: 8),
             itemBuilder: (context, index) {
               final report = reports[index];
-              print(
-                'Report ${report.id} - Title: ${report.title} - Created At: ${report.createdAt}',
-              );
               return Card(
                 margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                 child: ListTile(
