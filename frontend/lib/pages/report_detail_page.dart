@@ -14,19 +14,21 @@ class ReportDetailPage extends StatefulWidget {
   });
 
   @override
-  _ReportDetailPageState createState() => _ReportDetailPageState();
+  ReportDetailPageState createState() => ReportDetailPageState();
 }
 
-class _ReportDetailPageState extends State<ReportDetailPage> {
+class ReportDetailPageState extends State<ReportDetailPage> {
   late Future<Report> futureReport;
-
-  // Tracks which temporal chart is currently visible (0 = 30-Day, 1 = Hours, 2 = Days)
   int _selectedChartIndex = 0;
 
   @override
   void initState() {
     super.initState();
     futureReport = widget.reportService.getReportDetails(widget.reportId);
+  }
+
+  String _formatMetric(num value, {int decimals = 2}) {
+    return value.toStringAsFixed(decimals);
   }
 
   @override
@@ -49,21 +51,68 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
             return const Center(child: Text('No analytics data available.'));
           }
 
+          final wallNames =
+              report.walls
+                  ?.where((wall) => wall['name'] != null)
+                  .map((wall) => wall['name'] as String)
+                  .toList() ??
+              [];
+          final wallNameById = <String, String>{};
+          for (final wall in report.walls ?? []) {
+            final wallId = (wall['id'] ?? wall['_id'])?.toString();
+            final wallName = wall['name']?.toString();
+            if (wallId != null && wallName != null && wallName.isNotEmpty) {
+              wallNameById[wallId] = wallName;
+            }
+          }
+          final wallComparisons = data.wallComparisons.map((comparison) {
+            final normalized = Map<String, dynamic>.from(comparison);
+            final wallId = (normalized['wallId'] ?? normalized['wall_id'])
+                ?.toString();
+            if ((normalized['wallName']?.toString() ?? '').isEmpty &&
+                wallId != null) {
+              final derivedName = wallNameById[wallId];
+              if (derivedName != null && derivedName.isNotEmpty) {
+                normalized['wallName'] = derivedName;
+              }
+            }
+            return normalized;
+          }).toList();
+
           return SingleChildScrollView(
             padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // HEADER
                 Text(
                   report.title,
                   style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
                 ),
+                const SizedBox(height: 8),
+                if (report.notes.isNotEmpty)
+                  Text(
+                    report.notes,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
                 const SizedBox(height: 16),
+                if (wallNames.isNotEmpty) ...[
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: wallNames.map((wallName) {
+                      return Chip(
+                        label: Text(wallName),
+                        avatar: const Icon(Icons.terrain_rounded, size: 18),
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 12),
+                ],
 
-                // KPIS
                 GridView.extent(
                   maxCrossAxisExtent: 200,
                   shrinkWrap: true,
@@ -87,20 +136,19 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
                     _buildKpiCard(
                       context,
                       'Retention',
-                      '${data.engagement['retentionRate']}x',
+                      '${_formatMetric((data.engagement['retentionRate'] ?? 0) as num)}x',
                       Icons.repeat,
                     ),
                     _buildKpiCard(
                       context,
                       'Avg Time',
-                      '${data.engagement['avgTimeMins']}m',
+                      '${_formatMetric((data.engagement['avgTimeMins'] ?? 0) as num)}m',
                       Icons.timer,
                     ),
                   ],
                 ),
                 const SizedBox(height: 32),
 
-                // SEND RATE + DEMOGRAPHICS
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -122,7 +170,6 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
                 ),
                 const SizedBox(height: 32),
 
-                // RATINGS CHART
                 const Text(
                   'Quality Distribution',
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
@@ -138,7 +185,59 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
                 ),
                 const SizedBox(height: 32),
 
-                // RECENT FEEDBACK
+                if (wallComparisons.isNotEmpty) ...[
+                  const Text(
+                    'Wall Comparison (Sessions)',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    height: 220,
+                    child: _buildWallComparisonChart(
+                      context,
+                      wallComparisons,
+                      wallNameById,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  const Text(
+                    'Average Rating Comparison',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    height: 220,
+                    child: _buildRatingComparisonChart(
+                      context,
+                      wallComparisons,
+                      wallNameById,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: wallComparisons.map((comparison) {
+                      final wallName = _wallComparisonLabel(
+                        comparison,
+                        wallComparisons.indexOf(comparison),
+                        wallNameById,
+                      );
+                      final totalSessions =
+                          (comparison['engagement']['totalSessions'] ?? 0)
+                              as num;
+                      final avgRating =
+                          (comparison['quality']['avgRating'] ?? 0) as num;
+                      return Chip(
+                        label: Text(
+                          '$wallName • ${totalSessions.toInt()} sessions • ${_formatMetric(avgRating)}★',
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 32),
+                ],
+
                 const Text(
                   'Recent Feedback',
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
@@ -207,7 +306,6 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
                   }),
                 const SizedBox(height: 40),
 
-                // TRENDS SWITCHER SECTION
                 const Text(
                   'Traffic & Trends',
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
@@ -241,10 +339,7 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
                 ),
 
                 const SizedBox(height: 24),
-
-                // DYNAMIC CHART CONTAINER
                 SizedBox(height: 250, child: _buildDynamicChart(context, data)),
-
                 const SizedBox(height: 40),
               ],
             ),
@@ -254,7 +349,6 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
     );
   }
 
-  // Determines which chart to render based on the Segmented Button
   Widget _buildDynamicChart(BuildContext context, ReportData data) {
     if (_selectedChartIndex == 0) {
       return _buildTrafficLineChart(context, data.trends);
@@ -265,9 +359,217 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
     }
   }
 
-  // ==========================================
-  // WIDGET HELPERS (Charts & Cards)
-  // ==========================================
+  String _wallComparisonLabel(
+    Map<String, dynamic> comparison,
+    int index,
+    Map<String, String> wallNameById,
+  ) {
+    final storedName = comparison['wallName']?.toString();
+    if (storedName != null && storedName.isNotEmpty) {
+      return storedName;
+    }
+
+    final wallId = (comparison['wallId'] ?? comparison['wall_id'])?.toString();
+    if (wallId != null) {
+      final derivedName = wallNameById[wallId];
+      if (derivedName != null && derivedName.isNotEmpty) {
+        return derivedName;
+      }
+    }
+
+    return 'Wall ${index + 1}';
+  }
+
+  Widget _buildWallComparisonChart(
+    BuildContext context,
+    List<Map<String, dynamic>> wallComparisons,
+    Map<String, String> wallNameById,
+  ) {
+    final textColor = Theme.of(context).colorScheme.onSurfaceVariant;
+    final maxSessions = wallComparisons
+        .map(
+          (comparison) =>
+              (comparison['engagement']['totalSessions'] ?? 0) as num,
+        )
+        .fold<num>(
+          0,
+          (previousValue, element) =>
+              previousValue > element ? previousValue : element,
+        )
+        .toDouble();
+
+    return ClipRect(
+      child: BarChart(
+        BarChartData(
+          alignment: BarChartAlignment.spaceAround,
+          maxY: maxSessions == 0 ? 5 : maxSessions + (maxSessions * 0.2),
+          barTouchData: BarTouchData(enabled: false),
+          titlesData: FlTitlesData(
+            show: true,
+            bottomTitles: AxisTitles(
+              sideTitles: SideTitles(
+                showTitles: true,
+                reservedSize: 40,
+                getTitlesWidget: (value, meta) {
+                  final index = value.toInt();
+                  if (index < 0 || index >= wallComparisons.length) {
+                    return const SizedBox.shrink();
+                  }
+                  final label = _wallComparisonLabel(
+                    wallComparisons[index],
+                    index,
+                    wallNameById,
+                  );
+                  return SideTitleWidget(
+                    meta: meta,
+                    child: Text(
+                      label.length > 14 ? '${label.substring(0, 12)}…' : label,
+                      style: TextStyle(color: textColor, fontSize: 10),
+                      textAlign: TextAlign.center,
+                    ),
+                  );
+                },
+              ),
+            ),
+            leftTitles: AxisTitles(
+              sideTitles: SideTitles(
+                showTitles: true,
+                reservedSize: 32,
+                getTitlesWidget: (value, meta) => Text(
+                  value.toInt().toString(),
+                  style: TextStyle(fontSize: 10, color: textColor),
+                ),
+              ),
+            ),
+            topTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false),
+            ),
+            rightTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false),
+            ),
+          ),
+          gridData: FlGridData(
+            show: true,
+            drawVerticalLine: false,
+            getDrawingHorizontalLine: (value) => FlLine(
+              color: Colors.grey.withValues(alpha: 0.2),
+              strokeWidth: 1,
+            ),
+          ),
+          borderData: FlBorderData(show: false),
+          barGroups: List.generate(wallComparisons.length, (index) {
+            final comparison = wallComparisons[index];
+            final totalSessions =
+                ((comparison['engagement']['totalSessions'] ?? 0) as num)
+                    .toDouble();
+            return BarChartGroupData(
+              x: index,
+              barRods: [
+                BarChartRodData(
+                  toY: totalSessions,
+                  color: Colors.deepPurpleAccent,
+                  width: 20,
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(4),
+                  ),
+                ),
+              ],
+            );
+          }),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRatingComparisonChart(
+    BuildContext context,
+    List<Map<String, dynamic>> wallComparisons,
+    Map<String, String> wallNameById,
+  ) {
+    final textColor = Theme.of(context).colorScheme.onSurfaceVariant;
+
+    return ClipRect(
+      child: BarChart(
+        BarChartData(
+          alignment: BarChartAlignment.spaceAround,
+          maxY: 5,
+          barTouchData: BarTouchData(enabled: false),
+          titlesData: FlTitlesData(
+            show: true,
+            bottomTitles: AxisTitles(
+              sideTitles: SideTitles(
+                showTitles: true,
+                reservedSize: 40,
+                getTitlesWidget: (value, meta) {
+                  final index = value.toInt();
+                  if (index < 0 || index >= wallComparisons.length) {
+                    return const SizedBox.shrink();
+                  }
+                  final label = _wallComparisonLabel(
+                    wallComparisons[index],
+                    index,
+                    wallNameById,
+                  );
+                  return SideTitleWidget(
+                    meta: meta,
+                    child: Text(
+                      label.length > 14 ? '${label.substring(0, 12)}…' : label,
+                      style: TextStyle(color: textColor, fontSize: 10),
+                      textAlign: TextAlign.center,
+                    ),
+                  );
+                },
+              ),
+            ),
+            leftTitles: AxisTitles(
+              sideTitles: SideTitles(
+                showTitles: true,
+                interval: 1,
+                reservedSize: 32,
+                getTitlesWidget: (value, meta) => Text(
+                  value.toInt().toString(),
+                  style: TextStyle(fontSize: 10, color: textColor),
+                ),
+              ),
+            ),
+            topTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false),
+            ),
+            rightTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false),
+            ),
+          ),
+          gridData: FlGridData(
+            show: true,
+            drawVerticalLine: false,
+            getDrawingHorizontalLine: (value) => FlLine(
+              color: Colors.grey.withValues(alpha: 0.2),
+              strokeWidth: 1,
+            ),
+          ),
+          borderData: FlBorderData(show: false),
+          barGroups: List.generate(wallComparisons.length, (index) {
+            final comparison = wallComparisons[index];
+            final avgRating = ((comparison['quality']['avgRating'] ?? 0) as num)
+                .toDouble();
+            return BarChartGroupData(
+              x: index,
+              barRods: [
+                BarChartRodData(
+                  toY: avgRating.clamp(0.0, 5.0),
+                  color: Colors.amber,
+                  width: 20,
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(4),
+                  ),
+                ),
+              ],
+            );
+          }),
+        ),
+      ),
+    );
+  }
 
   Widget _buildKpiCard(
     BuildContext context,
@@ -326,7 +628,7 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
     return BarChart(
       BarChartData(
         alignment: BarChartAlignment.spaceAround,
-        maxY: maxY, // Fixes glitch if empty
+        maxY: maxY,
         titlesData: FlTitlesData(
           bottomTitles: AxisTitles(
             sideTitles: SideTitles(
@@ -379,13 +681,12 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
       counts[item['day'] as int] = item['count'] as int;
     }
 
-    // Explicitly calculate MaxY to prevent the infinite grid glitch
     final maxY = (counts.values.reduce((a, b) => a > b ? a : b).toDouble()) + 2;
 
     return BarChart(
       BarChartData(
         alignment: BarChartAlignment.spaceAround,
-        maxY: maxY, // Fixes glitch if empty
+        maxY: maxY,
         titlesData: FlTitlesData(
           bottomTitles: AxisTitles(
             sideTitles: SideTitles(
