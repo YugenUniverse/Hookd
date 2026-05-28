@@ -1,6 +1,7 @@
 const reportService = require("../services/report.service");
 const { Wall } = require("../models/Wall");
 const mongoose = require("mongoose");
+
 exports.getWallReport = async (req, res, next) => {
     try {
         const { wallId } = req.params;
@@ -81,6 +82,78 @@ exports.saveReport = async (req, res, next) => {
 
         res.status(201).json({
             message: "Report snapshot saved successfully",
+            report: savedReport,
+        });
+    } catch (err) {
+        console.error(err);
+        next(err);
+    }
+};
+
+exports.saveGroupReport = async (req, res, next) => {
+    try {
+        const { title, notes } = req.body;
+        const wallIds = Array.isArray(req.body.wallIds)
+            ? req.body.wallIds
+            : Array.isArray(req.body.wall_ids)
+              ? req.body.wall_ids
+              : undefined;
+
+        if (!title) {
+            return res
+                .status(400)
+                .json({ message: "A title is required to save a report." });
+        }
+
+        if (!Array.isArray(wallIds) || wallIds.length < 2) {
+            return res.status(400).json({
+                message:
+                    "At least two wall IDs are required to save a group report.",
+            });
+        }
+
+        const walls = await Wall.find({ _id: { $in: wallIds } });
+        if (walls.length !== wallIds.length) {
+            return res
+                .status(404)
+                .json({ message: "One or more walls not found" });
+        }
+
+        let isOwner = false;
+        if (req.user.userType === "FacilityOwner") {
+            const Facility = mongoose.model("Facility");
+            const facilityProfile = await Facility.findOne({
+                ownerAccount: req.user.id,
+            });
+
+            isOwner = walls.every(
+                (wall) =>
+                    wall.facility?.toString() ===
+                        facilityProfile?._id.toString() ||
+                    wall.facility?.toString() === req.user.id,
+            );
+        } else if (req.user.userType === "PublicBody") {
+            isOwner = walls.every(
+                (wall) => wall.publicBody?.toString() === req.user.id,
+            );
+        }
+
+        if (!isOwner) {
+            return res.status(403).json({
+                message:
+                    "You do not have permission to save reports for these walls.",
+            });
+        }
+
+        const savedReport = await reportService.saveGroupReport(
+            req.user.id,
+            wallIds,
+            title,
+            notes,
+        );
+
+        res.status(201).json({
+            message: "Group report snapshot saved successfully",
             report: savedReport,
         });
     } catch (err) {

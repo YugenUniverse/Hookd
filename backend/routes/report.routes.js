@@ -16,6 +16,9 @@ router.get("/wall/:wallId", reportController.getWallReport);
 // POST request to generate and save a snapshot
 router.post("/wall/:wallId/save", reportController.saveReport);
 
+// POST request to generate and save a snapshot for multiple walls
+router.post("/walls/save", reportController.saveGroupReport);
+
 // GET list of all saved reports (lightweight list)
 router.get("/saved", reportController.getReports);
 

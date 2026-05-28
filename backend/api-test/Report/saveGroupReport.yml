@@ -1,0 +1,28 @@
+info:
+    name: saveGroupReport
+    type: http
+    seq: 3
+
+http:
+    method: POST
+    url: http://localhost:3000/reports/walls/save
+    body:
+        type: json
+        data: |-
+            {
+                "wallIds": [
+                    "6a076624defbf23fd60ddddf",
+                    "6a076624defbf23fd60dddde"
+                ],
+                "title": "Multi-wall Snapshot",
+                "notes": "Testing group report save route"
+            }
+    auth:
+        type: bearer
+        token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2YTA3NjYyNGRlZmJmMjNmZDYwZGRkZGQiLCJlbWFpbCI6Imd5bV9mYmQwYjFAdGVzdC5jb20iLCJ1c2VyVHlwZSI6IkZhY2lsaXR5IiwiaWF0IjoxNzc4ODcwMDQ3LCJleHAiOjE3Nzg4NzM2NDcsImlzcyI6Imhvb2tkIn0.hf_Bur89XIC99d7YN5ktuXAW7q_8VuUhk5P7BdhOQ2I
+
+settings:
+    encodeUrl: true
+    timeout: 0
+    followRedirects: true
+    maxRedirects: 5

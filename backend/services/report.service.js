@@ -1,7 +1,8 @@
 const mongoose = require("mongoose");
 const ClimbingSession = require("../models/ClimbingSession");
-const SavedReport = require("../models/Report");
-const { Issue } = require("../models/Issue"); // 👈 The missing Issue import!
+const { Report, BaseReport, GroupReport } = require("../models/Report");
+const { Issue } = require("../models/Issue");
+const { Wall } = require("../models/Wall");
 
 exports.getWallReport = async (wallId) => {
     if (!mongoose.Types.ObjectId.isValid(wallId)) {
@@ -11,6 +12,7 @@ exports.getWallReport = async (wallId) => {
     }
 
     const objectId = new mongoose.Types.ObjectId(wallId);
+    const wall = await Wall.findById(objectId).select("name");
 
     // --- PIPELINE 1: Engagement & Benchmark Stats ---
     const sessionStatsPromise = ClimbingSession.aggregate([
@@ -206,6 +208,8 @@ exports.getWallReport = async (wallId) => {
     }));
 
     return {
+        wallId: wallId,
+        wallName: wall?.name || null,
         engagement: {
             totalSessions: stats.totalSessions,
             uniqueClimbers: stats.uniqueClimbersCount,
@@ -251,11 +255,11 @@ exports.getWallReport = async (wallId) => {
     };
 };
 
-exports.saveReport = async (facilityId, wallId, title, notes) => {
+exports.saveReport = async (ownerId, wallId, title, notes) => {
     const reportData = await exports.getWallReport(wallId);
 
-    const newReport = await SavedReport.create({
-        facility_id: facilityId,
+    const newReport = await BaseReport.create({
+        owner_id: ownerId,
         wall_id: wallId,
         title: title,
         notes: notes || "",
@@ -265,18 +269,313 @@ exports.saveReport = async (facilityId, wallId, title, notes) => {
     return newReport;
 };
 
-exports.getReportsList = async (facilityId) => {
-    return await SavedReport.find({ facility_id: facilityId })
-        .select("-reportData -quality -trends")
+exports.saveGroupReport = async (ownerId, wallIds, title, notes) => {
+    if (!Array.isArray(wallIds) || wallIds.length < 2) {
+        const error = new Error("At least two wall IDs are required");
+        error.statusCode = 400;
+        throw error;
+    }
+
+    const invalidId = wallIds.find(
+        (id) => !mongoose.Types.ObjectId.isValid(id),
+    );
+    if (invalidId) {
+        const error = new Error("Invalid wall id in wallIds");
+        error.statusCode = 400;
+        throw error;
+    }
+
+    const objectIds = wallIds.map((id) => new mongoose.Types.ObjectId(id));
+    const distinctClimberIdsPromise = ClimbingSession.distinct("climber_id", {
+        wall_id: { $in: objectIds },
+    }).exec();
+
+    const sessionStatsPromise = ClimbingSession.aggregate([
+        { $match: { wall_id: { $in: objectIds } } },
+        {
+            $group: {
+                _id: null,
+                totalSessions: { $sum: 1 },
+                uniqueClimbers: { $addToSet: "$climber_id" },
+                avgTime: { $avg: "$time" },
+                fastestTime: { $min: "$time" },
+                totalSends: { $sum: { $cond: ["$isSend", 1, 0] } },
+            },
+        },
+        {
+            $project: {
+                totalSessions: 1,
+                uniqueClimbersCount: { $size: "$uniqueClimbers" },
+                avgTime: { $round: ["$avgTime", 1] },
+                fastestTime: 1,
+                totalSends: 1,
+                totalAttempts: { $subtract: ["$totalSessions", "$totalSends"] },
+            },
+        },
+    ]);
+
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const temporalStatsPromise = ClimbingSession.aggregate([
+        { $match: { wall_id: { $in: objectIds } } },
+        {
+            $facet: {
+                last30Days: [
+                    { $match: { date: { $gte: thirtyDaysAgo } } },
+                    {
+                        $group: {
+                            _id: {
+                                $dateToString: {
+                                    format: "%Y-%m-%d",
+                                    date: "$date",
+                                },
+                            },
+                            count: { $sum: 1 },
+                        },
+                    },
+                    { $sort: { _id: 1 } },
+                ],
+                byDayOfWeek: [
+                    {
+                        $group: {
+                            _id: { $dayOfWeek: "$date" },
+                            count: { $sum: 1 },
+                        },
+                    },
+                    { $sort: { _id: 1 } },
+                ],
+                byHourOfDay: [
+                    { $group: { _id: { $hour: "$date" }, count: { $sum: 1 } } },
+                    { $sort: { _id: 1 } },
+                ],
+            },
+        },
+    ]);
+
+    const reviewStatsPromise = ClimbingSession.aggregate([
+        { $match: { wall_id: { $in: objectIds } } },
+        {
+            $lookup: {
+                from: "reviews",
+                localField: "_id",
+                foreignField: "climbing_session_id",
+                as: "review",
+            },
+        },
+        { $unwind: "$review" },
+        {
+            $facet: {
+                overall: [
+                    {
+                        $group: {
+                            _id: null,
+                            avgRating: { $avg: "$review.rating" },
+                            totalReviews: { $sum: 1 },
+                        },
+                    },
+                ],
+                distribution: [
+                    { $group: { _id: "$review.rating", count: { $sum: 1 } } },
+                    { $sort: { _id: 1 } },
+                ],
+            },
+        },
+    ]);
+
+    const sessionIdsPromise = ClimbingSession.find({
+        wall_id: { $in: objectIds },
+    }).distinct("_id");
+
+    const demographicsPromise = distinctClimberIdsPromise.then(
+        async (userIds) => {
+            const User = mongoose.model("User");
+            const users = await User.find({ _id: { $in: userIds } }).select(
+                "birthdate",
+            );
+
+            const brackets = { "< 20": 0, "20-29": 0, "30-39": 0, "40+": 0 };
+            const today = new Date();
+
+            users.forEach((user) => {
+                if (!user.birthdate) return;
+                const birthDate = new Date(user.birthdate);
+                let age = today.getFullYear() - birthDate.getFullYear();
+                const m = today.getMonth() - birthDate.getMonth();
+                if (
+                    m < 0 ||
+                    (m === 0 && today.getDate() < birthDate.getDate())
+                ) {
+                    age--;
+                }
+
+                if (age < 20) brackets["< 20"]++;
+                else if (age <= 29) brackets["20-29"]++;
+                else if (age <= 39) brackets["30-39"]++;
+                else brackets["40+"]++;
+            });
+
+            return Object.keys(brackets).map((key) => ({
+                bracket: key,
+                count: brackets[key],
+            }));
+        },
+    );
+
+    const perWallReportsPromise = Promise.all(
+        objectIds.map((id) => exports.getWallReport(id.toString())),
+    );
+
+    const wallDocs = await Wall.find({ _id: { $in: objectIds } }).select(
+        "name",
+    );
+    const wallNameById = new Map(
+        wallDocs.map((wall) => [wall._id.toString(), wall.name]),
+    );
+
+    const [
+        sessionStats,
+        temporalStatsResult,
+        reviewStats,
+        sessionIds,
+        distinctClimberIds,
+        demographics,
+        recentIssues,
+        perWallReports,
+    ] = await Promise.all([
+        sessionStatsPromise,
+        temporalStatsPromise,
+        reviewStatsPromise,
+        sessionIdsPromise,
+        distinctClimberIdsPromise,
+        demographicsPromise,
+        Issue.find({ wall_id: { $in: objectIds } })
+            .sort({ submitted_at: -1 })
+            .limit(5)
+            .select("body status submitted_at"),
+        perWallReportsPromise,
+    ]);
+
+    const recentFeedbackPromise = mongoose
+        .model("Review")
+        .find({
+            climbing_session_id: { $in: sessionIds },
+            body: { $ne: "", $exists: true },
+        })
+        .sort({ createdAt: -1 })
+        .limit(3)
+        .select("rating body createdAt");
+
+    const recentFeedback = await recentFeedbackPromise;
+
+    const stats = sessionStats[0] || {
+        totalSessions: 0,
+        uniqueClimbersCount: 0,
+        avgTime: 0,
+        fastestTime: null,
+    };
+    const temporalData = temporalStatsResult[0] || {
+        last30Days: [],
+        byDayOfWeek: [],
+        byHourOfDay: [],
+    };
+    const reviews = reviewStats[0] || { overall: [], distribution: [] };
+    const overallReviews = reviews.overall[0] || {
+        avgRating: 0,
+        totalReviews: 0,
+    };
+    const retentionRate =
+        distinctClimberIds.length > 0
+            ? parseFloat(
+                  (stats.totalSessions / distinctClimberIds.length).toFixed(2),
+              )
+            : 0;
+
+    const formattedIssues = recentIssues.map((i) => ({
+        body: i.body,
+        status: i.status || "OPEN",
+        date: i.submitted_at
+            ? i.submitted_at.toISOString().split("T")[0]
+            : "Recent",
+    }));
+
+    const groupReportData = {
+        aggregatedEngagement: {
+            totalSessions: stats.totalSessions,
+            uniqueClimbers: distinctClimberIds.length,
+            retentionRate: retentionRate,
+            avgTimeMins: stats.avgTime,
+            fastestTimeMins: stats.fastestTime,
+            totalSends: stats.totalSends || 0,
+            totalAttempts: stats.totalAttempts || 0,
+        },
+        aggregatedQuality: {
+            avgRating: overallReviews.avgRating
+                ? parseFloat(overallReviews.avgRating.toFixed(1))
+                : 0,
+            totalReviews: overallReviews.totalReviews,
+            distribution: reviews.distribution.map((d) => ({
+                stars: d._id,
+                count: d.count,
+            })),
+        },
+        aggregatedTrends: {
+            last30Days: temporalData.last30Days.map((t) => ({
+                date: t._id,
+                sessions: t.count,
+            })),
+            byDayOfWeek: temporalData.byDayOfWeek.map((t) => ({
+                day: t._id,
+                count: t.count,
+            })),
+            byHourOfDay: temporalData.byHourOfDay.map((t) => ({
+                hour: t._id,
+                count: t.count,
+            })),
+        },
+        aggregatedFeedback: recentFeedback.map((r) => ({
+            rating: r.rating,
+            body: r.body,
+            date: r.createdAt
+                ? r.createdAt.toISOString().split("T")[0]
+                : "Recent",
+        })),
+        aggregatedIssues: formattedIssues,
+        aggregatedDemographics: demographics,
+        wallComparisons: objectIds.map((wallId, index) => ({
+            wallId: wallId,
+            wallName: wallNameById.get(wallId.toString()) || "Unknown Wall",
+            engagement: perWallReports[index].engagement,
+            quality: perWallReports[index].quality,
+        })),
+    };
+
+    const newReport = await GroupReport.create({
+        owner_id: ownerId,
+        wall_ids: objectIds,
+        title: title,
+        notes: notes || "",
+        reportData: groupReportData,
+    });
+
+    return newReport;
+};
+
+exports.getReportsList = async (ownerId) => {
+    return await Report.find({ owner_id: ownerId })
+        .select("-reportData")
         .populate("wall_id", "name difficulty")
+        .populate("wall_ids", "name difficulty")
         .sort({ createdAt: -1 });
 };
 
-exports.getReportById = async (reportId, facilityId) => {
-    const report = await SavedReport.findOne({
+exports.getReportById = async (reportId, ownerId) => {
+    const report = await Report.findOne({
         _id: reportId,
-        facility_id: facilityId,
-    }).populate("wall_id", "name difficulty location");
+        owner_id: ownerId,
+    })
+        .populate("wall_id", "name difficulty location")
+        .populate("wall_ids", "name difficulty location");
 
     if (!report) {
         const error = new Error("Report not found");
@@ -286,10 +585,10 @@ exports.getReportById = async (reportId, facilityId) => {
     return report;
 };
 
-exports.deleteReport = async (reportId, facilityId) => {
-    const report = await SavedReport.findOneAndDelete({
+exports.deleteReport = async (reportId, ownerId) => {
+    const report = await Report.findOneAndDelete({
         _id: reportId,
-        facility_id: facilityId,
+        owner_id: ownerId,
     });
 
     if (!report) {

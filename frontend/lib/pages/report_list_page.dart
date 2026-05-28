@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import '../services/report_service.dart';
 import '../models/report.dart';
-import 'report_detail_page.dart';
 import 'live_report_page.dart';
+import 'report_detail_page.dart';
 
 class ReportListPage extends StatefulWidget {
   final ReportService reportService;
@@ -10,11 +10,13 @@ class ReportListPage extends StatefulWidget {
   const ReportListPage({super.key, required this.reportService});
 
   @override
-  _ReportListPageState createState() => _ReportListPageState();
+  ReportListPageState createState() => ReportListPageState();
 }
 
-class _ReportListPageState extends State<ReportListPage> {
+class ReportListPageState extends State<ReportListPage> {
   late Future<List<Report>> _futureSavedReports;
+  bool _groupReportMode = false;
+  final Set<String> _selectedWallIds = {};
 
   @override
   void initState() {
@@ -28,7 +30,6 @@ class _ReportListPageState extends State<ReportListPage> {
     });
   }
 
-  // --- THE NEW REPORT FLOW: WALL SELECTOR ---
   void _openNewReportSelector() async {
     showModalBottomSheet(
       context: context,
@@ -37,90 +38,191 @@ class _ReportListPageState extends State<ReportListPage> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (context) {
-        return Container(
-          padding: const EdgeInsets.all(16),
-          height: MediaQuery.of(context).size.height * 0.6,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.grey,
-                    borderRadius: BorderRadius.all(Radius.circular(2)),
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return Container(
+              padding: const EdgeInsets.all(16),
+              height: MediaQuery.of(context).size.height * 0.72,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.grey,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
                   ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'Select Wall for Live Analysis',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 12),
-              Expanded(
-                child: FutureBuilder<List<dynamic>>(
-                  future: widget.reportService.getFacilityWalls(),
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return const Center(child: CircularProgressIndicator());
-                    }
-                    if (snapshot.hasError) {
-                      return const Center(
-                        child: Text('Error downloading wall profiles.'),
-                      );
-                    }
-                    if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                      return const Center(
-                        child: Text(
-                          'No active walls found. Create a wall profile first.',
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Choose report flow',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ChoiceChip(
+                          label: const Text('Single Wall'),
+                          selected: !_groupReportMode,
+                          onSelected: (_) {
+                            setState(() {
+                              _groupReportMode = false;
+                              _selectedWallIds.clear();
+                            });
+                          },
                         ),
-                      );
-                    }
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ChoiceChip(
+                          label: const Text('Group Report'),
+                          selected: _groupReportMode,
+                          onSelected: (_) {
+                            setState(() {
+                              _groupReportMode = true;
+                              _selectedWallIds.clear();
+                            });
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  if (_groupReportMode)
+                    Text(
+                      'Select two or more walls',
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  if (_groupReportMode) const SizedBox(height: 8),
+                  Expanded(
+                    child: FutureBuilder<List<dynamic>>(
+                      future: widget.reportService.getWalls(),
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
+                          return const Center(
+                            child: CircularProgressIndicator(),
+                          );
+                        }
+                        if (snapshot.hasError) {
+                          return const Center(
+                            child: Text('Error downloading wall profiles.'),
+                          );
+                        }
+                        if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                          return const Center(
+                            child: Text(
+                              'No active walls found. Create a wall profile first.',
+                            ),
+                          );
+                        }
 
-                    final walls = snapshot.data!;
-                    return ListView.builder(
-                      itemCount: walls.length,
-                      itemBuilder: (context, index) {
-                        final wall = walls[index];
-                        final wallId = wall['id'] ?? wall['_id'];
-                        final wallName = wall['name'] ?? 'Unnamed Wall';
+                        final walls = snapshot.data!;
+                        return ListView.builder(
+                          itemCount: walls.length,
+                          itemBuilder: (context, index) {
+                            final wall = walls[index];
+                            final wallId = wall['id'] ?? wall['_id'];
+                            final wallName = wall['name'] ?? 'Unnamed Wall';
+                            final isSelected = _selectedWallIds.contains(
+                              wallId,
+                            );
 
-                        return ListTile(
-                          leading: Icon(
-                            Icons.terrain_rounded,
-                            color: Theme.of(context).colorScheme.primary,
-                          ),
-                          title: Text(
-                            wallName,
-                            style: const TextStyle(fontWeight: FontWeight.w600),
-                          ),
-                          trailing: const Icon(Icons.chevron_right_rounded),
-                          onTap: () async {
-                            Navigator.pop(context); // Dismiss sheet safely
+                            if (_groupReportMode) {
+                              return CheckboxListTile(
+                                value: isSelected,
+                                onChanged: (value) {
+                                  setState(() {
+                                    if (value == true) {
+                                      _selectedWallIds.add(wallId);
+                                    } else {
+                                      _selectedWallIds.remove(wallId);
+                                    }
+                                  });
+                                },
+                                title: Text(
+                                  wallName,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                secondary: Icon(
+                                  Icons.terrain_rounded,
+                                  color: Theme.of(context).colorScheme.primary,
+                                ),
+                              );
+                            }
 
-                            // Navigate to Live Analytics view
-                            await Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => LiveReportPage(
-                                  wallId: wallId,
-                                  wallName: wallName,
-                                  reportService: widget.reportService,
+                            return ListTile(
+                              leading: Icon(
+                                Icons.terrain_rounded,
+                                color: Theme.of(context).colorScheme.primary,
+                              ),
+                              title: Text(
+                                wallName,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w600,
                                 ),
                               ),
+                              trailing: const Icon(Icons.chevron_right_rounded),
+                              onTap: () async {
+                                Navigator.pop(context);
+                                await Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => LiveReportPage(
+                                      wallId: wallId,
+                                      wallName: wallName,
+                                      reportService: widget.reportService,
+                                    ),
+                                  ),
+                                );
+                                _fetchHistory();
+                              },
                             );
-                            _fetchHistory(); // Refresh history timeline when returning
                           },
                         );
                       },
-                    );
-                  },
-                ),
+                    ),
+                  ),
+                  if (_groupReportMode)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 16),
+                      child: FilledButton(
+                        onPressed: _selectedWallIds.length < 2
+                            ? null
+                            : () async {
+                                Navigator.pop(context);
+                                await Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => LiveReportPage(
+                                      wallIds: _selectedWallIds.toList(),
+                                      wallName:
+                                          'Multiple Walls (${_selectedWallIds.length})',
+                                      reportService: widget.reportService,
+                                    ),
+                                  ),
+                                );
+                                _fetchHistory();
+                              },
+                        child: Text(
+                          _selectedWallIds.length < 2
+                              ? 'Select at least 2 walls'
+                              : 'Open grouped report (${_selectedWallIds.length})',
+                        ),
+                      ),
+                    ),
+                ],
               ),
-            ],
-          ),
+            );
+          },
         );
       },
     );
@@ -130,14 +232,11 @@ class _ReportListPageState extends State<ReportListPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Performance Analytics')),
-
-      // 👇 TRIPPED BY COMPONENT REQUEST: FAB TO LOAD SELECTOR
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _openNewReportSelector,
         icon: const Icon(Icons.add),
         label: const Text('New Report'),
       ),
-
       body: FutureBuilder<List<Report>>(
         future: _futureSavedReports,
         builder: (context, snapshot) {
@@ -176,7 +275,9 @@ class _ReportListPageState extends State<ReportListPage> {
                     style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
                   subtitle: Text(
-                    "${report.createdAt.toLocal().toString().split(' ')[0]}\n${report.notes}",
+                    report.walls != null && report.walls!.isNotEmpty
+                        ? "${report.createdAt.toLocal().toString().split(' ')[0]} • ${report.walls!.length} walls\n${report.notes}"
+                        : "${report.createdAt.toLocal().toString().split(' ')[0]}\n${report.notes}",
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
