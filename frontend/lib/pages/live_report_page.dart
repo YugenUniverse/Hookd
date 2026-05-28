@@ -474,7 +474,7 @@ class LiveReportPageState extends State<LiveReportPage> {
       return nestedName;
     }
 
-    return 'Wall ${index + 1}';
+    return '  ${index + 1}';
   }
 
   Widget _buildWallComparisonChart(

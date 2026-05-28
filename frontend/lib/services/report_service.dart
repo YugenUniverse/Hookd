@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../constants/api_config.dart';
 import '../models/report.dart';
+import '../models/wall.dart';
 
 class ReportService {
   final String baseUrl = ApiConfig.apiBaseUrl;
@@ -61,16 +62,55 @@ class ReportService {
     }
   }
 
+  Future<String?> _getWallName(String wallId) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/walls/$wallId'),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+
+      if (response.statusCode == 200) {
+        final decoded = json.decode(response.body);
+        if (decoded is Map<String, dynamic>) {
+          return Wall.fromJson(decoded).name;
+        }
+        if (decoded is Map) {
+          return Wall.fromJson(Map<String, dynamic>.from(decoded)).name;
+        }
+      }
+    } catch (_) {
+      // Ignore wall lookup failures so grouped report aggregation can continue.
+    }
+
+    return null;
+  }
+
   Future<ReportData> getLiveGroupReport(List<String> wallIds) async {
     final reportDataList = await Future.wait(
       wallIds.map((wallId) => getLiveReport(wallId)),
     );
-    return _aggregateGroupedReportData(wallIds, reportDataList);
+    final wallNamesById = await _fetchWallNames(wallIds);
+    return _aggregateGroupedReportData(wallIds, reportDataList, wallNamesById);
+  }
+
+  Future<Map<String, String>> _fetchWallNames(List<String> wallIds) async {
+    final resolvedNames = await Future.wait(
+      wallIds.map((wallId) async {
+        final name = await _getWallName(wallId);
+        if (name == null || name.trim().isEmpty) {
+          return MapEntry(wallId, '');
+        }
+        return MapEntry(wallId, name);
+      }),
+    );
+
+    return Map.fromEntries(resolvedNames);
   }
 
   ReportData _aggregateGroupedReportData(
     List<String> wallIds,
     List<ReportData> reportDataList,
+    Map<String, String> wallNamesById,
   ) {
     final Map<String, int> trendCounts = {};
     final Map<int, int> dayCounts = {};
@@ -81,11 +121,19 @@ class ReportService {
     final Map<int, int> combinedDistribution = {1: 0, 2: 0, 3: 0, 4: 0, 5: 0};
     final List<Map<String, dynamic>> wallComparisons = List.generate(
       reportDataList.length,
-      (index) => {
-        'wallId': wallIds[index],
-        'wallName': reportDataList[index].wallName ?? 'Wall ${index + 1}',
-        'engagement': reportDataList[index].engagement,
-        'quality': reportDataList[index].quality,
+      (index) {
+        final wallId = wallIds[index];
+        final resolvedWallName =
+            wallNamesById[wallId]?.trim().isNotEmpty == true
+            ? wallNamesById[wallId]!
+            : reportDataList[index].wallName;
+
+        return {
+          'wallId': wallId,
+          'wallName': resolvedWallName ?? 'Wall ${index + 1}',
+          'engagement': reportDataList[index].engagement,
+          'quality': reportDataList[index].quality,
+        };
       },
     );
 
