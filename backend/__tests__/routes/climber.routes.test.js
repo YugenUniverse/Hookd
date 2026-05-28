@@ -98,12 +98,12 @@ describe("Climber Routes", () => {
             expect(res.body.length).toBe(2);
 
             // Rank #1 should be Climber A
-            expect(res.body[0].username).toBe("climberA");
+            expect(res.body[0].username).toBe("climbera");
             expect(res.body[0].totalAscents).toBe(2);
             expect(res.body[0].score).toBe(100);
 
             // Rank #2 should be Climber B
-            expect(res.body[1].username).toBe("climberB");
+            expect(res.body[1].username).toBe("climberb");
             expect(res.body[1].score).toBe(50);
         });
 

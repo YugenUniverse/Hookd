@@ -91,7 +91,7 @@ describe("user.routes", () => {
         expect(response.status).toBe(200);
         expect(response.body).toEqual({
             id: climber.id,
-            username: "publicClimber",
+            username: "publicclimber",
             avatar: "https://example.com/avatar.png",
             userType: "Climber",
             profile: {
@@ -150,7 +150,7 @@ describe("user.routes", () => {
             expect.objectContaining({
                 id: climber.id,
                 email: "private.climber@example.com",
-                username: "privateClimber",
+                username: "privateclimber",
                 userType: "Climber",
                 name: "Private",
                 surname: "Climber",
@@ -183,10 +183,10 @@ describe("user.routes", () => {
             .send({ username: "newName" });
 
         expect(response.status).toBe(200);
-        expect(response.body.username).toBe("newName");
+        expect(response.body.username).toBe("newname");
 
         const reloaded = await Climber.findById(climber._id);
-        expect(reloaded.username).toBe("newName");
+        expect(reloaded.username).toBe("newname");
     });
 
     it("PATCH /users/me updates avatar URL", async () => {
@@ -358,7 +358,7 @@ describe("user.routes", () => {
             });
 
         expect(response.status).toBe(200);
-        expect(response.body.username).toBe("updatedOwner");
+        expect(response.body.username).toBe("updatedowner");
         expect(response.body.name).toBe("Anna");
         expect(response.body.surname).toBe("Verdi");
         expect(response.body.bio).toBe("Manages a climbing gym");
@@ -404,7 +404,7 @@ describe("user.routes", () => {
             .send({ username: "updatedBody", surname: "ignored", birthdate: "1990-01-01" });
 
         expect(response.status).toBe(200);
-        expect(response.body.username).toBe("updatedBody");
+        expect(response.body.username).toBe("updatedbody");
         expect(response.body.surname).toBeUndefined();
         expect(response.body.birthdate).toBeUndefined();
     });
