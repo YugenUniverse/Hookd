@@ -1216,4 +1216,333 @@ describe("issue.routes", () => {
             expect(response.status).toBe(401);
         });
     });
+
+    describe("Severity and Public Body Dashboard", () => {
+        it("should create issue with severity field when provided", async () => {
+            const climber = await User.create({
+                email: "climber@example.com",
+                username: "climberuser",
+                userType: "Climber",
+                name: "Climber",
+                surname: "User",
+                birthdate: new Date("1990-01-01"),
+                authMethods: ["local"],
+            });
+
+            const publicBody = await User.create({
+                email: "pb@example.com",
+                username: "pbuser",
+                userType: "PublicBody",
+                name: "Public Body",
+                location: {
+                    type: "Point",
+                    coordinates: [10.5, 20.5],
+                },
+                authMethods: ["local"],
+            });
+
+            const wall = await OutdoorWall.create({
+                publicBody: publicBody._id,
+                name: "Test Outdoor Wall",
+                location: {
+                    type: "Point",
+                    coordinates: [10.5, 20.5],
+                },
+                difficulty: "ADVANCED",
+            });
+
+            const accessToken = createAuthToken(climber);
+
+            const response = await request(app)
+                .post("/issues")
+                .set("Authorization", `Bearer ${accessToken}`)
+                .send({
+                    wall_id: wall._id.toString(),
+                    body: "Loose rock detected",
+                    severity: "HIGH",
+                    description: "Potential safety hazard",
+                    location: "Upper section",
+                });
+
+            expect(response.status).toBe(201);
+            expect(response.body.issue).toEqual(
+                expect.objectContaining({
+                    body: "Loose rock detected",
+                    severity: "HIGH",
+                    description: "Potential safety hazard",
+                    location: "Upper section",
+                }),
+            );
+        });
+
+        it("should default severity to MEDIUM when not provided", async () => {
+            const climber = await User.create({
+                email: "climber@example.com",
+                username: "climberuser",
+                userType: "Climber",
+                name: "Climber",
+                surname: "User",
+                birthdate: new Date("1990-01-01"),
+                authMethods: ["local"],
+            });
+
+            const facility = await User.create({
+                email: "facility@example.com",
+                username: "facilityuser",
+                userType: "FacilityOwner",
+                name: "Test Facility",
+                location: {
+                    type: "Point",
+                    coordinates: [10.5, 20.5],
+                },
+                authMethods: ["local"],
+            });
+
+            const wall = await IndoorWall.create({
+                facility: facility._id,
+                name: "Test Wall",
+                location: {
+                    type: "Point",
+                    coordinates: [10.5, 20.5],
+                },
+                difficulty: "INTERMEDIATE",
+            });
+
+            const accessToken = createAuthToken(climber);
+
+            const response = await request(app)
+                .post("/issues")
+                .set("Authorization", `Bearer ${accessToken}`)
+                .send({
+                    wall_id: wall._id.toString(),
+                    body: "Minor issue",
+                });
+
+            expect(response.status).toBe(201);
+            expect(response.body.issue.severity).toBe("MEDIUM");
+        });
+
+        it("should fetch issues for public body dashboard", async () => {
+            const climber = await User.create({
+                email: "climber@example.com",
+                username: "climberuser",
+                userType: "Climber",
+                name: "Climber",
+                surname: "User",
+                birthdate: new Date("1990-01-01"),
+                authMethods: ["local"],
+            });
+
+            const publicBody = await User.create({
+                email: "pb@example.com",
+                username: "pbuser",
+                userType: "PublicBody",
+                name: "Public Body",
+                location: {
+                    type: "Point",
+                    coordinates: [10.5, 20.5],
+                },
+                authMethods: ["local"],
+            });
+
+            const wall = await OutdoorWall.create({
+                publicBody: publicBody._id,
+                name: "Test Outdoor Wall",
+                location: {
+                    type: "Point",
+                    coordinates: [10.5, 20.5],
+                },
+                difficulty: "ADVANCED",
+            });
+
+            // Create issues with different severities
+            const issue1 = await Issue.create({
+                climber_id: climber._id,
+                wall_id: wall._id,
+                body: "High severity issue",
+                severity: "HIGH",
+                status: "OPEN",
+            });
+
+            const issue2 = await Issue.create({
+                climber_id: climber._id,
+                wall_id: wall._id,
+                body: "Medium severity issue",
+                severity: "MEDIUM",
+                status: "OPEN",
+            });
+
+            // Verify issues were created with correct severity
+            expect(issue1.severity).toBe("HIGH");
+            expect(issue2.severity).toBe("MEDIUM");
+
+            const pbAccessToken = createAuthToken(publicBody);
+
+            const response = await request(app)
+                .get("/issues/public-body/dashboard")
+                .set("Authorization", `Bearer ${pbAccessToken}`);
+
+            expect(response.status).toBe(200);
+            expect(response.body.issues).toHaveLength(2);
+            // Check both issues are returned with correct severity
+            const severities = response.body.issues.map(i => i.severity).sort();
+            expect(severities).toEqual(["HIGH", "MEDIUM"]);
+        });
+
+        it("should filter issues by status", async () => {
+            const climber = await User.create({
+                email: "climber@example.com",
+                username: "climberuser",
+                userType: "Climber",
+                name: "Climber",
+                surname: "User",
+                birthdate: new Date("1990-01-01"),
+                authMethods: ["local"],
+            });
+
+            const publicBody = await User.create({
+                email: "pb@example.com",
+                username: "pbuser",
+                userType: "PublicBody",
+                name: "Public Body",
+                location: {
+                    type: "Point",
+                    coordinates: [10.5, 20.5],
+                },
+                authMethods: ["local"],
+            });
+
+            const wall = await OutdoorWall.create({
+                publicBody: publicBody._id,
+                name: "Test Outdoor Wall",
+                location: {
+                    type: "Point",
+                    coordinates: [10.5, 20.5],
+                },
+                difficulty: "ADVANCED",
+            });
+
+            await Issue.create({
+                climber_id: climber._id,
+                wall_id: wall._id,
+                body: "Open issue",
+                status: "OPEN",
+            });
+
+            await Issue.create({
+                climber_id: climber._id,
+                wall_id: wall._id,
+                body: "Resolved issue",
+                status: "RESOLVED",
+            });
+
+            const pbAccessToken = createAuthToken(publicBody);
+
+            const response = await request(app)
+                .get("/issues/public-body/dashboard?status=OPEN")
+                .set("Authorization", `Bearer ${pbAccessToken}`);
+
+            expect(response.status).toBe(200);
+            expect(response.body.issues).toHaveLength(1);
+            expect(response.body.issues[0].status).toBe("OPEN");
+        });
+
+        it("should return issue summary for public body", async () => {
+            const climber = await User.create({
+                email: "climber@example.com",
+                username: "climberuser",
+                userType: "Climber",
+                name: "Climber",
+                surname: "User",
+                birthdate: new Date("1990-01-01"),
+                authMethods: ["local"],
+            });
+
+            const publicBody = await User.create({
+                email: "pb@example.com",
+                username: "pbuser",
+                userType: "PublicBody",
+                name: "Public Body",
+                location: {
+                    type: "Point",
+                    coordinates: [10.5, 20.5],
+                },
+                authMethods: ["local"],
+            });
+
+            const wall = await OutdoorWall.create({
+                publicBody: publicBody._id,
+                name: "Test Outdoor Wall",
+                location: {
+                    type: "Point",
+                    coordinates: [10.5, 20.5],
+                },
+                difficulty: "ADVANCED",
+            });
+
+            await Issue.create({
+                climber_id: climber._id,
+                wall_id: wall._id,
+                body: "High severity",
+                severity: "HIGH",
+                status: "OPEN",
+            });
+
+            await Issue.create({
+                climber_id: climber._id,
+                wall_id: wall._id,
+                body: "High severity",
+                severity: "HIGH",
+                status: "IN_PROGRESS",
+            });
+
+            await Issue.create({
+                climber_id: climber._id,
+                wall_id: wall._id,
+                body: "Medium severity",
+                severity: "MEDIUM",
+                status: "OPEN",
+            });
+
+            const pbAccessToken = createAuthToken(publicBody);
+
+            const response = await request(app)
+                .get("/issues/public-body/dashboard/summary")
+                .set("Authorization", `Bearer ${pbAccessToken}`);
+
+            expect(response.status).toBe(200);
+            expect(response.body).toEqual({
+                totalOpen: 2,
+                highSeverity: 2,
+                mediumSeverity: 1,
+                byStatus: {
+                    OPEN: 2,
+                    IN_PROGRESS: 1,
+                    RESOLVED: 0,
+                    CLOSED: 0,
+                },
+            });
+        });
+
+        it("should restrict dashboard access to public body only", async () => {
+            const climber = await User.create({
+                email: "climber@example.com",
+                username: "climberuser",
+                userType: "Climber",
+                name: "Climber",
+                surname: "User",
+                birthdate: new Date("1990-01-01"),
+                authMethods: ["local"],
+            });
+
+            const climberAccessToken = createAuthToken(climber);
+
+            const response = await request(app)
+                .get("/issues/public-body/dashboard")
+                .set("Authorization", `Bearer ${climberAccessToken}`);
+
+            expect(response.status).toBe(403);
+            expect(response.body.error).toContain("Only public bodies");
+        });
+    });
 });

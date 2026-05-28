@@ -47,6 +47,47 @@ exports.getIssuesByUser = async (req, res, next) => {
     }
 };
 
+exports.getPublicBodyIssuesDashboard = async (req, res, next) => {
+    try {
+        if (req.user.userType !== "PublicBody") {
+            const error = new Error("Only public bodies can access this dashboard");
+            error.statusCode = 403;
+            throw error;
+        }
+
+        const { status, severity } = req.query;
+        const filters = {};
+
+        if (status) {
+            filters.status = Array.isArray(status) ? status : [status];
+        }
+
+        if (severity) {
+            filters.severity = Array.isArray(severity) ? severity : [severity];
+        }
+
+        const issues = await issueService.getIssuesForPublicBodyDashboard(req.user.id, filters);
+        res.json({ issues });
+    } catch (err) {
+        next(err);
+    }
+};
+
+exports.getPublicBodyIssueSummary = async (req, res, next) => {
+    try {
+        if (req.user.userType !== "PublicBody") {
+            const error = new Error("Only public bodies can access this dashboard");
+            error.statusCode = 403;
+            throw error;
+        }
+
+        const summary = await issueService.getIssuesSummaryForPublicBody(req.user.id);
+        res.json(summary);
+    } catch (err) {
+        next(err);
+    }
+};
+
 exports.updateIssueStatus = async (req, res, next) => {
     try {
         const issue = await issueService.updateIssueStatus(
