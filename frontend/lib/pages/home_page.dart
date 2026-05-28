@@ -11,6 +11,7 @@ import '../pages/facility_owner_page.dart';
 import '../pages/global_leaderboard_page.dart';
 import '../pages/active_events_page.dart';
 import '../pages/log_session_page.dart';
+import '../pages/public_body_issues_page.dart';
 import '../pages/public_body_page.dart';
 import '../pages/user_page.dart';
 import '../services/api_service.dart';
@@ -31,6 +32,9 @@ class _MyHomePageState extends State<MyHomePage>
   final WallMapController _mapController = WallMapController();
   late final AnimationController _navExpand;
   late final Animation<double> _navAnim;
+  bool _avatarLoadAttempted = false;
+  int? _openIssueCount;
+  String? _worstSeverity; // 'HIGH', 'MEDIUM', 'LOW', or null
 
   @override
   void initState() {
@@ -41,7 +45,11 @@ class _MyHomePageState extends State<MyHomePage>
       duration: const Duration(milliseconds: 220),
     );
     _navAnim = CurvedAnimation(parent: _navExpand, curve: Curves.easeInOut);
-    if (AuthService().isAuthenticated) _loadAvatar();
+    if (AuthService().isAuthenticated) {
+      _avatarLoadAttempted = true;
+      _loadAvatar();
+      if (AuthService().userType == 'PublicBody') _loadIssueCount();
+    }
   }
 
   @override
@@ -53,12 +61,57 @@ class _MyHomePageState extends State<MyHomePage>
 
   void _onAuthChanged() {
     setState(() {});
-    if (AuthService().isAuthenticated && AuthService().avatar == null) {
+    if (!AuthService().isAuthenticated) {
+      _avatarLoadAttempted = false;
+      _openIssueCount = null;
+      return;
+    }
+    if (!_avatarLoadAttempted) {
+      _avatarLoadAttempted = true;
       _loadAvatar();
+      if (AuthService().userType == 'PublicBody') _loadIssueCount();
     }
   }
 
   Future<void> _loadAvatar() => ApiService().loadAndCacheAvatar();
+
+  Future<void> _loadIssueCount() async {
+    try {
+      final summary = await ApiService().fetchPublicBodyIssueSummary();
+      if (mounted) {
+        setState(() {
+          _openIssueCount = (summary['totalOpen'] as num?)?.toInt() ?? 0;
+          final high = ((summary['highSeverity'] as num?)?.toInt() ?? 0);
+          final medium = ((summary['mediumSeverity'] as num?)?.toInt() ?? 0);
+          _worstSeverity = high > 0 ? 'HIGH' : medium > 0 ? 'MEDIUM' : (_openIssueCount! > 0 ? 'LOW' : null);
+        });
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _openIssuesPage() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => PublicBodyIssuesPage(
+          onWallTapped: (wallId, wallName, lat, lng) {
+            Navigator.of(context).pop();
+            _mapController.focusOnWall(Wall(
+              id: wallId,
+              name: wallName,
+              latitude: lat,
+              longitude: lng,
+              description: '',
+              difficulty: 'UNKNOWN',
+              wallType: 'OutdoorWall',
+              sessions: [],
+              issues: [],
+            ));
+          },
+        ),
+      ),
+    );
+    _loadIssueCount();
+  }
 
   Future<bool> _ensureAuthenticated() async {
     if (AuthService().isAuthenticated) {
@@ -159,6 +212,13 @@ class _MyHomePageState extends State<MyHomePage>
     if (!mounted) return;
     await Navigator.of(context).push(MaterialPageRoute(builder: (_) => page));
   }
+
+  Color? get _badgeSeverityColor => switch (_worstSeverity) {
+    'HIGH' => Colors.red,
+    'MEDIUM' => Colors.orange,
+    'LOW' => Colors.amber,
+    _ => null,
+  };
 
   bool get _isDesktopLike {
     if (kIsWeb) return true;
@@ -315,6 +375,19 @@ class _MyHomePageState extends State<MyHomePage>
                                       : null,
                                   t: t,
                                 ),
+                              if (userType == 'PublicBody')
+                                navBtn(
+                                  icon: Icons.warning_outlined,
+                                  label: 'Issues',
+                                  onTap: _openIssuesPage,
+                                  customIcon: Badge(
+                                    isLabelVisible: _openIssueCount != null && _openIssueCount! > 0,
+                                    label: Text('${_openIssueCount ?? 0}'),
+                                    backgroundColor: _badgeSeverityColor,
+                                    child: Icon(Icons.warning_outlined, size: 24, color: cs.onSurfaceVariant),
+                                  ),
+                                  t: t,
+                                ),
                               navBtn(
                                 icon: isAuthenticated
                                     ? Icons.person_outline
@@ -380,6 +453,19 @@ class _MyHomePageState extends State<MyHomePage>
                     label: 'Log',
                     hint: isAuthenticated ? null : 'Login',
                     onTap: _openLogSessionSheet,
+                  ),
+                if (userType == 'PublicBody')
+                  _NavItem(
+                    tooltip: 'Issues',
+                    icon: Icons.warning_outlined,
+                    label: 'Issues',
+                    onTap: _openIssuesPage,
+                    customIcon: Badge(
+                      isLabelVisible: _openIssueCount != null && _openIssueCount! > 0,
+                      label: Text('${_openIssueCount ?? 0}'),
+                      backgroundColor: _badgeSeverityColor,
+                      child: const Icon(Icons.warning_outlined),
+                    ),
                   ),
                 _NavItem(
                   tooltip: isAuthenticated ? 'Account' : 'Login',

@@ -40,4 +40,14 @@ router.patch("/read-all", async (req, res, next) => {
     }
 });
 
+// Get unread notification count
+router.get("/unread-count", async (req, res, next) => {
+    try {
+        const count = await notificationService.getUnreadCount(req.user.id);
+        res.json({ count });
+    } catch (err) {
+        next(err);
+    }
+});
+
 module.exports = router;
