@@ -232,6 +232,68 @@ class ApiService {
     }
   }
 
+  Future<List<Badge>> getBadgesForEvent(String eventId) async {
+    try {
+      final response = await _dio.get('/badges', queryParameters: {
+        'type': 'event',
+        'eventId': eventId,
+      });
+      final data = response.data;
+      if (data is! List) return [];
+      return data
+          .whereType<Map>()
+          .map((e) => Badge.fromJson(Map<String, dynamic>.from(e)))
+          .toList();
+    } catch (e) {
+      print('Error fetching event badges: $e');
+      return [];
+    }
+  }
+
+  Future<Badge> createEventBadge({
+    required String name,
+    required String description,
+    required int score,
+    required int level,
+    required String eventId,
+    required WinningCondition winningCondition,
+  }) async {
+    final payload = {
+      'name': name,
+      'description': description,
+      'score': score,
+      'level': level,
+      'type': 'event',
+      'eventId': eventId,
+      'winningCondition': winningCondition.toJson(),
+    };
+    final response = await _dio.post('/badges', data: payload);
+    return Badge.fromJson(Map<String, dynamic>.from(response.data));
+  }
+
+  Future<Badge> updateEventBadge(
+    String badgeId, {
+    required String name,
+    required String description,
+    required int score,
+    required int level,
+    required WinningCondition winningCondition,
+  }) async {
+    final payload = {
+      'name': name,
+      'description': description,
+      'score': score,
+      'level': level,
+      'winningCondition': winningCondition.toJson(),
+    };
+    final response = await _dio.put('/badges/$badgeId', data: payload);
+    return Badge.fromJson(Map<String, dynamic>.from(response.data));
+  }
+
+  Future<void> deleteBadge(String badgeId) async {
+    await _dio.delete('/badges/$badgeId');
+  }
+
   // Wall endpoints
   Future<List<Wall>> getAllWalls() async {
     try {
@@ -607,6 +669,7 @@ class ApiService {
     String? description,
     required DateTime startDate,
     DateTime? endDate,
+    List<String> walls = const [],
   }) async {
     final payload = <String, dynamic>{
       'title': title,
@@ -614,6 +677,7 @@ class ApiService {
       if (description != null && description.trim().isNotEmpty)
         'description': description.trim(),
       if (endDate != null) 'endDate': endDate.toIso8601String(),
+      'walls': walls,
     };
     final response = await _dio.post('/events', data: payload);
     final data = response.data;
@@ -629,6 +693,17 @@ class ApiService {
     final list = data is Map ? data['events'] : null;
     if (list is! List) return [];
     return list
+        .whereType<Map<String, dynamic>>()
+        .map((m) => Event.fromJson(m))
+        .toList();
+  }
+
+  Future<List<Event>> getActiveEvents() async {
+    final response = await _dio.get('/events/active');
+    final data = response.data;
+    final list = data is Map ? data['events'] : null;
+    if (list is! List) return [];
+    return list
         .whereType<Map>()
         .map((e) => Event.fromJson(Map<String, dynamic>.from(e)))
         .toList();
@@ -640,12 +715,14 @@ class ApiService {
     String? description,
     DateTime? startDate,
     DateTime? endDate,
+    List<String>? walls,
   }) async {
     final body = <String, dynamic>{};
     if (title != null) body['title'] = title;
     if (description != null) body['description'] = description;
     if (startDate != null) body['startDate'] = startDate.toIso8601String();
     if (endDate != null) body['endDate'] = endDate.toIso8601String();
+    if (walls != null) body['walls'] = walls;
     final response = await _dio.patch('/events/$eventId', data: body);
     return Event.fromJson(Map<String, dynamic>.from(response.data['event']));
   }
@@ -654,7 +731,19 @@ class ApiService {
     await _dio.delete('/events/$eventId');
   }
 
+  Future<Map<String, dynamic>> closeEvent(String eventId) async {
+    final response = await _dio.post('/events/$eventId/close');
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<List<Map<String, dynamic>>> getEventLeaderboard(String eventId) async {
+    final response = await _dio.get('/events/$eventId/leaderboard');
+    final List<dynamic> data = response.data['leaderboard'];
+    return data.cast<Map<String, dynamic>>();
+  }
+
   // Follow endpoints
+
 
   Future<void> followUser(String userId) async {
     await _dio.post('/follows/$userId');

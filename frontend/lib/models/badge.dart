@@ -1,3 +1,31 @@
+class WinningCondition {
+  final String metric;
+  final String operator;
+  final int value;
+
+  const WinningCondition({
+    required this.metric,
+    required this.operator,
+    required this.value,
+  });
+
+  factory WinningCondition.fromJson(Map<String, dynamic> json) {
+    return WinningCondition(
+      metric: (json['metric'] ?? '').toString(),
+      operator: (json['operator'] ?? '').toString(),
+      value: (json['value'] as num?)?.toInt() ?? 0,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'metric': metric,
+      'operator': operator,
+      'value': value,
+    };
+  }
+}
+
 class Badge {
   final String id;
   final String name;
@@ -6,6 +34,8 @@ class Badge {
   final int score;
   final String type;
   final int level;
+  final String? eventId;
+  final WinningCondition? winningCondition;
 
   const Badge({
     required this.id,
@@ -15,6 +45,8 @@ class Badge {
     required this.score,
     required this.type,
     required this.level,
+    this.eventId,
+    this.winningCondition,
   });
 
   factory Badge.fromJson(Map<String, dynamic> json) {
@@ -26,6 +58,11 @@ class Badge {
       score: (json['score'] as num?)?.toInt() ?? 0,
       type: (json['type'] ?? 'system').toString(),
       level: (json['level'] as num?)?.toInt() ?? 4,
+      eventId: json['eventId']?.toString(),
+      winningCondition: json['winningCondition'] != null
+          ? WinningCondition.fromJson(
+              Map<String, dynamic>.from(json['winningCondition']))
+          : null,
     );
   }
 }

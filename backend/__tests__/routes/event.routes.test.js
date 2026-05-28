@@ -425,10 +425,59 @@ describe("event & notification routes", () => {
     });
 
     it("GET /follows/:userId/followers returns empty array for a user with no followers", async () => {
-        const res = await request(app)
+        const response = await request(app)
             .get(`/follows/${climber._id}/followers`)
             .set("Authorization", `Bearer ${climberToken}`);
-        expect(res.status).toBe(200);
-        expect(res.body.followers).toHaveLength(0);
+        expect(response.status).toBe(200);
+        expect(response.body.followers).toHaveLength(0);
+    });
+
+    it("POST /events/:id/close closes an event and distributes badges", async () => {
+        const payload = {
+            title: "Closing Event",
+            description: "An event to be closed",
+            startDate: new Date(),
+            endDate: new Date(Date.now() + 86400000), // tomorrow
+        };
+
+        const createRes = await request(app)
+            .post("/events")
+            .set("Authorization", `Bearer ${ownerToken}`)
+            .send(payload);
+
+        const eventId = createRes.body.event.id;
+
+        const closeRes = await request(app)
+            .post(`/events/${eventId}/close`)
+            .set("Authorization", `Bearer ${ownerToken}`);
+
+        expect(closeRes.status).toBe(200);
+        expect(closeRes.body.message).toBe("Event closed and badges distributed successfully");
+        expect(closeRes.body.event.status).toBe("closed");
+    });
+
+    it("POST /events/:id/close returns 400 if already closed", async () => {
+        const payload = {
+            title: "Already Closed Event",
+            description: "An event",
+            startDate: new Date(),
+        };
+
+        const createRes = await request(app)
+            .post("/events")
+            .set("Authorization", `Bearer ${ownerToken}`)
+            .send(payload);
+
+        const eventId = createRes.body.event.id;
+
+        await request(app)
+            .post(`/events/${eventId}/close`)
+            .set("Authorization", `Bearer ${ownerToken}`);
+
+        const duplicateCloseRes = await request(app)
+            .post(`/events/${eventId}/close`)
+            .set("Authorization", `Bearer ${ownerToken}`);
+
+        expect(duplicateCloseRes.status).toBe(400);
     });
 });

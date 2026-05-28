@@ -5,6 +5,8 @@ import '../models/event.dart';
 import '../models/poi.dart';
 import '../models/wall.dart';
 import '../pages/events_list_page.dart' show EventFormPage;
+import '../pages/manage_event_badges_page.dart';
+import '../pages/event_leaderboard_page.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
 import '../dialogs/wall_details_dialog.dart';
@@ -98,10 +100,26 @@ class _FacilityDetailsDialogState extends State<FacilityDetailsDialog>
   Future<void> _editEvent(int index) async {
     final updated = await Navigator.of(context).push<Event>(
       MaterialPageRoute(
-          builder: (_) => EventFormPage(existing: _events[index])),
+          builder: (_) => EventFormPage(
+                existing: _events[index],
+                availableWalls: _walls,
+              )),
     );
     if (updated != null && mounted) {
       setState(() => _events[index] = updated);
+    }
+  }
+
+  Future<void> _createEvent() async {
+    final newEvent = await Navigator.of(context).push<Event>(
+      MaterialPageRoute(
+          builder: (_) => EventFormPage(
+                availableWalls: _walls,
+              )),
+    );
+    if (newEvent != null && mounted) {
+      _loadEvents();
+      widget.onChanged?.call();
     }
   }
 
@@ -138,6 +156,55 @@ class _FacilityDetailsDialogState extends State<FacilityDetailsDialog>
     }
   }
 
+  Future<void> _closeEvent(int index) async {
+    final event = _events[index];
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Close event?'),
+        content: Text('Close "${event.title}" and distribute badges?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Close Event'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      await ApiService().closeEvent(event.id);
+      _loadEvents();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Event closed and badges distributed!')));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Failed to close event: $e')));
+    }
+  }
+
+  void _viewLeaderboard(int index) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => EventLeaderboardPage(event: _events[index]),
+      ),
+    );
+  }
+
+  void _manageBadges(int index) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ManageEventBadgesPage(event: _events[index]),
+      ),
+    );
+  }
+
   Widget _buildEventsTab() {
     final now = DateTime.now();
     final upcoming = <Event>[];
@@ -158,6 +225,15 @@ class _FacilityDetailsDialogState extends State<FacilityDetailsDialog>
     return ListView(
       padding: const EdgeInsets.symmetric(vertical: 4),
       children: [
+        if (_isOwner)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: FilledButton.icon(
+              onPressed: _createEvent,
+              icon: const Icon(Icons.add),
+              label: const Text('Create New Event'),
+            ),
+          ),
         if (upcoming.isEmpty)
           const Padding(
             padding: EdgeInsets.all(16),
@@ -171,6 +247,9 @@ class _FacilityDetailsDialogState extends State<FacilityDetailsDialog>
               isOwner: _isOwner,
               onEdit: () => _editEvent(i),
               onDelete: () => _deleteEvent(i),
+              onClose: () => _closeEvent(i),
+              onManageBadges: () => _manageBadges(i),
+              onViewLeaderboard: () => _viewLeaderboard(i),
             );
           }),
         if (past.isNotEmpty)
@@ -187,6 +266,9 @@ class _FacilityDetailsDialogState extends State<FacilityDetailsDialog>
                 isOwner: _isOwner,
                 onEdit: () => _editEvent(i),
                 onDelete: () => _deleteEvent(i),
+                onClose: () => _closeEvent(i),
+                onManageBadges: () => _manageBadges(i),
+              onViewLeaderboard: () => _viewLeaderboard(i),
               );
             }).toList(),
           ),
@@ -451,6 +533,9 @@ class _EventTile extends StatelessWidget {
     required this.isOwner,
     required this.onEdit,
     required this.onDelete,
+    required this.onClose,
+    required this.onManageBadges,
+    required this.onViewLeaderboard,
     this.isPast = false,
   });
 
@@ -458,6 +543,9 @@ class _EventTile extends StatelessWidget {
   final bool isOwner;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
+  final VoidCallback onClose;
+  final VoidCallback onManageBadges;
+  final VoidCallback onViewLeaderboard;
   final bool isPast;
 
   String _formatDate(DateTime d) => DateFormat('d MMM yyyy').format(d);
@@ -475,28 +563,59 @@ class _EventTile extends StatelessWidget {
         : _formatDate(event.startDate);
 
     Widget? trailing;
+    
+    final viewLeaderboardBtn = IconButton(
+      icon: const Icon(Icons.leaderboard_outlined, size: 20),
+      tooltip: 'View Leaderboard',
+      onPressed: onViewLeaderboard,
+      visualDensity: VisualDensity.compact,
+    );
+
     if (isOwner) {
       trailing = Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           if (isOngoing) _BlinkingDot(color: cs.primary),
+          viewLeaderboardBtn,
           IconButton(
-            icon: const Icon(Icons.edit_outlined, size: 20),
-            tooltip: 'Edit',
-            onPressed: onEdit,
+            icon: const Icon(Icons.military_tech, size: 20),
+            tooltip: 'Manage Badges',
+            onPressed: onManageBadges,
             visualDensity: VisualDensity.compact,
           ),
-          IconButton(
-            icon: Icon(Icons.delete_outline, size: 20, color: cs.error),
-            tooltip: 'Delete',
-            onPressed: onDelete,
-            visualDensity: VisualDensity.compact,
-          ),
+          if (event.status != 'closed') ...[
+            if (!isPast)
+              IconButton(
+                icon: Icon(Icons.check_circle_outline, size: 20, color: cs.primary),
+                tooltip: 'Close Event',
+                onPressed: onClose,
+                visualDensity: VisualDensity.compact,
+              ),
+            IconButton(
+              icon: const Icon(Icons.edit_outlined, size: 20),
+              tooltip: 'Edit',
+              onPressed: onEdit,
+              visualDensity: VisualDensity.compact,
+            ),
+            IconButton(
+              icon: Icon(Icons.delete_outline, size: 20, color: cs.error),
+              tooltip: 'Delete',
+              onPressed: onDelete,
+              visualDensity: VisualDensity.compact,
+            ),
+          ],
         ],
       );
-    } else if (isOngoing) {
-      trailing = _BlinkingDot(color: cs.primary);
+    } else {
+      trailing = Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (isOngoing) _BlinkingDot(color: cs.primary),
+          viewLeaderboardBtn,
+        ],
+      );
     }
+
 
     return Card(
       elevation: 0,

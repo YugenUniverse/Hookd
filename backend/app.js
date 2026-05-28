@@ -80,6 +80,8 @@ app.use("/climbers", climberRoutes);
 app.use("/badges", badgeRouter);
 app.use("/users", userRouter);
 
+app.use("/events", eventRouter);
+
 // Everything after this point requires a valid access token.
 app.use(authenticateJwt);
 
@@ -87,7 +89,6 @@ app.use("/", indexRouter);
 app.use("/sessions", sessionRouter);
 app.use("/issues", issueRouter);
 app.use("/reports", reportRouter);
-app.use("/events", eventRouter);
 app.use("/notifications", notificationRouter);
 app.use("/follows", followRouter);
 // catch 404 and forward to error handler
