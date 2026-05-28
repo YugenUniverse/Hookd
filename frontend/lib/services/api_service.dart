@@ -441,8 +441,21 @@ class ApiService {
   Future<void> createIssue({
     required String wallId,
     required String body,
+    String severity = 'MEDIUM',
+    String description = '',
+    String location = '',
   }) async {
-    final payload = {'wall_id': wallId, 'body': body};
+    final payload = {
+      'wall_id': wallId,
+      'body': body,
+      'severity': severity,
+    };
+    if (description.isNotEmpty) {
+      payload['description'] = description;
+    }
+    if (location.isNotEmpty) {
+      payload['location'] = location;
+    }
     final response = await _dio.post('/issues', data: payload);
     if (response.statusCode != 201) {
       throw Exception('Failed to create issue: ${response.statusCode}');
@@ -490,6 +503,62 @@ class ApiService {
 
   Future<void> updateIssueStatus(String issueId, String status) async {
     await _dio.put('/issues/$issueId/status', data: {'status': status});
+  }
+
+  Future<List<Issue>> fetchPublicBodyIssuesDashboard({
+    List<String>? statuses,
+    List<String>? severities,
+  }) async {
+    try {
+      final queryParams = <String, dynamic>{};
+      if (statuses != null && statuses.isNotEmpty) {
+        queryParams['status'] = statuses;
+      }
+      if (severities != null && severities.isNotEmpty) {
+        queryParams['severity'] = severities;
+      }
+
+      final response = await _dio.get(
+        '/issues/public-body/dashboard',
+        queryParameters: queryParams,
+      );
+      final data = response.data;
+      final issuesList = <Issue>[];
+      if (data is Map && data['issues'] is List) {
+        for (final item in data['issues']) {
+          if (item is Map<String, dynamic>) {
+            issuesList.add(Issue.fromJson(item));
+          } else if (item is Map) {
+            issuesList.add(Issue.fromJson(Map<String, dynamic>.from(item)));
+          }
+        }
+      }
+      return issuesList;
+    } catch (e) {
+      print('Error fetching public body issues: $e');
+      return [];
+    }
+  }
+
+  Future<Map<String, dynamic>> fetchPublicBodyIssueSummary() async {
+    try {
+      final response = await _dio.get('/issues/public-body/dashboard/summary');
+      return response.data is Map ? Map<String, dynamic>.from(response.data) : {};
+    } catch (e) {
+      print('Error fetching issue summary: $e');
+      return {};
+    }
+  }
+
+  Future<int> getUnreadNotificationCount() async {
+    try {
+      final response = await _dio.get('/notifications/unread-count');
+      final count = response.data is Map ? response.data['count'] : 0;
+      return (count as num?)?.toInt() ?? 0;
+    } catch (e) {
+      print('Error fetching unread count: $e');
+      return 0;
+    }
   }
 
   Future<List<Map<String, dynamic>>> searchFacilities(String query) async {

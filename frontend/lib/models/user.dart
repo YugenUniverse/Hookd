@@ -216,6 +216,8 @@ class User {
       } else if (bd is int) {
         birthdate = DateTime.fromMillisecondsSinceEpoch(bd);
       }
+    }
+
     Wallet? wallet;
     if (json['wallet'] is Map) {
       wallet = Wallet.fromJson(Map<String, dynamic>.from(json['wallet']));

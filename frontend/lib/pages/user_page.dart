@@ -1,5 +1,6 @@
 import 'dart:ui' as dart_ui;
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../models/climbing_session.dart';
 import '../models/user.dart';
@@ -11,6 +12,7 @@ import '../utils/image_helpers.dart';
 import 'my_issues_page.dart';
 import 'notifications_page.dart';
 import 'wall_issues_page.dart';
+import '../providers/notification_provider.dart';
 
 class _UserPageData {
   const _UserPageData({required this.user, required this.sessions});
@@ -655,32 +657,82 @@ class _NotificationsButton extends StatelessWidget {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    return InkWell(
-      borderRadius: BorderRadius.circular(20),
-      onTap: () => Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => const NotificationsPage()),
-      ),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        decoration: BoxDecoration(
-          color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.7),
+    return Consumer<NotificationProvider>(
+      builder: (context, notificationProvider, child) {
+        final unreadCount = notificationProvider.unreadCount;
+        return InkWell(
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.3)),
-        ),
-        child: Row(
-          children: [
-            Icon(Icons.notifications_outlined, size: 20, color: colorScheme.primary),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                'Notifications',
-                style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
-              ),
+          onTap: () async {
+            await Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const NotificationsPage()),
+            );
+            // Refresh notifications when returning
+            notificationProvider.loadNotifications();
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.7),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.3)),
             ),
-            Icon(Icons.chevron_right, size: 20, color: colorScheme.onSurfaceVariant),
-          ],
-        ),
-      ),
+            child: Row(
+              children: [
+                Stack(
+                  children: [
+                    Icon(Icons.notifications_outlined, size: 20, color: colorScheme.primary),
+                    if (unreadCount > 0)
+                      Positioned(
+                        right: 0,
+                        top: 0,
+                        child: Container(
+                          padding: const EdgeInsets.all(2),
+                          decoration: BoxDecoration(
+                            color: colorScheme.error,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          constraints: const BoxConstraints(
+                            minWidth: 16,
+                            minHeight: 16,
+                          ),
+                          child: Text(
+                            unreadCount > 99 ? '99+' : unreadCount.toString(),
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: colorScheme.onError,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Notifications',
+                        style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
+                      ),
+                      if (unreadCount > 0)
+                        Text(
+                          '$unreadCount unread',
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: colorScheme.error,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                Icon(Icons.chevron_right, size: 20, color: colorScheme.onSurfaceVariant),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }

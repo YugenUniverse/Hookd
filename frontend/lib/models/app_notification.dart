@@ -37,4 +37,14 @@ class AppNotification {
   String get eventTitle => payload['eventTitle']?.toString() ?? '';
   String get facilityId => payload['facilityId']?.toString() ?? '';
   String get eventId => payload['eventId']?.toString() ?? '';
+
+  // Issue-specific fields
+  String get issueId => payload['issueId']?.toString() ?? '';
+  String get wallId => payload['wallId']?.toString() ?? '';
+  String get wallName => payload['wallName']?.toString() ?? '';
+  String get severity => payload['severity']?.toString() ?? '';
+  String get issueBody => payload['body']?.toString() ?? '';
+  String get description => payload['description']?.toString() ?? '';
+  String get location => payload['location']?.toString() ?? '';
+  String get climberId => payload['climberId']?.toString() ?? '';
 }

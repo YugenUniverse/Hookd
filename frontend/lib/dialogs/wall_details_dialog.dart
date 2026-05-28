@@ -325,27 +325,99 @@ class _WallDetailsDialogState extends State<WallDetailsDialog> {
                           onPressed: () {
                             final TextEditingController issueController =
                                 TextEditingController();
+                            final TextEditingController descriptionController =
+                                TextEditingController();
+                            final TextEditingController locationController =
+                                TextEditingController();
+                            String selectedSeverity = 'MEDIUM';
                             showDialog(
                               context: context,
                               builder: (context) => StatefulBuilder(
                                 builder: (context, setState) => AlertDialog(
                                   title: const Text('Report an issue'),
-                                  content: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text('Report an issue for ${wall.name}.'),
-                                      const SizedBox(height: 12),
-                                      TextField(
-                                        controller: issueController,
-                                        maxLines: 5,
-                                        decoration: const InputDecoration(
-                                          hintText: 'Describe the issue...',
-                                          border: OutlineInputBorder(),
+                                  content: SingleChildScrollView(
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text('Report an issue for ${wall.name}.'),
+                                        const SizedBox(height: 12),
+                                        const Text('Severity *',
+                                            style: TextStyle(
+                                                fontWeight: FontWeight.bold)),
+                                        const SizedBox(height: 8),
+                                        DropdownButton<String>(
+                                          value: selectedSeverity,
+                                          isExpanded: true,
+                                          onChanged: (String? newValue) {
+                                            if (newValue != null) {
+                                              setState(() {
+                                                selectedSeverity = newValue;
+                                              });
+                                            }
+                                          },
+                                          items: const [
+                                            DropdownMenuItem(
+                                              value: 'LOW',
+                                              child: Text('🟡 Low'),
+                                            ),
+                                            DropdownMenuItem(
+                                              value: 'MEDIUM',
+                                              child: Text('🟠 Medium'),
+                                            ),
+                                            DropdownMenuItem(
+                                              value: 'HIGH',
+                                              child: Text('🔴 High'),
+                                            ),
+                                          ],
                                         ),
-                                      ),
-                                    ],
+                                        const SizedBox(height: 16),
+                                        const Text('Description *',
+                                            style: TextStyle(
+                                                fontWeight: FontWeight.bold)),
+                                        const SizedBox(height: 8),
+                                        TextField(
+                                          controller: issueController,
+                                          maxLines: 4,
+                                          maxLength: 500,
+                                          decoration: const InputDecoration(
+                                            hintText:
+                                                'Brief description of the issue...',
+                                            border: OutlineInputBorder(),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 12),
+                                        const Text('Location',
+                                            style: TextStyle(
+                                                fontWeight: FontWeight.bold)),
+                                        const SizedBox(height: 8),
+                                        TextField(
+                                          controller: locationController,
+                                          maxLength: 200,
+                                          decoration: const InputDecoration(
+                                            hintText:
+                                                'e.g., Upper left section, Area 3...',
+                                            border: OutlineInputBorder(),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 12),
+                                        const Text('Additional Details',
+                                            style: TextStyle(
+                                                fontWeight: FontWeight.bold)),
+                                        const SizedBox(height: 8),
+                                        TextField(
+                                          controller: descriptionController,
+                                          maxLines: 3,
+                                          maxLength: 1000,
+                                          decoration: const InputDecoration(
+                                            hintText:
+                                                'Additional context or details (optional)...',
+                                            border: OutlineInputBorder(),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                   actions: [
                                     TextButton(
@@ -357,21 +429,45 @@ class _WallDetailsDialogState extends State<WallDetailsDialog> {
                                       onPressed: () async {
                                         final issueBody = issueController.text
                                             .trim();
-                                        if (issueBody.isNotEmpty) {
-                                          final apiService = ApiService();
-                                          final navigator = Navigator.of(
-                                            context,
+                                        if (issueBody.isEmpty) {
+                                          ScaffoldMessenger.of(context)
+                                              .showSnackBar(
+                                            const SnackBar(
+                                              content: Text(
+                                                  'Description is required'),
+                                            ),
                                           );
-                                          final messenger =
-                                              ScaffoldMessenger.of(context);
+                                          return;
+                                        }
+                                        final apiService = ApiService();
+                                        final navigator = Navigator.of(
+                                          context,
+                                        );
+                                        final messenger =
+                                            ScaffoldMessenger.of(context);
+                                        try {
                                           await apiService.createIssue(
                                             wallId: wall.id,
                                             body: issueBody,
+                                            severity: selectedSeverity,
+                                            description:
+                                                descriptionController.text
+                                                    .trim(),
+                                            location: locationController.text
+                                                .trim(),
                                           );
                                           navigator.pop();
                                           messenger.showSnackBar(
                                             const SnackBar(
-                                              content: Text('Issue submitted.'),
+                                              content:
+                                                  Text('Issue submitted.'),
+                                            ),
+                                          );
+                                        } catch (e) {
+                                          messenger.showSnackBar(
+                                            SnackBar(
+                                              content: Text(
+                                                  'Failed to submit: $e'),
                                             ),
                                           );
                                         }
