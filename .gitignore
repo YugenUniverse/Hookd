@@ -264,6 +264,3 @@ node_modules/
 
 # Database
 db/
-
-# Continue.dev
-.continue/

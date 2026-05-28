@@ -1,6 +1,6 @@
 const mongoose = require("mongoose");
 const ClimbingSession = require("../models/ClimbingSession");
-const { BaseReport, GroupReport } = require("../models/Report");
+const { Report, BaseReport, GroupReport } = require("../models/Report");
 const { Issue } = require("../models/Issue");
 
 exports.getWallReport = async (wallId) => {
@@ -550,17 +550,20 @@ exports.saveGroupReport = async (ownerId, wallIds, title, notes) => {
 };
 
 exports.getReportsList = async (ownerId) => {
-    return await BaseReport.find({ owner_id: ownerId })
+    return await Report.find({ owner_id: ownerId })
         .select("-reportData")
         .populate("wall_id", "name difficulty")
+        .populate("wall_ids", "name difficulty")
         .sort({ createdAt: -1 });
 };
 
 exports.getReportById = async (reportId, ownerId) => {
-    const report = await BaseReport.findOne({
+    const report = await Report.findOne({
         _id: reportId,
         owner_id: ownerId,
-    }).populate("wall_id", "name difficulty location");
+    })
+        .populate("wall_id", "name difficulty location")
+        .populate("wall_ids", "name difficulty location");
 
     if (!report) {
         const error = new Error("Report not found");
@@ -571,7 +574,7 @@ exports.getReportById = async (reportId, ownerId) => {
 };
 
 exports.deleteReport = async (reportId, ownerId) => {
-    const report = await BaseReport.findOneAndDelete({
+    const report = await Report.findOneAndDelete({
         _id: reportId,
         owner_id: ownerId,
     });

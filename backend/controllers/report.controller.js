@@ -92,7 +92,12 @@ exports.saveReport = async (req, res, next) => {
 
 exports.saveGroupReport = async (req, res, next) => {
     try {
-        const { wallIds, title, notes } = req.body;
+        const { title, notes } = req.body;
+        const wallIds = Array.isArray(req.body.wallIds)
+            ? req.body.wallIds
+            : Array.isArray(req.body.wall_ids)
+              ? req.body.wall_ids
+              : undefined;
 
         if (!title) {
             return res
