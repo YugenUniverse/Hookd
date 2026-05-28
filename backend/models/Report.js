@@ -201,6 +201,10 @@ const groupReportSchema = new mongoose.Schema(
                             type: mongoose.Schema.Types.ObjectId,
                             ref: "Wall",
                         },
+                        wallName: {
+                            type: String,
+                            trim: true,
+                        },
                         engagement: {
                             totalSessions: Number,
                             uniqueClimbers: Number,

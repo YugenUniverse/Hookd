@@ -537,27 +537,204 @@ async function seedViaApi() {
         }
         console.log(`✅ Logged ${totalIssues} wall issues.`);
 
-        // 6. GENERATE AND SAVE REPORTS
-        console.log("📊 Generating Saved Reports as the Facility...");
-        await axios.post(
-            `${BASE_URL}/reports/wall/${wallId}/save`,
-            {
-                title: `Mid-Season Check-in (${runId})`,
-                notes: "Traffic is holding steady. Evening rush is intense!",
-            },
-            { headers: facilityHeaders },
-        );
-        console.log("✅ First report snapshot saved!");
+        // Keep the original synthetic facility wall seeding, and add
+        // real public-body wall traffic against Regione Trentino data.
+        const regioneTrentino = await PublicBody.findOne({
+            username: "regione_trentino",
+        });
 
-        await axios.post(
-            `${BASE_URL}/reports/wall/${wallId}/save`,
-            {
-                title: `Final Wrap-up Report (${runId})`,
-                notes: "Route is getting polished, scheduling a reset.",
-            },
-            { headers: facilityHeaders },
-        );
-        console.log("✅ Second report snapshot saved!");
+        if (!regioneTrentino) {
+            console.warn(
+                "⚠️ PublicBody 'regione_trentino' not found. Skipping public-body seeded activity.",
+            );
+        } else {
+            const publicBodyWalls = await OutdoorWall.find({
+                publicBody: regioneTrentino._id,
+            })
+                .sort({ name: 1, createdAt: 1 })
+                .lean();
+
+            if (!publicBodyWalls.length) {
+                console.warn(
+                    "⚠️ No OutdoorWall documents linked to Regione Trentino. Skipping public-body seeded activity.",
+                );
+            } else {
+                const selectedWallCount = Math.max(
+                    1,
+                    Math.ceil(publicBodyWalls.length / 3),
+                );
+                const targetWalls = publicBodyWalls.slice(0, selectedWallCount);
+
+                console.log(
+                    `🌍 Seeding activity across ${targetWalls.length}/${publicBodyWalls.length} Regione Trentino walls (>= 1/3).`,
+                );
+
+                const regionLoginRes = await axios.post(
+                    `${BASE_URL}/auth/login`,
+                    {
+                        email: regioneTrentino.email,
+                        password:
+                            process.env.SEED_PUBLICBODY_PASSWORD ||
+                            "hookd_test_password",
+                    },
+                );
+                const publicBodyToken = regionLoginRes.data.accessToken;
+                const publicBodyHeaders = {
+                    Authorization: `Bearer ${publicBodyToken}`,
+                };
+
+                let regionSessions = 0;
+                let regionReviews = 0;
+                let regionIssues = 0;
+
+                for (const wall of targetWalls) {
+                    const wallId = wall.id || wall._id.toString();
+
+                    for (const token of climberTokens) {
+                        const climberHeaders = {
+                            Authorization: `Bearer ${token}`,
+                        };
+                        const numSessions = faker.number.int({
+                            min: MIN_SESSIONS_PER_CLIMBER,
+                            max: MAX_SESSIONS_PER_CLIMBER,
+                        });
+
+                        for (
+                            let sessionIndex = 0;
+                            sessionIndex < numSessions;
+                            sessionIndex++
+                        ) {
+                            const daysAgo =
+                                Math.random() > 0.15
+                                    ? faker.number.int({ min: 0, max: 29 })
+                                    : faker.number.int({ min: 30, max: 90 });
+                            const baseDate = new Date(
+                                new Date().getTime() -
+                                    daysAgo * 24 * 60 * 60 * 1000,
+                            );
+                            const isWeekend =
+                                baseDate.getDay() === 0 ||
+                                baseDate.getDay() === 6;
+
+                            const randomHour = isWeekend
+                                ? weightedRandom(
+                                      [9, 10, 11, 12, 13, 14, 15, 16, 17, 18],
+                                      [5, 15, 20, 15, 15, 10, 5, 5, 5, 5],
+                                  )
+                                : weightedRandom(
+                                      [12, 13, 16, 17, 18, 19, 20, 21, 22],
+                                      [5, 5, 10, 20, 25, 20, 10, 3, 2],
+                                  );
+
+                            baseDate.setHours(
+                                randomHour,
+                                faker.number.int({ min: 0, max: 59 }),
+                                0,
+                                0,
+                            );
+                            const timeTaken = weightedRandom(
+                                [
+                                    faker.number.int({ min: 15, max: 25 }),
+                                    faker.number.int({ min: 45, max: 90 }),
+                                    faker.number.int({ min: 90, max: 120 }),
+                                ],
+                                [10, 80, 10],
+                            );
+
+                            const sessionRes = await axios.post(
+                                `${BASE_URL}/sessions`,
+                                {
+                                    wall_id: wallId,
+                                    date: baseDate.toISOString(),
+                                    time: timeTaken,
+                                    isSend: Math.random() < SEND_PROBABILITY,
+                                },
+                                { headers: climberHeaders },
+                            );
+
+                            regionSessions++;
+                            const sessionId =
+                                sessionRes.data?.id ||
+                                sessionRes.data?._id ||
+                                sessionRes.data?.session?.id ||
+                                sessionRes.data?.session?._id;
+
+                            if (
+                                sessionId &&
+                                Math.random() < REVIEW_PROBABILITY
+                            ) {
+                                const rating =
+                                    timeTaken > 90
+                                        ? weightedRandom(
+                                              [1, 2, 3, 4, 5],
+                                              [15, 20, 25, 25, 15],
+                                          )
+                                        : weightedRandom(
+                                              [1, 2, 3, 4, 5],
+                                              [2, 5, 15, 45, 33],
+                                          );
+                                const feedbackText =
+                                    rating <= 3
+                                        ? faker.helpers.arrayElement(
+                                              CLIMBING_FEEDBACK.slice(7),
+                                          )
+                                        : faker.helpers.arrayElement(
+                                              CLIMBING_FEEDBACK.slice(0, 7),
+                                          );
+
+                                await axios.post(
+                                    `${BASE_URL}/sessions/${sessionId}/reviews`,
+                                    {
+                                        rating: rating,
+                                        body: feedbackText,
+                                    },
+                                    { headers: climberHeaders },
+                                );
+                                regionReviews++;
+                            }
+                        }
+                    }
+                }
+
+                for (let k = 0; k < NUM_ISSUES; k++) {
+                    const randomWall =
+                        targetWalls[
+                            Math.floor(Math.random() * targetWalls.length)
+                        ];
+                    const issueWallId =
+                        randomWall.id || randomWall._id.toString();
+                    const randomClimberToken =
+                        faker.helpers.arrayElement(climberTokens);
+                    const randomIssue =
+                        faker.helpers.arrayElement(CLIMBING_ISSUES);
+
+                    try {
+                        const formattedBody = `${randomIssue.title}: ${randomIssue.description}`;
+                        await axios.post(
+                            `${BASE_URL}/issues`,
+                            {
+                                wall_id: issueWallId,
+                                body: formattedBody,
+                            },
+                            {
+                                headers: {
+                                    Authorization: `Bearer ${randomClimberToken}`,
+                                },
+                            },
+                        );
+                        regionIssues++;
+                    } catch (err) {
+                        console.warn(
+                            `⚠️ Failed to create Regione Trentino issue. Error: ${err.response?.status} - ${JSON.stringify(err.response?.data)}`,
+                        );
+                    }
+                }
+
+                console.log(
+                    `✅ Logged ${regionSessions} Regione Trentino sessions, ${regionReviews} reviews, and ${regionIssues} issues across ${targetWalls.length} walls.`,
+                );
+            }
+        }
     } catch (error) {
         console.error("❌ API Seeding Failed:");
         if (error.response) {

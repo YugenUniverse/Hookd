@@ -115,6 +115,10 @@ describe("Report Routes", () => {
         expect(response.body).toHaveProperty("report");
         expect(response.body.report.title).toBe("Group Snapshot");
         expect(response.body.report.wall_ids).toHaveLength(2);
+        expect(response.body.report.reportData.wallComparisons).toHaveLength(2);
+        expect(
+            response.body.report.reportData.wallComparisons[0],
+        ).toHaveProperty("wallName");
     });
 
     it("GET /reports/saved should return saved reports list", async () => {

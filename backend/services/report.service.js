@@ -2,6 +2,7 @@ const mongoose = require("mongoose");
 const ClimbingSession = require("../models/ClimbingSession");
 const { Report, BaseReport, GroupReport } = require("../models/Report");
 const { Issue } = require("../models/Issue");
+const { Wall } = require("../models/Wall");
 
 exports.getWallReport = async (wallId) => {
     if (!mongoose.Types.ObjectId.isValid(wallId)) {
@@ -11,6 +12,7 @@ exports.getWallReport = async (wallId) => {
     }
 
     const objectId = new mongoose.Types.ObjectId(wallId);
+    const wall = await Wall.findById(objectId).select("name");
 
     // --- PIPELINE 1: Engagement & Benchmark Stats ---
     const sessionStatsPromise = ClimbingSession.aggregate([
@@ -206,6 +208,8 @@ exports.getWallReport = async (wallId) => {
     }));
 
     return {
+        wallId: wallId,
+        wallName: wall?.name || null,
         engagement: {
             totalSessions: stats.totalSessions,
             uniqueClimbers: stats.uniqueClimbersCount,
@@ -422,6 +426,13 @@ exports.saveGroupReport = async (ownerId, wallIds, title, notes) => {
         objectIds.map((id) => exports.getWallReport(id.toString())),
     );
 
+    const wallDocs = await Wall.find({ _id: { $in: objectIds } }).select(
+        "name",
+    );
+    const wallNameById = new Map(
+        wallDocs.map((wall) => [wall._id.toString(), wall.name]),
+    );
+
     const [
         sessionStats,
         temporalStatsResult,
@@ -531,10 +542,11 @@ exports.saveGroupReport = async (ownerId, wallIds, title, notes) => {
         })),
         aggregatedIssues: formattedIssues,
         aggregatedDemographics: demographics,
-        wallComparisons: perWallReports.map((report, index) => ({
-            wallId: objectIds[index],
-            engagement: report.engagement,
-            quality: report.quality,
+        wallComparisons: objectIds.map((wallId, index) => ({
+            wallId: wallId,
+            wallName: wallNameById.get(wallId.toString()) || "Unknown Wall",
+            engagement: perWallReports[index].engagement,
+            quality: perWallReports[index].quality,
         })),
     };
 
