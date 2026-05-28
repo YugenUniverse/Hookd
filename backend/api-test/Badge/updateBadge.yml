@@ -12,7 +12,15 @@ http:
       type: path
   body:
     type: json
-    data: ""
+    data: |-
+      {
+        "name": "Updated Badge Name",
+        "winningCondition": {
+          "metric": "score",
+          "operator": "gte",
+          "value": 500
+        }
+      }
   auth:
     type: bearer
     token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2YTE2MTIyMzZkNzFhODU4MjVhNWY0NTQiLCJlbWFpbCI6Imd5bV9jNzAwNGVAdGVzdC5jb20iLCJ1c2VyVHlwZSI6IkZhY2lsaXR5T3duZXIiLCJpYXQiOjE3Nzk4MzE3MzUsImV4cCI6MTc3OTgzNTMzNSwiaXNzIjoiaG9va2QifQ.SF__RcX5PevD0P4XAqOYnTFwNxfwtU2bd00Qb2DEspg

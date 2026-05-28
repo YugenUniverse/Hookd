@@ -12,8 +12,37 @@ const badgeSchema = new mongoose.Schema(
         score: { type: Number, default: 0 },
         type: {
             type: String,
-            enum: ["system", "custom"],
+            enum: ["system", "event"],
             default: "system",
+        },
+        eventId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Event",
+            required: function () {
+                return this.type === "event";
+            },
+        },
+        winningCondition: {
+            metric: {
+                type: String,
+                enum: ["rank", "score", "sessions"],
+                required: function () {
+                    return this.type === "event";
+                },
+            },
+            operator: {
+                type: String,
+                enum: ["top", "gte"],
+                required: function () {
+                    return this.type === "event";
+                },
+            },
+            value: {
+                type: Number,
+                required: function () {
+                    return this.type === "event";
+                },
+            },
         },
         reEarnable: {
             type: Boolean,

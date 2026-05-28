@@ -14,8 +14,14 @@ http:
         "description": "Attended the Friday night bouldering session.",
         "icon": "path or link",
         "score": 25,
-        "type": "custom",
-        "reEarnable": true //optional
+        "type": "event",
+        "eventId": "event_id_here",
+        "winningCondition": {
+          "metric": "sessions",
+          "operator": "gte",
+          "value": 1
+        },
+        "reEarnable": true
       }
   auth:
     type: bearer

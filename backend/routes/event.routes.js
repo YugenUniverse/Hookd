@@ -3,21 +3,17 @@ const router = express.Router();
 const { authenticateJwt, restrictTo } = require("../middleware/auth.middleware");
 const eventService = require("../services/event.service");
 
-// All event routes require authentication
-router.use(authenticateJwt);
-
-// Create event — FacilityOwner only
-router.post("/", restrictTo("FacilityOwner"), async (req, res, next) => {
+// Get all active events across facilities (PUBLIC)
+router.get("/active", async (req, res, next) => {
     try {
-        const event = await eventService.createEvent(req.user.id, req.body);
-        res.status(201).json({ event });
+        const events = await eventService.getActiveEvents();
+        res.json({ events });
     } catch (err) {
-        if (err.name === "ValidationError") err.statusCode = 400;
         next(err);
     }
 });
 
-// List events for a facility
+// List events for a facility (PUBLIC)
 router.get("/", async (req, res, next) => {
     try {
         const { facilityId, limit, skip } = req.query;
@@ -34,12 +30,37 @@ router.get("/", async (req, res, next) => {
     }
 });
 
-// Get single event
+// Get single event (PUBLIC)
 router.get("/:id", async (req, res, next) => {
     try {
         const event = await eventService.getEventById(req.params.id);
         res.json({ event });
     } catch (err) {
+        next(err);
+    }
+});
+
+// Get event leaderboard (PUBLIC)
+router.get("/:id/leaderboard", async (req, res, next) => {
+    try {
+        const leaderboard = await eventService.getEventLeaderboard(req.params.id);
+        res.json({ leaderboard });
+    } catch (err) {
+        if (err.name === "ValidationError") err.statusCode = 400;
+        next(err);
+    }
+});
+
+// All event routes below require authentication
+router.use(authenticateJwt);
+
+// Create event — FacilityOwner only
+router.post("/", restrictTo("FacilityOwner"), async (req, res, next) => {
+    try {
+        const event = await eventService.createEvent(req.user.id, req.body);
+        res.status(201).json({ event });
+    } catch (err) {
+        if (err.name === "ValidationError") err.statusCode = 400;
         next(err);
     }
 });
@@ -61,6 +82,17 @@ router.delete("/:id", restrictTo("FacilityOwner"), async (req, res, next) => {
         await eventService.deleteEvent(req.params.id, req.user.id);
         res.status(204).end();
     } catch (err) {
+        next(err);
+    }
+});
+
+// Close event — FacilityOwner only (must own the event)
+router.post("/:id/close", restrictTo("FacilityOwner"), async (req, res, next) => {
+    try {
+        const event = await eventService.closeEvent(req.params.id, req.user.id);
+        res.json({ event, message: "Event closed and badges distributed successfully" });
+    } catch (err) {
+        if (err.name === "ValidationError") err.statusCode = 400;
         next(err);
     }
 });

@@ -9,6 +9,7 @@ import '../models/poi.dart';
 import '../models/wall.dart';
 import '../pages/facility_owner_page.dart';
 import '../pages/global_leaderboard_page.dart';
+import '../pages/active_events_page.dart';
 import '../pages/log_session_page.dart';
 import '../pages/public_body_page.dart';
 import '../pages/user_page.dart';
@@ -109,6 +110,13 @@ class _MyHomePageState extends State<MyHomePage>
         showDragHandle: true,
         builder: (_) => LogSessionPage(initialWall: wall),
       ),
+    );
+  }
+
+  void _openEvents() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const ActiveEventsPage()),
     );
   }
 
@@ -275,6 +283,12 @@ class _MyHomePageState extends State<MyHomePage>
                                 icon: Icons.search,
                                 label: 'Search',
                                 onTap: _openWallSearch,
+                                t: t,
+                              ),
+                              navBtn(
+                                icon: Icons.event,
+                                label: 'Events',
+                                onTap: _openEvents,
                                 t: t,
                               ),
                               navBtn(
