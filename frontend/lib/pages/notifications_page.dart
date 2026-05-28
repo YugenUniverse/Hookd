@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../models/app_notification.dart';
+import '../providers/group_provider.dart';
 import '../services/api_service.dart';
 
 class NotificationsPage extends StatefulWidget {
@@ -81,6 +83,19 @@ class _NotificationsPageState extends State<NotificationsPage> {
               separatorBuilder: (_, _) => const Divider(height: 1),
               itemBuilder: (context, i) {
                 final n = notifications[i];
+                if (n.type == 'group_invite') {
+                  return _GroupInviteTile(
+                    notification: n,
+                    onAccept: () async {
+                      await context.read<GroupProvider>().acceptInvite(n.invitationId);
+                      await _markRead(n);
+                    },
+                    onDecline: () async {
+                      await context.read<GroupProvider>().declineInvite(n.invitationId);
+                      await _markRead(n);
+                    },
+                  );
+                }
                 return _NotificationTile(notification: n, onTap: () => _markRead(n));
               },
             );
@@ -125,4 +140,92 @@ class _NotificationTile extends StatelessWidget {
 
   String _fmt(DateTime d) =>
       '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+}
+
+class _GroupInviteTile extends StatefulWidget {
+  const _GroupInviteTile({
+    required this.notification,
+    required this.onAccept,
+    required this.onDecline,
+  });
+
+  final AppNotification notification;
+  final Future<void> Function() onAccept;
+  final Future<void> Function() onDecline;
+
+  @override
+  State<_GroupInviteTile> createState() => _GroupInviteTileState();
+}
+
+class _GroupInviteTileState extends State<_GroupInviteTile> {
+  bool _busy = false;
+
+  Future<void> _handle(Future<void> Function() action) async {
+    setState(() => _busy = true);
+    try {
+      await action();
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final n = widget.notification;
+    final unread = !n.read;
+    final inviter = n.invitedByName.isNotEmpty ? n.invitedByName : 'Someone';
+    final groupName = n.groupName.isNotEmpty ? n.groupName : 'a group';
+
+    return ListTile(
+      tileColor: unread ? cs.primaryContainer.withAlpha(60) : null,
+      leading: Icon(Icons.group, color: unread ? cs.primary : cs.onSurfaceVariant),
+      title: Text(
+        '$inviter invited you to join "$groupName"',
+        style: TextStyle(fontWeight: unread ? FontWeight.bold : FontWeight.normal),
+      ),
+      subtitle: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (n.createdAt != null)
+            Text(
+              '${n.createdAt!.day.toString().padLeft(2, '0')}/${n.createdAt!.month.toString().padLeft(2, '0')}/${n.createdAt!.year}',
+            ),
+          if (!n.read) ...[
+            const SizedBox(height: 8),
+            _busy
+                ? const SizedBox(
+                    height: 20,
+                    width: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : Row(
+                    children: [
+                      FilledButton(
+                        onPressed: () => _handle(widget.onAccept),
+                        style: FilledButton.styleFrom(
+                          visualDensity: VisualDensity.compact,
+                        ),
+                        child: const Text('Accept'),
+                      ),
+                      const SizedBox(width: 8),
+                      OutlinedButton(
+                        onPressed: () => _handle(widget.onDecline),
+                        style: OutlinedButton.styleFrom(
+                          visualDensity: VisualDensity.compact,
+                        ),
+                        child: const Text('Decline'),
+                      ),
+                    ],
+                  ),
+          ],
+        ],
+      ),
+      trailing: unread
+          ? Icon(Icons.circle, size: 10, color: cs.primary)
+          : null,
+      isThreeLine: !n.read,
+    );
+  }
 }

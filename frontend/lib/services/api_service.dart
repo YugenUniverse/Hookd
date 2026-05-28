@@ -10,6 +10,7 @@ import '../models/issue.dart';
 import '../models/event.dart';
 import '../models/app_notification.dart';
 import '../models/badge.dart';
+import '../models/group.dart';
 import '../constants/api_config.dart';
 import 'auth_service.dart';
 
@@ -862,6 +863,104 @@ class ApiService {
 
   Future<void> markAllNotificationsRead() async {
     await _dio.patch('/notifications/read-all');
+  }
+
+  // Group endpoints
+
+  Future<Group> createGroup({required String name, String? description}) async {
+    final response = await _dio.post('/groups', data: {
+      'name': name,
+      if (description != null && description.trim().isNotEmpty) 'description': description.trim(),
+    });
+    return Group.fromJson(Map<String, dynamic>.from(response.data['group']));
+  }
+
+  Future<List<Group>> getMyGroups() async {
+    final response = await _dio.get('/groups/mine');
+    final list = response.data is Map ? response.data['groups'] : null;
+    if (list is! List) return [];
+    return list
+        .whereType<Map>()
+        .map((e) => Group.fromJson(Map<String, dynamic>.from(e)))
+        .toList();
+  }
+
+  Future<Group> getGroupById(String groupId) async {
+    final response = await _dio.get('/groups/$groupId');
+    return Group.fromJson(Map<String, dynamic>.from(response.data['group']));
+  }
+
+  Future<Group> updateGroup(String groupId, {String? name, String? description}) async {
+    final body = <String, dynamic>{};
+    if (name != null) body['name'] = name;
+    if (description != null) body['description'] = description;
+    final response = await _dio.patch('/groups/$groupId', data: body);
+    return Group.fromJson(Map<String, dynamic>.from(response.data['group']));
+  }
+
+  Future<void> deleteGroup(String groupId) async {
+    await _dio.delete('/groups/$groupId');
+  }
+
+  Future<void> inviteToGroup(String groupId, String username) async {
+    await _dio.post('/groups/$groupId/invites', data: {'username': username});
+  }
+
+  Future<List<GroupInvitation>> getPendingGroupInvites() async {
+    final response = await _dio.get('/groups/invites/pending');
+    final list = response.data is Map ? response.data['invitations'] : null;
+    if (list is! List) return [];
+    return list
+        .whereType<Map>()
+        .map((e) => GroupInvitation.fromJson(Map<String, dynamic>.from(e)))
+        .toList();
+  }
+
+  Future<Group> acceptGroupInvite(String inviteId) async {
+    final response = await _dio.patch('/groups/invites/$inviteId/accept');
+    return Group.fromJson(Map<String, dynamic>.from(response.data['group']));
+  }
+
+  Future<void> declineGroupInvite(String inviteId) async {
+    await _dio.patch('/groups/invites/$inviteId/decline');
+  }
+
+  Future<void> leaveOrRemoveFromGroup(String groupId, String userId) async {
+    await _dio.delete('/groups/$groupId/members/$userId');
+  }
+
+  Future<List<PlannedClimb>> getPlannedClimbs(String groupId) async {
+    final response = await _dio.get('/groups/$groupId/climbs');
+    final list = response.data['climbs'] as List;
+    return list.map((e) => PlannedClimb.fromJson(Map<String, dynamic>.from(e))).toList();
+  }
+
+  Future<PlannedClimb> createPlannedClimb(
+    String groupId, {
+    required DateTime date,
+    String? venueId,
+    String? venueType,
+    String? notes,
+  }) async {
+    final response = await _dio.post('/groups/$groupId/climbs', data: {
+      'date': date.toUtc().toIso8601String(),
+      if (venueId != null) 'venueId': venueId,
+      if (venueType != null) 'venueType': venueType,
+      if (notes != null && notes.isNotEmpty) 'notes': notes,
+    });
+    return PlannedClimb.fromJson(Map<String, dynamic>.from(response.data['climb']));
+  }
+
+  Future<void> deletePlannedClimb(String groupId, String climbId) async {
+    await _dio.delete('/groups/$groupId/climbs/$climbId');
+  }
+
+  Future<PlannedClimb> rsvpPlannedClimb(String groupId, String climbId, String status) async {
+    final response = await _dio.patch(
+      '/groups/$groupId/climbs/$climbId/rsvp',
+      data: {'status': status},
+    );
+    return PlannedClimb.fromJson(Map<String, dynamic>.from(response.data['climb']));
   }
 
   String _formatDate(DateTime date) {

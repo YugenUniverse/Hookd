@@ -47,4 +47,10 @@ class AppNotification {
   String get description => payload['description']?.toString() ?? '';
   String get location => payload['location']?.toString() ?? '';
   String get climberId => payload['climberId']?.toString() ?? '';
+
+  // Group invite fields
+  String get groupId => payload['groupId']?.toString() ?? '';
+  String get groupName => payload['groupName']?.toString() ?? '';
+  String get invitationId => payload['invitationId']?.toString() ?? '';
+  String get invitedByName => payload['invitedByName']?.toString() ?? '';
 }
