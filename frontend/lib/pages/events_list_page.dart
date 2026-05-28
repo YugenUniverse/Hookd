@@ -1,19 +1,24 @@
 import 'package:flutter/material.dart';
+import 'event_leaderboard_page.dart';
 import 'package:intl/intl.dart';
 
 import '../models/event.dart';
+import '../models/poi.dart';
 import '../services/api_service.dart';
+import 'manage_event_badges_page.dart';
 
 class EventsListPage extends StatefulWidget {
   const EventsListPage({
     super.key,
     required this.facilityId,
     required this.facilityName,
+    this.availableWalls = const [],
     this.canCreate = false,
   });
 
   final String facilityId;
   final String facilityName;
+  final List<IndoorWallSummary> availableWalls;
   final bool canCreate;
 
   @override
@@ -29,21 +34,27 @@ class _EventsListPageState extends State<EventsListPage> {
     _eventsFuture = ApiService().getEventsForFacility(widget.facilityId);
   }
 
-  void _refresh() => setState(
-        () => _eventsFuture =
-            ApiService().getEventsForFacility(widget.facilityId),
-      );
+  void _refresh() {
+    setState(() {
+      _eventsFuture = ApiService().getEventsForFacility(widget.facilityId);
+    });
+  }
 
   Future<void> _createEvent() async {
     final result = await Navigator.of(context).push<Event>(
-      MaterialPageRoute(builder: (_) => const EventFormPage()),
+      MaterialPageRoute(
+          builder: (_) => EventFormPage(availableWalls: widget.availableWalls)),
     );
     if (result != null) _refresh();
   }
 
   Future<void> _editEvent(Event event) async {
     final result = await Navigator.of(context).push<Event>(
-      MaterialPageRoute(builder: (_) => EventFormPage(existing: event)),
+      MaterialPageRoute(
+          builder: (_) => EventFormPage(
+                existing: event,
+                availableWalls: widget.availableWalls,
+              )),
     );
     if (result != null) _refresh();
   }
@@ -78,6 +89,55 @@ class _EventsListPageState extends State<EventsListPage> {
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text('Failed to delete: $e')));
     }
+  }
+
+  Future<void> _closeEvent(Event event) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Close Event'),
+        content: Text('Are you sure you want to close "${event.title}"? Badges will be distributed automatically and this action cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Close Event'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      await ApiService().closeEvent(event.id);
+      _refresh();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Event closed and badges distributed!')));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Failed to close event: $e')));
+    }
+  }
+
+  void _viewLeaderboard(Event event) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => EventLeaderboardPage(event: event),
+      ),
+    );
+  }
+
+  void _manageBadges(Event event) {
+
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ManageEventBadgesPage(event: event),
+      ),
+    );
   }
 
   @override
@@ -141,6 +201,9 @@ class _EventsListPageState extends State<EventsListPage> {
                       canManage: widget.canCreate,
                       onEdit: () => _editEvent(e),
                       onDelete: () => _deleteEvent(e),
+                      onClose: () => _closeEvent(e),
+                      onManageBadges: () => _manageBadges(e),
+                      onViewLeaderboard: () => _viewLeaderboard(e),
                     ),
                   ),
                 if (past.isNotEmpty)
@@ -157,6 +220,9 @@ class _EventsListPageState extends State<EventsListPage> {
                             canManage: widget.canCreate,
                             onEdit: () => _editEvent(e),
                             onDelete: () => _deleteEvent(e),
+                            onClose: () {}, // Already closed
+                            onManageBadges: () => _manageBadges(e),
+                      onViewLeaderboard: () => _viewLeaderboard(e),
                           ),
                         )
                         .toList(),
@@ -173,8 +239,9 @@ class _EventsListPageState extends State<EventsListPage> {
 // ─── Event form page (create & edit) ─────────────────────────────────────────
 
 class EventFormPage extends StatefulWidget {
-  const EventFormPage({super.key, this.existing});
+  const EventFormPage({super.key, this.existing, this.availableWalls = const []});
   final Event? existing;
+  final List<IndoorWallSummary> availableWalls;
 
   @override
   State<EventFormPage> createState() => EventFormPageState();
@@ -187,6 +254,7 @@ class EventFormPageState extends State<EventFormPage> {
   DateTime? _startDate;
   DateTime? _endDate;
   bool _submitting = false;
+  final Set<String> _selectedWalls = {};
 
   bool get _isEdit => widget.existing != null;
 
@@ -198,6 +266,9 @@ class EventFormPageState extends State<EventFormPage> {
     _descCtrl = TextEditingController(text: e?.description ?? '');
     _startDate = e?.startDate;
     _endDate = e?.endDate;
+    if (e != null) {
+      _selectedWalls.addAll(e.walls);
+    }
   }
 
   @override
@@ -248,6 +319,7 @@ class EventFormPageState extends State<EventFormPage> {
               : _descCtrl.text.trim(),
           startDate: _startDate!,
           endDate: _endDate,
+          walls: _selectedWalls.toList(),
         );
       } else {
         result = await ApiService().createEvent(
@@ -257,6 +329,7 @@ class EventFormPageState extends State<EventFormPage> {
               : _descCtrl.text.trim(),
           startDate: _startDate!,
           endDate: _endDate,
+          walls: _selectedWalls.toList(),
         );
       }
       if (!mounted) return;
@@ -332,6 +405,40 @@ class EventFormPageState extends State<EventFormPage> {
                   ),
                 ),
               ),
+              if (widget.availableWalls.isNotEmpty) ...[
+                const SizedBox(height: 24),
+                Text('Select Event Walls', style: Theme.of(context).textTheme.titleMedium),
+                const SizedBox(height: 8),
+                Container(
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Theme.of(context).dividerColor),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: ListView.separated(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: widget.availableWalls.length,
+                    separatorBuilder: (context, index) => const Divider(height: 1),
+                    itemBuilder: (context, index) {
+                      final wall = widget.availableWalls[index];
+                      return CheckboxListTile(
+                        title: Text(wall.name),
+                        subtitle: Text('${wall.difficulty} • ${wall.status}'),
+                        value: _selectedWalls.contains(wall.id),
+                        onChanged: (selected) {
+                          setState(() {
+                            if (selected == true) {
+                              _selectedWalls.add(wall.id);
+                            } else {
+                              _selectedWalls.remove(wall.id);
+                            }
+                          });
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ],
               const SizedBox(height: 28),
               FilledButton(
                 onPressed: _submitting ? null : _submit,
@@ -359,6 +466,9 @@ class _EventTile extends StatelessWidget {
     required this.canManage,
     required this.onEdit,
     required this.onDelete,
+    required this.onClose,
+    required this.onManageBadges,
+    required this.onViewLeaderboard,
     this.isPast = false,
   });
 
@@ -366,7 +476,11 @@ class _EventTile extends StatelessWidget {
   final bool canManage;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
+  final VoidCallback onClose;
+  final VoidCallback onManageBadges;
+  final VoidCallback onViewLeaderboard;
   final bool isPast;
+
 
   String _fmt(DateTime d) => DateFormat('d MMM yyyy').format(d);
 
@@ -393,21 +507,45 @@ class _EventTile extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 IconButton(
-                  icon: const Icon(Icons.edit_outlined, size: 20),
-                  tooltip: 'Edit event',
-                  onPressed: onEdit,
+                  icon: const Icon(Icons.leaderboard_outlined, size: 20),
+                  tooltip: 'View Leaderboard',
+                  onPressed: onViewLeaderboard,
                   visualDensity: VisualDensity.compact,
                 ),
                 IconButton(
-                  icon: Icon(Icons.delete_outline,
-                      size: 20, color: cs.error),
-                  tooltip: 'Delete event',
-                  onPressed: onDelete,
+                  icon: const Icon(Icons.military_tech, size: 20),
+                  tooltip: 'Manage Badges',
+                  onPressed: onManageBadges,
                   visualDensity: VisualDensity.compact,
                 ),
+                if (event.status != 'closed') ...[
+                  if (!isPast)
+                    IconButton(
+                      icon: Icon(Icons.check_circle_outline,
+                          size: 20, color: cs.primary),
+                      tooltip: 'Close Event',
+                      onPressed: onClose,
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  IconButton(
+                    icon: const Icon(Icons.edit_outlined, size: 20),
+                    tooltip: 'Edit event',
+                    onPressed: onEdit,
+                    visualDensity: VisualDensity.compact,
+                  ),
+                  IconButton(
+                    icon: Icon(Icons.delete_outline,
+                        size: 20, color: cs.error),
+                    tooltip: 'Delete event',
+                    onPressed: onDelete,
+                    visualDensity: VisualDensity.compact,
+                  ),
+                ],
               ],
             )
           : null,
+
+
     );
   }
 }

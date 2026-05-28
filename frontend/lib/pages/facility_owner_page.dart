@@ -500,6 +500,7 @@ class _FacilityCard extends StatelessWidget {
                         builder: (_) => EventsListPage(
                           facilityId: facility.id,
                           facilityName: facility.name,
+                          availableWalls: facility.walls,
                           canCreate: true,
                         ),
                       ),

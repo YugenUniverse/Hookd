@@ -23,6 +23,10 @@ const eventSchema = new mongoose.Schema(
             ref: "User",
             required: true,
         },
+        walls: [{
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "IndoorWall"
+        }],
         startDate: {
             type: Date,
             required: [true, "Start date is required"],
@@ -35,6 +39,11 @@ const eventSchema = new mongoose.Schema(
                 },
                 message: "End date must be on or after start date",
             },
+        },
+        status: {
+            type: String,
+            enum: ["active", "closed"],
+            default: "active",
         },
     },
     {

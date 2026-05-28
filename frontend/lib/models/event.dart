@@ -6,6 +6,8 @@ class Event {
   final DateTime startDate;
   final DateTime? endDate;
   final DateTime? createdAt;
+  final String status;
+  final List<String> walls;
 
   const Event({
     required this.id,
@@ -15,6 +17,8 @@ class Event {
     required this.startDate,
     this.endDate,
     this.createdAt,
+    this.status = 'active',
+    this.walls = const [],
   });
 
   factory Event.fromJson(Map<String, dynamic> json) {
@@ -32,6 +36,8 @@ class Event {
       startDate: parseDate(json['startDate']) ?? DateTime.now(),
       endDate: parseDate(json['endDate']),
       createdAt: parseDate(json['createdAt']),
+      status: json['status']?.toString() ?? 'active',
+      walls: (json['walls'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? [],
     );
   }
 }

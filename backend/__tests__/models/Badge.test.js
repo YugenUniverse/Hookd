@@ -81,4 +81,45 @@ describe("Badge model", () => {
         expect(error.errors.type).toBeDefined();
         expect(error.errors.level).toBeDefined();
     });
+
+    it("requires eventId and winningCondition for event type badges", async () => {
+        const badge = new Badge({
+            name: "Event Badge",
+            type: "event",
+        });
+
+        let error = null;
+        try {
+            await badge.save();
+        } catch (err) {
+            error = err;
+        }
+
+        expect(error).not.toBeNull();
+        expect(error.errors.eventId).toBeDefined();
+        expect(error.errors["winningCondition.metric"]).toBeDefined();
+        expect(error.errors["winningCondition.operator"]).toBeDefined();
+        expect(error.errors["winningCondition.value"]).toBeDefined();
+    });
+
+    it("creates an event badge successfully", async () => {
+        const badge = new Badge({
+            name: "Top 3 Event Badge",
+            type: "event",
+            eventId: new mongoose.Types.ObjectId(),
+            winningCondition: {
+                metric: "rank",
+                operator: "top",
+                value: 3
+            }
+        });
+
+        await badge.save();
+        const foundBadge = await Badge.findById(badge._id);
+
+        expect(foundBadge.type).toBe("event");
+        expect(foundBadge.eventId).toBeDefined();
+        expect(foundBadge.winningCondition.metric).toBe("rank");
+        expect(foundBadge.winningCondition.value).toBe(3);
+    });
 });

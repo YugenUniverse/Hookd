@@ -138,7 +138,7 @@ class FacilityPoi extends Poi {
       description: (json['description'] ?? '').toString(),
       walls: walls,
       address: json['address']?.toString(),
-      ownerAccountId: json['ownerAccountId']?.toString(),
+      ownerAccountId: (json['ownerAccountId'] ?? json['ownerAccount'])?.toString(),
     );
   }
 }

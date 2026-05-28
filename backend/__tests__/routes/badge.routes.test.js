@@ -6,6 +6,7 @@ const request = require("supertest");
 const badgeRoutes = require("../../routes/badge.routes");
 const errorMiddleware = require("../../middleware/error.middleware");
 const Badge = require("../../models/Badge");
+const Event = require("../../models/Event");
 const { User, FacilityOwner, PublicBody, Climber } = require("../../models/User");
 
 const app = express();
@@ -58,6 +59,14 @@ describe("badge.routes", () => {
             userType: "Climber",
         });
         climberToken = createAuthToken(climber, "Climber");
+
+        testEvent = await Event.create({
+            title: "Test Event",
+            description: "A test event",
+            facility: new mongoose.Types.ObjectId(),
+            createdBy: facilityOwner._id,
+            startDate: new Date(),
+        });
     });
 
     afterEach(async () => {
@@ -66,6 +75,7 @@ describe("badge.routes", () => {
 
     afterAll(async () => {
         await User.deleteMany({});
+        await Event.deleteMany({});
         console.error.mockRestore();
         await mongoose.disconnect();
     });
@@ -75,7 +85,13 @@ describe("badge.routes", () => {
             name: "Test Badge",
             description: "A test badge",
             score: 50,
-            type: "custom",
+            type: "event",
+            eventId: testEvent._id.toString(),
+            winningCondition: {
+                metric: "rank",
+                operator: "top",
+                value: 3
+            },
             level: 3
         };
 
@@ -121,7 +137,13 @@ describe("badge.routes", () => {
     });
 
     it("PUT /badges/:id updates a badge if authorized", async () => {
-        const badge = await Badge.create({ name: "Old Name", type: "custom", createdBy: facilityOwner._id });
+        const badge = await Badge.create({ 
+            name: "Old Name", 
+            type: "event", 
+            eventId: testEvent._id,
+            winningCondition: { metric: "rank", operator: "top", value: 3 },
+            createdBy: facilityOwner._id 
+        });
 
         const response = await request(app)
             .put(`/badges/${badge._id}`)
@@ -134,7 +156,13 @@ describe("badge.routes", () => {
     });
 
     it("DELETE /badges/:id deletes a badge if authorized", async () => {
-        const badge = await Badge.create({ name: "To Delete", type: "custom", createdBy: facilityOwner._id });
+        const badge = await Badge.create({ 
+            name: "To Delete", 
+            type: "event", 
+            eventId: testEvent._id,
+            winningCondition: { metric: "rank", operator: "top", value: 3 },
+            createdBy: facilityOwner._id 
+        });
 
         const response = await request(app)
             .delete(`/badges/${badge._id}`)
