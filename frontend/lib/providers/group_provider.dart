@@ -7,12 +7,16 @@ class GroupProvider extends ChangeNotifier {
 
   List<Group> _groups = [];
   List<GroupInvitation> _pendingInvites = [];
+  List<Group> _discoverResults = [];
   bool _isLoading = false;
+  bool _isDiscovering = false;
   String? _error;
 
   List<Group> get groups => _groups;
   List<GroupInvitation> get pendingInvites => _pendingInvites;
+  List<Group> get discoverResults => _discoverResults;
   bool get isLoading => _isLoading;
+  bool get isDiscovering => _isDiscovering;
   String? get error => _error;
 
   Future<void> loadMyGroups() async {
@@ -38,10 +42,48 @@ class GroupProvider extends ChangeNotifier {
     }
   }
 
-  Future<Group?> createGroup({required String name, String? description}) async {
+  Future<Group?> createGroup({
+    required String name,
+    String? description,
+    String visibility = 'private',
+  }) async {
     try {
-      final group = await _api.createGroup(name: name, description: description);
+      final group = await _api.createGroup(
+        name: name,
+        description: description,
+        visibility: visibility,
+      );
       _groups.insert(0, group);
+      notifyListeners();
+      return group;
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+      return null;
+    }
+  }
+
+  Future<void> discoverGroups({String? search}) async {
+    _isDiscovering = true;
+    notifyListeners();
+    try {
+      _discoverResults = await _api.discoverGroups(search: search);
+    } catch (e) {
+      debugPrint('Error discovering groups: $e');
+      _discoverResults = [];
+    } finally {
+      _isDiscovering = false;
+      notifyListeners();
+    }
+  }
+
+  Future<Group?> joinGroup(String groupId) async {
+    try {
+      final group = await _api.joinGroup(groupId);
+      _discoverResults.removeWhere((g) => g.id == groupId);
+      if (!_groups.any((g) => g.id == group.id)) {
+        _groups.insert(0, group);
+      }
       notifyListeners();
       return group;
     } catch (e) {

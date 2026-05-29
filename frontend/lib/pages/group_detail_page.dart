@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import '../utils/calendar_helper.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 
@@ -136,6 +137,69 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
     }
   }
 
+  Future<void> _leaveGroup(Group group, String currentUserId) async {
+    final isAdmin = _isAdmin(group, currentUserId);
+    final others = group.members.where((m) => m.userId != currentUserId).toList();
+
+    if (isAdmin && others.isEmpty) {
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Cannot leave'),
+          content: Text('You are the only member of "${group.name}". Delete the group instead.'),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    String content = 'Are you sure you want to leave "${group.name}"?';
+    if (isAdmin && others.every((m) => !m.isAdmin)) {
+      final earliest = (others.toList()
+            ..sort((a, b) => (a.joinedAt ?? DateTime(0))
+                .compareTo(b.joinedAt ?? DateTime(0))))
+          .first;
+      final name = earliest.name ?? earliest.username ?? 'another member';
+      content += '\n\n$name will become the new admin.';
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Leave group?'),
+        content: Text(content),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Leave'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    final ok = await context
+        .read<GroupProvider>()
+        .leaveOrRemoveMember(group.id, currentUserId);
+    if (!mounted) return;
+    if (ok) {
+      Navigator.of(context).pop();
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not leave group. Please try again.')),
+      );
+    }
+  }
+
   Future<void> _deleteGroup(Group group) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -257,6 +321,7 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
 
             final group = snapshot.data!;
             final isAdmin = _isAdmin(group, currentUserId);
+            final isSolo = group.members.length == 1;
 
             return Scaffold(
               backgroundColor: Colors.transparent,
@@ -269,6 +334,12 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
                       icon: const Icon(Icons.person_add_outlined),
                       tooltip: 'Invite',
                       onPressed: () => _inviteUser(group),
+                    ),
+                  if (!isSolo)
+                    IconButton(
+                      icon: const Icon(Icons.exit_to_app),
+                      tooltip: 'Leave group',
+                      onPressed: () => _leaveGroup(group, currentUserId),
                     ),
                   if (isAdmin)
                     IconButton(
@@ -354,6 +425,7 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
                     else
                       ..._climbs.map((climb) => _PlannedClimbTile(
                             climb: climb,
+                            groupName: group.name,
                             isAdmin: isAdmin,
                             currentUserId: currentUserId,
                             onDelete: () => _deletePlannedClimb(climb),
@@ -651,6 +723,7 @@ class _SelectedVenueTile extends StatelessWidget {
 class _PlannedClimbTile extends StatelessWidget {
   const _PlannedClimbTile({
     required this.climb,
+    required this.groupName,
     required this.isAdmin,
     required this.currentUserId,
     required this.onDelete,
@@ -658,10 +731,23 @@ class _PlannedClimbTile extends StatelessWidget {
   });
 
   final PlannedClimb climb;
+  final String groupName;
   final bool isAdmin;
   final String currentUserId;
   final VoidCallback onDelete;
   final void Function(String status) onRsvp;
+
+  void _addToCalendar() {
+    final title = climb.wallName != null && climb.wallName!.isNotEmpty
+        ? '$groupName @ ${climb.wallName}'
+        : '$groupName – Group climb';
+    addClimbToCalendar(
+      title: title,
+      start: climb.date.toLocal(),
+      location: climb.wallName ?? '',
+      description: climb.notes ?? '',
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -744,6 +830,12 @@ class _PlannedClimbTile extends StatelessWidget {
                       ],
                     ],
                   ),
+                ),
+                IconButton(
+                  icon: Icon(Icons.calendar_today_outlined, size: 18, color: cs.onSurfaceVariant),
+                  tooltip: 'Add to calendar',
+                  onPressed: _addToCalendar,
+                  visualDensity: VisualDensity.compact,
                 ),
                 if (isAdmin)
                   IconButton(
@@ -858,7 +950,7 @@ class _MemberTile extends StatelessWidget {
     final isSelf = member.userId == currentUserId;
     final displayName = member.name ?? member.username ?? member.userId;
     final initial = displayName.isNotEmpty ? displayName[0].toUpperCase() : '?';
-    final canAct = isCurrentUserAdmin || isSelf;
+    final canAct = isCurrentUserAdmin && !isSelf;
 
     return Card(
       elevation: 0,
@@ -901,11 +993,8 @@ class _MemberTile extends StatelessWidget {
             if (canAct) ...[
               const SizedBox(width: 4),
               IconButton(
-                icon: Icon(
-                  isSelf ? Icons.exit_to_app : Icons.remove_circle_outline,
-                  color: cs.error,
-                ),
-                tooltip: isSelf ? 'Leave group' : 'Remove member',
+                icon: Icon(Icons.remove_circle_outline, color: cs.error),
+                tooltip: 'Remove member',
                 onPressed: onRemove,
               ),
             ],

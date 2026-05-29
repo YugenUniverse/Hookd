@@ -867,10 +867,15 @@ class ApiService {
 
   // Group endpoints
 
-  Future<Group> createGroup({required String name, String? description}) async {
+  Future<Group> createGroup({
+    required String name,
+    String? description,
+    String visibility = 'private',
+  }) async {
     final response = await _dio.post('/groups', data: {
       'name': name,
       if (description != null && description.trim().isNotEmpty) 'description': description.trim(),
+      'visibility': visibility,
     });
     return Group.fromJson(Map<String, dynamic>.from(response.data['group']));
   }
@@ -927,6 +932,24 @@ class ApiService {
 
   Future<void> leaveOrRemoveFromGroup(String groupId, String userId) async {
     await _dio.delete('/groups/$groupId/members/$userId');
+  }
+
+  Future<List<Group>> discoverGroups({String? search}) async {
+    final response = await _dio.get(
+      '/groups/discover',
+      queryParameters: search != null && search.isNotEmpty ? {'search': search} : null,
+    );
+    final list = response.data is Map ? response.data['groups'] : null;
+    if (list is! List) return [];
+    return list
+        .whereType<Map>()
+        .map((e) => Group.fromJson(Map<String, dynamic>.from(e)))
+        .toList();
+  }
+
+  Future<Group> joinGroup(String groupId) async {
+    final response = await _dio.post('/groups/$groupId/join');
+    return Group.fromJson(Map<String, dynamic>.from(response.data['group']));
   }
 
   Future<List<PlannedClimb>> getPlannedClimbs(String groupId) async {
