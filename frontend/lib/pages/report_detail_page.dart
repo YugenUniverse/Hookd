@@ -22,6 +22,7 @@ class ReportDetailPageState extends State<ReportDetailPage> {
   late Future<Report> futureReport;
   int _selectedChartIndex = 0;
   bool _isExporting = false;
+  final Set<String> _selectedCsvSections = {};
 
   @override
   void initState() {
@@ -35,8 +36,12 @@ class ReportDetailPageState extends State<ReportDetailPage> {
 
   Widget _buildExportButton(BuildContext context, Report report) {
     final colorScheme = Theme.of(context).colorScheme;
+    final availableSections = _availableExportSections(report);
+    final selectedSections = _selectedCsvSections.isEmpty
+        ? availableSections.toSet()
+        : _selectedCsvSections;
 
-    return OutlinedButton.icon(
+    return FilledButton.icon(
       onPressed: _isExporting
           ? null
           : () async {
@@ -47,8 +52,13 @@ class ReportDetailPageState extends State<ReportDetailPage> {
               final messenger = ScaffoldMessenger.of(context);
 
               try {
+                final exportSections =
+                    selectedSections.length == availableSections.length
+                    ? null
+                    : selectedSections.toList();
                 final csvContent = await widget.reportService.exportReportCsv(
                   report.id,
+                  sections: exportSections,
                 );
                 final safeTitle = report.title
                     .replaceAll(RegExp(r'[^A-Za-z0-9_-]'), '_')
@@ -82,15 +92,225 @@ class ReportDetailPageState extends State<ReportDetailPage> {
           ? const SizedBox(
               width: 18,
               height: 18,
-              child: CircularProgressIndicator(strokeWidth: 2),
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: Colors.white,
+              ),
             )
           : const Icon(Icons.download_rounded, size: 18),
       label: Text(_isExporting ? 'Exporting...' : 'Export CSV'),
-      style: OutlinedButton.styleFrom(
-        foregroundColor: colorScheme.primary,
-        side: BorderSide(color: colorScheme.outlineVariant),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      style: FilledButton.styleFrom(
+        backgroundColor: colorScheme.primary,
+        foregroundColor: colorScheme.onPrimary,
+        minimumSize: const Size(0, 42),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+      ),
+    );
+  }
+
+  List<String> _availableExportSections(Report report) {
+    final sections = [
+      'engagement',
+      'quality',
+      'trends',
+      'feedback',
+      'issues',
+      'demographics',
+    ];
+
+    if ((report.reportData?.wallComparisons ?? []).isNotEmpty) {
+      sections.add('wallComparisons');
+    }
+
+    return sections;
+  }
+
+  String _sectionLabel(String section) {
+    const labels = {
+      'engagement': 'Engagement',
+      'quality': 'Quality',
+      'trends': 'Trends',
+      'feedback': 'Feedback',
+      'issues': 'Issues',
+      'demographics': 'Demographics',
+      'wallComparisons': 'Wall comparisons',
+    };
+
+    return labels[section] ?? section;
+  }
+
+  Widget _buildExportControls(BuildContext context, Report report) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final availableSections = _availableExportSections(report);
+    final hasWallComparisons =
+        (report.reportData?.wallComparisons ?? []).isNotEmpty;
+    final displaySections = [
+      'engagement',
+      'quality',
+      'trends',
+      'feedback',
+      'issues',
+      'demographics',
+      'wallComparisons',
+    ];
+    final selectedSections = _selectedCsvSections.isEmpty
+        ? availableSections.toSet()
+        : _selectedCsvSections;
+    final normalizedSelection = selectedSections.toSet()
+      ..removeWhere(
+        (section) => section == 'wallComparisons' && !hasWallComparisons,
+      );
+    final allSelected = normalizedSelection.length == availableSections.length;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerLow.withValues(alpha: 0.96),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.55),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: colorScheme.shadow.withValues(alpha: 0.12),
+            blurRadius: 18,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: colorScheme.primaryContainer,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  Icons.download_rounded,
+                  size: 20,
+                  color: colorScheme.onPrimaryContainer,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Export CSV',
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Pick sections, then download the saved report snapshot.',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              _buildExportButton(context, report),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Text(
+                'Sections',
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: colorScheme.secondaryContainer,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  allSelected
+                      ? 'All selected'
+                      : '${normalizedSelection.length}/${availableSections.length} selected',
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: colorScheme.onSecondaryContainer,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          SegmentedButton<String>(
+            multiSelectionEnabled: true,
+            showSelectedIcon: true,
+            segments: displaySections
+                .map(
+                  (section) => ButtonSegment<String>(
+                    value: section,
+                    label: Text(_sectionLabel(section)),
+                  ),
+                )
+                .toList(),
+            selected: normalizedSelection,
+            onSelectionChanged: (newSelection) {
+              final nextSelection = newSelection.toSet()
+                ..removeWhere(
+                  (section) =>
+                      section == 'wallComparisons' && !hasWallComparisons,
+                );
+              setState(() {
+                _selectedCsvSections
+                  ..clear()
+                  ..addAll(nextSelection);
+              });
+            },
+            style: ButtonStyle(
+              padding: WidgetStateProperty.all(
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              ),
+              minimumSize: WidgetStateProperty.all(const Size(0, 40)),
+              visualDensity: VisualDensity.compact,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              side: WidgetStateProperty.resolveWith((states) {
+                if (states.contains(WidgetState.selected)) {
+                  return BorderSide(color: colorScheme.primary, width: 1.2);
+                }
+                return BorderSide(
+                  color: colorScheme.outlineVariant.withValues(alpha: 0.6),
+                );
+              }),
+              backgroundColor: WidgetStateProperty.resolveWith((states) {
+                if (states.contains(WidgetState.selected)) {
+                  return colorScheme.primaryContainer;
+                }
+                return colorScheme.surface;
+              }),
+              foregroundColor: WidgetStateProperty.resolveWith((states) {
+                if (states.contains(WidgetState.selected)) {
+                  return colorScheme.onPrimaryContainer;
+                }
+                return colorScheme.onSurface;
+              }),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -174,10 +394,10 @@ class ReportDetailPageState extends State<ReportDetailPage> {
                         ],
                       ),
                     ),
-                    const SizedBox(width: 12),
-                    _buildExportButton(context, report),
                   ],
                 ),
+                const SizedBox(height: 12),
+                _buildExportControls(context, report),
                 const SizedBox(height: 16),
                 if (wallNames.isNotEmpty) ...[
                   Wrap(

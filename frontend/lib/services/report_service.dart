@@ -301,9 +301,18 @@ class ReportService {
     }
   }
 
-  Future<String> exportReportCsv(String reportId) async {
+  Future<String> exportReportCsv(
+    String reportId, {
+    List<String>? sections,
+  }) async {
+    final uri = Uri.parse('$baseUrl/reports/saved/$reportId/export').replace(
+      queryParameters: sections == null || sections.isEmpty
+          ? null
+          : {'sections': sections.join(',')},
+    );
+
     final response = await http.get(
-      Uri.parse('$baseUrl/reports/saved/$reportId/export'),
+      uri,
       headers: {'Authorization': 'Bearer $token', 'Accept': 'text/csv'},
     );
 
