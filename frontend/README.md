@@ -1,6 +1,6 @@
 # Hookd — Frontend
 
-Flutter app for the Hookd climbing platform. Targets Android, iOS, and web/desktop from a single codebase.
+Flutter app for the Hookd climbing platform. Targets Android and web only.
 
 ## Stack
 
@@ -37,9 +37,12 @@ The app uses Firebase Auth for Google Sign-In. `google-services.json` (Android) 
 ## Running
 
 ```bash
-flutter run -d chrome       # run as a web app
+flutter run -d web-server   # run as a web server
 flutter run                 # run on a connected device or emulator
 ```
+
+> [!TIP]
+> For web development, you can specify `--web-port` to avoid random port assignment after each restart.
 
 ## Building
 
