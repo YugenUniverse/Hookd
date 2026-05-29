@@ -11,7 +11,8 @@ http:
         data: |-
             {
                 "name": "Weekend Crew",
-                "description": "Planning climbs every weekend"
+                "description": "Planning climbs every weekend",
+                "visibility": "public"
             }
     auth:
         type: bearer

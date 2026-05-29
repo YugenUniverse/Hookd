@@ -88,6 +88,26 @@ describe("group.routes", () => {
             expect(res.body.group.members[0].role).toBe("admin");
         });
 
+        it("defaults visibility to private", async () => {
+            const res = await request(app)
+                .post("/groups")
+                .set("Authorization", `Bearer ${token1}`)
+                .send({ name: "Secret Crew" });
+
+            expect(res.status).toBe(201);
+            expect(res.body.group.visibility).toBe("private");
+        });
+
+        it("creates a public group when visibility is 'public'", async () => {
+            const res = await request(app)
+                .post("/groups")
+                .set("Authorization", `Bearer ${token1}`)
+                .send({ name: "Open Crew", visibility: "public" });
+
+            expect(res.status).toBe(201);
+            expect(res.body.group.visibility).toBe("public");
+        });
+
         it("returns 400 when name is missing", async () => {
             const res = await request(app)
                 .post("/groups")
@@ -201,6 +221,23 @@ describe("group.routes", () => {
 
             expect(res.status).toBe(200);
             expect(res.body.group.name).toBe("New Name");
+        });
+
+        it("allows admin to change visibility", async () => {
+            const group = await Group.create({
+                name: "Private Group",
+                visibility: "private",
+                creator: climber1._id,
+                members: [{ user: climber1._id, role: "admin" }],
+            });
+
+            const res = await request(app)
+                .patch(`/groups/${group._id}`)
+                .set("Authorization", `Bearer ${token1}`)
+                .send({ visibility: "public" });
+
+            expect(res.status).toBe(200);
+            expect(res.body.group.visibility).toBe("public");
         });
 
         it("returns 403 when non-admin tries to update", async () => {
@@ -525,7 +562,7 @@ describe("group.routes", () => {
             expect(res.status).toBe(204);
         });
 
-        it("returns 409 when trying to remove the last admin", async () => {
+        it("returns 409 when the admin is the only member and tries to leave", async () => {
             const group = await Group.create({
                 name: "Last Admin",
                 creator: climber1._id,
@@ -537,6 +574,67 @@ describe("group.routes", () => {
                 .set("Authorization", `Bearer ${token1}`);
 
             expect(res.status).toBe(409);
+        });
+
+        it("admin leaving auto-promotes the earliest-joined member", async () => {
+            const group = await Group.create({
+                name: "Admin Leave Promote",
+                creator: climber1._id,
+                members: [
+                    { user: climber1._id, role: "admin", joinedAt: new Date("2024-01-01") },
+                    { user: climber2._id, role: "member", joinedAt: new Date("2024-01-02") },
+                    { user: climber3._id, role: "member", joinedAt: new Date("2024-01-03") },
+                ],
+            });
+
+            const res = await request(app)
+                .delete(`/groups/${group._id}/members/${climber1._id}`)
+                .set("Authorization", `Bearer ${token1}`);
+
+            expect(res.status).toBe(204);
+            const updated = await Group.findById(group._id);
+            expect(updated.members).toHaveLength(2);
+            const newAdmin = updated.members.find(
+                (m) => m.user.toString() === climber2._id.toString(),
+            );
+            expect(newAdmin.role).toBe("admin");
+        });
+
+        it("admin leaving does not promote when another admin already exists", async () => {
+            const group = await Group.create({
+                name: "Two Admins Leave",
+                creator: climber1._id,
+                members: [
+                    { user: climber1._id, role: "admin" },
+                    { user: climber2._id, role: "admin" },
+                ],
+            });
+
+            const res = await request(app)
+                .delete(`/groups/${group._id}/members/${climber1._id}`)
+                .set("Authorization", `Bearer ${token1}`);
+
+            expect(res.status).toBe(204);
+            const updated = await Group.findById(group._id);
+            expect(updated.members).toHaveLength(1);
+            expect(updated.members[0].role).toBe("admin");
+        });
+
+        it("returns 403 when non-admin tries to remove an admin", async () => {
+            const group = await Group.create({
+                name: "Force Remove Admin",
+                creator: climber1._id,
+                members: [
+                    { user: climber1._id, role: "admin" },
+                    { user: climber2._id, role: "member" },
+                ],
+            });
+
+            const res = await request(app)
+                .delete(`/groups/${group._id}/members/${climber1._id}`)
+                .set("Authorization", `Bearer ${token2}`);
+
+            expect(res.status).toBe(403);
         });
 
         it("returns 403 when non-admin tries to remove another member", async () => {
@@ -892,6 +990,143 @@ describe("group.routes", () => {
                 .send({ status: "going" });
 
             expect(res.status).toBe(404);
+        });
+    });
+
+    // ─── Discover ────────────────────────────────────────────────────────────
+
+    describe("GET /groups/discover", () => {
+        it("returns only public groups", async () => {
+            await Group.create({ name: "Public One", visibility: "public", creator: climber2._id, members: [{ user: climber2._id, role: "admin" }] });
+            await Group.create({ name: "Private One", visibility: "private", creator: climber2._id, members: [{ user: climber2._id, role: "admin" }] });
+
+            const res = await request(app)
+                .get("/groups/discover")
+                .set("Authorization", `Bearer ${token1}`);
+
+            expect(res.status).toBe(200);
+            expect(res.body.groups).toHaveLength(1);
+            expect(res.body.groups[0].name).toBe("Public One");
+        });
+
+        it("excludes groups the requester already belongs to", async () => {
+            await Group.create({ name: "Already In", visibility: "public", creator: climber1._id, members: [{ user: climber1._id, role: "admin" }] });
+            await Group.create({ name: "Can Join", visibility: "public", creator: climber2._id, members: [{ user: climber2._id, role: "admin" }] });
+
+            const res = await request(app)
+                .get("/groups/discover")
+                .set("Authorization", `Bearer ${token1}`);
+
+            expect(res.status).toBe(200);
+            expect(res.body.groups.every((g) => g.name !== "Already In")).toBe(true);
+            expect(res.body.groups.some((g) => g.name === "Can Join")).toBe(true);
+        });
+
+        it("filters by name when search query is provided", async () => {
+            await Group.create({ name: "Boulder Bros", visibility: "public", creator: climber2._id, members: [{ user: climber2._id, role: "admin" }] });
+            await Group.create({ name: "Sport Climbers", visibility: "public", creator: climber2._id, members: [{ user: climber2._id, role: "admin" }] });
+
+            const res = await request(app)
+                .get("/groups/discover?search=boulder")
+                .set("Authorization", `Bearer ${token1}`);
+
+            expect(res.status).toBe(200);
+            expect(res.body.groups).toHaveLength(1);
+            expect(res.body.groups[0].name).toBe("Boulder Bros");
+        });
+
+        it("returns memberCount in results", async () => {
+            await Group.create({
+                name: "Big Group",
+                visibility: "public",
+                creator: climber2._id,
+                members: [
+                    { user: climber2._id, role: "admin" },
+                    { user: climber3._id, role: "member" },
+                ],
+            });
+
+            const res = await request(app)
+                .get("/groups/discover")
+                .set("Authorization", `Bearer ${token1}`);
+
+            expect(res.status).toBe(200);
+            expect(res.body.groups[0].memberCount).toBe(2);
+        });
+
+        it("requires authentication", async () => {
+            const res = await request(app).get("/groups/discover");
+            expect(res.status).toBe(401);
+        });
+    });
+
+    // ─── Join ─────────────────────────────────────────────────────────────────
+
+    describe("POST /groups/:id/join", () => {
+        it("allows a climber to join a public group", async () => {
+            const group = await Group.create({
+                name: "Open Group",
+                visibility: "public",
+                creator: climber2._id,
+                members: [{ user: climber2._id, role: "admin" }],
+            });
+
+            const res = await request(app)
+                .post(`/groups/${group._id}/join`)
+                .set("Authorization", `Bearer ${token1}`);
+
+            expect(res.status).toBe(200);
+            expect(res.body.group.members.some((m) => m.user.id === climber1._id.toString() || m.user._id === climber1._id.toString())).toBe(true);
+        });
+
+        it("returns 403 when trying to join a private group", async () => {
+            const group = await Group.create({
+                name: "Private Group",
+                visibility: "private",
+                creator: climber2._id,
+                members: [{ user: climber2._id, role: "admin" }],
+            });
+
+            const res = await request(app)
+                .post(`/groups/${group._id}/join`)
+                .set("Authorization", `Bearer ${token1}`);
+
+            expect(res.status).toBe(403);
+        });
+
+        it("returns 409 when already a member", async () => {
+            const group = await Group.create({
+                name: "Open Group 2",
+                visibility: "public",
+                creator: climber1._id,
+                members: [{ user: climber1._id, role: "admin" }],
+            });
+
+            const res = await request(app)
+                .post(`/groups/${group._id}/join`)
+                .set("Authorization", `Bearer ${token1}`);
+
+            expect(res.status).toBe(409);
+        });
+
+        it("returns 404 for a non-existent group", async () => {
+            const res = await request(app)
+                .post(`/groups/${new mongoose.Types.ObjectId()}/join`)
+                .set("Authorization", `Bearer ${token1}`);
+
+            expect(res.status).toBe(404);
+        });
+
+        it("requires authentication", async () => {
+            const group = await Group.create({
+                name: "Auth Group",
+                visibility: "public",
+                creator: climber2._id,
+                members: [{ user: climber2._id, role: "admin" }],
+            });
+
+            const res = await request(app).post(`/groups/${group._id}/join`);
+            expect(res.status).toBe(401);
         });
     });
 });
