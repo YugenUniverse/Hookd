@@ -100,6 +100,7 @@ class _GroupsPageState extends State<GroupsPage>
     return Scaffold(
       appBar: AppBar(
         title: const Text('Groups'),
+        centerTitle: true,
         bottom: TabBar(
           controller: _tabController,
           tabs: const [

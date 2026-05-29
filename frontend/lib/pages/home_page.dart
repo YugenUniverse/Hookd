@@ -36,6 +36,8 @@ class _MyHomePageState extends State<MyHomePage>
   bool _avatarLoadAttempted = false;
   int? _openIssueCount;
   String? _worstSeverity; // 'HIGH', 'MEDIUM', 'LOW', or null
+  Widget? _panelContent;
+  String? _panelTag;
 
   @override
   void initState() {
@@ -91,6 +93,28 @@ class _MyHomePageState extends State<MyHomePage>
   }
 
   Future<void> _openIssuesPage() async {
+    if (_usePanelNav) {
+      _showPanel(
+        PublicBodyIssuesPage(
+          onWallTapped: (wallId, wallName, lat, lng) {
+            _closePanel();
+            _mapController.focusOnWall(Wall(
+              id: wallId,
+              name: wallName,
+              latitude: lat,
+              longitude: lng,
+              description: '',
+              difficulty: 'UNKNOWN',
+              wallType: 'OutdoorWall',
+              sessions: [],
+              issues: [],
+            ));
+          },
+        ),
+        'issues',
+      );
+      return;
+    }
     await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => PublicBodyIssuesPage(
@@ -131,6 +155,17 @@ class _MyHomePageState extends State<MyHomePage>
   }
 
   Future<void> _openWallSearch() async {
+    if (_usePanelNav) {
+      _showPanel(
+        _WallSearchSheet(
+          mapController: _mapController,
+          onLogWall: _openLogSessionSheetWithWall,
+          onClose: _closePanel,
+        ),
+        'search',
+      );
+      return;
+    }
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -144,32 +179,44 @@ class _MyHomePageState extends State<MyHomePage>
   }
 
   Future<void> _openLogSessionSheet() async {
-    await _runProtectedAction(
-      () => showModalBottomSheet(
+    await _runProtectedAction(() async {
+      if (_usePanelNav) {
+        _showPanel(const LogSessionPage(inPanel: true), 'log');
+        return;
+      }
+      await showModalBottomSheet(
         context: context,
         isScrollControlled: true,
         useSafeArea: true,
         showDragHandle: true,
         builder: (_) => const LogSessionPage(),
-      ),
-    );
+      );
+    });
   }
 
   Future<void> _openLogSessionSheetWithWall(Wall wall) async {
-    await _runProtectedAction(
-      () => showModalBottomSheet(
+    await _runProtectedAction(() async {
+      if (_usePanelNav) {
+        _showPanel(LogSessionPage(initialWall: wall, inPanel: true), 'log');
+        return;
+      }
+      await showModalBottomSheet(
         context: context,
         isScrollControlled: true,
         useSafeArea: true,
         showDragHandle: true,
         builder: (_) => LogSessionPage(initialWall: wall),
-      ),
-    );
+      );
+    });
   }
 
   Future<void> _openGroups() async {
     await _runProtectedAction(() async {
       if (!mounted) return;
+      if (_usePanelNav) {
+        _showPanel(const GroupsPage(), 'groups');
+        return;
+      }
       await Navigator.of(context).push(
         MaterialPageRoute(builder: (_) => const GroupsPage()),
       );
@@ -177,6 +224,10 @@ class _MyHomePageState extends State<MyHomePage>
   }
 
   void _openEvents() {
+    if (_usePanelNav) {
+      _showPanel(const ActiveEventsPage(), 'events');
+      return;
+    }
     Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const ActiveEventsPage()),
@@ -184,6 +235,10 @@ class _MyHomePageState extends State<MyHomePage>
   }
 
   void _openGlobalLeaderboard() {
+    if (_usePanelNav) {
+      _showPanel(const GlobalLeaderboardPage(), 'leaderboard');
+      return;
+    }
     Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const GlobalLeaderboardPage()),
@@ -219,6 +274,11 @@ class _MyHomePageState extends State<MyHomePage>
       _ => const UserPage(),
     };
 
+    if (_usePanelNav) {
+      _showPanel(page, 'account');
+      return;
+    }
+
     if (!mounted) return;
     await Navigator.of(context).push(MaterialPageRoute(builder: (_) => page));
   }
@@ -229,6 +289,30 @@ class _MyHomePageState extends State<MyHomePage>
     'LOW' => Colors.amber,
     _ => null,
   };
+
+  bool get _usePanelNav => _isDesktopLike;
+
+  void _showPanel(Widget child, String tag) {
+    if (_panelTag == tag) {
+      _closePanel();
+      return;
+    }
+    setState(() {
+      _panelContent = child;
+      _panelTag = tag;
+    });
+    _navExpand.forward();
+  }
+
+  void _closePanel() {
+    final closingTag = _panelTag;
+    setState(() {
+      _panelContent = null;
+      _panelTag = null;
+    });
+    if (closingTag == 'issues') _loadIssueCount();
+    _navExpand.reverse();
+  }
 
   bool get _isDesktopLike {
     if (kIsWeb) return true;
@@ -315,17 +399,73 @@ class _MyHomePageState extends State<MyHomePage>
         );
       }
 
+      final screenWidth = MediaQuery.of(context).size.width;
+      final panelWidth = (screenWidth - 224).clamp(0.0, 560.0);
+
       return Scaffold(
         body: SafeArea(
           child: Stack(
             children: [
               POIMap(controller: _mapController),
               Positioned(
+                left: 208,
+                top: 16,
+                bottom: 16,
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 220),
+                  switchInCurve: Curves.easeOutCubic,
+                  switchOutCurve: Curves.easeInCubic,
+                  transitionBuilder: (child, animation) => SlideTransition(
+                    position: Tween<Offset>(
+                      begin: const Offset(-0.12, 0),
+                      end: Offset.zero,
+                    ).animate(animation),
+                    child: FadeTransition(opacity: animation, child: child),
+                  ),
+                  child: _panelContent != null
+                      ? KeyedSubtree(
+                          key: ValueKey(_panelTag),
+                          child: SizedBox(
+                            width: panelWidth,
+                            child: Material(
+                              elevation: 10,
+                              borderRadius: BorderRadius.circular(24),
+                              color: cs.surface,
+                              clipBehavior: Clip.antiAlias,
+                              child: Column(
+                                mainAxisSize: MainAxisSize.max,
+                                children: [
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.end,
+                                    children: [
+                                      IconButton(
+                                        icon: const Icon(Icons.close, size: 18),
+                                        style: IconButton.styleFrom(
+                                          foregroundColor: cs.onSurfaceVariant,
+                                          minimumSize: const Size(40, 40),
+                                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                        ),
+                                        onPressed: _closePanel,
+                                      ),
+                                    ],
+                                  ),
+                                  Expanded(child: _panelContent!),
+                                ],
+                              ),
+                            ),
+                          ),
+                        )
+                      : const SizedBox.shrink(),
+                ),
+              ),
+              Positioned(
                 left: 16,
                 top: 16,
                 child: MouseRegion(
                   onEnter: (_) => _navExpand.forward(),
-                  onExit: (_) => _navExpand.reverse(),
+                  onExit: (_) {
+                    if (_panelTag == null) _navExpand.reverse();
+                  },
                   child: AnimatedBuilder(
                     animation: _navAnim,
                     builder: (context, _) {
@@ -345,26 +485,29 @@ class _MyHomePageState extends State<MyHomePage>
                               navBtn(
                                 icon: Icons.map_outlined,
                                 label: 'Map',
-                                onTap: () {},
-                                selected: true,
+                                onTap: _closePanel,
+                                selected: _panelTag == null,
                                 t: t,
                               ),
                               navBtn(
                                 icon: Icons.search,
                                 label: 'Search',
                                 onTap: _openWallSearch,
+                                selected: _panelTag == 'search',
                                 t: t,
                               ),
                               navBtn(
                                 icon: Icons.event,
                                 label: 'Events',
                                 onTap: _openEvents,
+                                selected: _panelTag == 'events',
                                 t: t,
                               ),
                               navBtn(
                                 icon: Icons.leaderboard_outlined,
                                 label: 'Rank',
                                 onTap: _openGlobalLeaderboard,
+                                selected: _panelTag == 'leaderboard',
                                 t: t,
                               ),
                               if (!isOwnerType)
@@ -372,6 +515,7 @@ class _MyHomePageState extends State<MyHomePage>
                                   icon: Icons.edit_calendar_outlined,
                                   label: 'Log climb',
                                   onTap: _openLogSessionSheet,
+                                  selected: _panelTag == 'log',
                                   lockBadge: !isAuthenticated
                                       ? Positioned(
                                           right: -2,
@@ -390,6 +534,7 @@ class _MyHomePageState extends State<MyHomePage>
                                   icon: Icons.group_outlined,
                                   label: 'Groups',
                                   onTap: _openGroups,
+                                  selected: _panelTag == 'groups',
                                   t: t,
                                 ),
                               if (userType == 'PublicBody')
@@ -397,6 +542,7 @@ class _MyHomePageState extends State<MyHomePage>
                                   icon: Icons.warning_outlined,
                                   label: 'Issues',
                                   onTap: _openIssuesPage,
+                                  selected: _panelTag == 'issues',
                                   customIcon: Badge(
                                     isLabelVisible: _openIssueCount != null && _openIssueCount! > 0,
                                     label: Text('${_openIssueCount ?? 0}'),
@@ -411,6 +557,7 @@ class _MyHomePageState extends State<MyHomePage>
                                     : Icons.login,
                                 label: isAuthenticated ? 'Me' : 'Login',
                                 onTap: _openAccountPage,
+                                selected: _panelTag == 'account',
                                 customIcon: isAuthenticated
                                     ? _buildAvatarWidget(radius: 12)
                                     : null,
@@ -514,10 +661,12 @@ class _WallSearchSheet extends StatefulWidget {
   const _WallSearchSheet({
     required this.mapController,
     required this.onLogWall,
+    this.onClose,
   });
 
   final WallMapController mapController;
   final Future<void> Function(Wall wall) onLogWall;
+  final VoidCallback? onClose;
 
   @override
   State<_WallSearchSheet> createState() => _WallSearchSheetState();
@@ -653,7 +802,11 @@ class _WallSearchSheetState extends State<_WallSearchSheet> {
     );
 
     final rootContext = Navigator.of(context, rootNavigator: true).context;
-    Navigator.of(context).pop();
+    if (widget.onClose != null) {
+      widget.onClose!();
+    } else {
+      Navigator.of(context).pop();
+    }
 
     if (!AuthService().isAuthenticated) {
       final loggedIn = await showLoginDialog(rootContext);
@@ -674,6 +827,7 @@ class _WallSearchSheetState extends State<_WallSearchSheet> {
   void _onQueryChanged(String value) {
     _debounce?.cancel();
     _debounce = Timer(const Duration(milliseconds: 300), _search);
+    setState(() {});
   }
 
   void _setPoiType(String value) {
@@ -725,7 +879,11 @@ class _WallSearchSheetState extends State<_WallSearchSheet> {
   }
 
   void _selectPoi(Poi poi) {
-    Navigator.of(context).pop();
+    if (widget.onClose != null) {
+      widget.onClose!();
+    } else {
+      Navigator.of(context).pop();
+    }
     if (poi is FacilityPoi) {
       widget.mapController.focusOnFacility(poi);
     } else if (poi is OutdoorWallPoi) {
@@ -750,35 +908,45 @@ class _WallSearchSheetState extends State<_WallSearchSheet> {
   @override
   Widget build(BuildContext context) {
     final isAuthenticated = AuthService().isAuthenticated;
+    final cs = Theme.of(context).colorScheme;
 
-    return SizedBox(
-      height: MediaQuery.of(context).size.height * 0.85,
+    final body = Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [cs.surface, cs.surfaceContainerHighest.withValues(alpha: 0.85)],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+        ),
+      ),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
               'Search climbing spots',
+              textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.titleLarge,
             ),
-            const SizedBox(height: 12),
-            TextField(
+            const SizedBox(height: 20),
+            SearchBar(
               controller: _controller,
-              autofocus: true,
-              textInputAction: TextInputAction.search,
+              autoFocus: true,
+              hintText: 'Search facilities and outdoor walls',
+              leading: const Icon(Icons.search),
               onChanged: _onQueryChanged,
               onSubmitted: (_) => _search(),
-              decoration: InputDecoration(
-                hintText: 'Search facilities and outdoor walls',
-                prefixIcon: const Icon(Icons.search),
-                suffixIcon: IconButton(
-                  tooltip: 'Search',
-                  icon: const Icon(Icons.arrow_forward),
-                  onPressed: _search,
-                ),
-                border: const OutlineInputBorder(),
-              ),
+              trailing: [
+                if (_controller.text.isNotEmpty)
+                  IconButton(
+                    icon: const Icon(Icons.clear),
+                    tooltip: 'Clear',
+                    onPressed: () {
+                      _controller.clear();
+                      _onQueryChanged('');
+                    },
+                  ),
+              ],
             ),
             const SizedBox(height: 12),
             SingleChildScrollView(
@@ -964,6 +1132,11 @@ class _WallSearchSheetState extends State<_WallSearchSheet> {
           ],
         ),
       ),
+    );
+    if (widget.onClose != null) return body;
+    return SizedBox(
+      height: MediaQuery.of(context).size.height * 0.85,
+      child: body,
     );
   }
 }

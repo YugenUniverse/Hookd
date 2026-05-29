@@ -6,9 +6,10 @@ import '../services/api_service.dart';
 import '../services/wall_service.dart';
 
 class LogSessionPage extends StatefulWidget {
-  const LogSessionPage({super.key, this.initialWall});
+  const LogSessionPage({super.key, this.initialWall, this.inPanel = false});
 
   final Wall? initialWall;
+  final bool inPanel;
 
   @override
   State<LogSessionPage> createState() => _LogSessionPageState();
@@ -178,8 +179,15 @@ class _LogSessionPageState extends State<LogSessionPage> {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: MediaQuery.of(context).size.height * 0.9,
+    final cs = Theme.of(context).colorScheme;
+    final body = Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [cs.surface, cs.surfaceContainerHighest.withValues(alpha: 0.85)],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+        ),
+      ),
       child: SafeArea(
         child: Form(
           key: _formKey,
@@ -193,28 +201,26 @@ class _LogSessionPageState extends State<LogSessionPage> {
             children: [
               Text(
                 'Log climbing session',
+                textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.titleLarge,
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 20),
               Text('Wall', style: Theme.of(context).textTheme.titleMedium),
               const SizedBox(height: 8),
-              TextField(
-                controller: _wallQueryController,
-                textInputAction: TextInputAction.search,
-                enabled: _selectedWall == null,
-                decoration: InputDecoration(
+              if (_selectedWall == null)
+                SearchBar(
+                  controller: _wallQueryController,
                   hintText: 'Search wall by name',
-                  prefixIcon: const Icon(Icons.search),
-                  suffixIcon: IconButton(
-                    icon: const Icon(Icons.arrow_forward),
-                    tooltip: 'Search',
-                    onPressed: _loadingWalls ? null : _searchWalls,
-                  ),
-                  border: const OutlineInputBorder(),
+                  leading: const Icon(Icons.search),
+                  onSubmitted: (_) => _searchWalls(),
+                  trailing: [
+                    IconButton(
+                      icon: const Icon(Icons.arrow_forward),
+                      tooltip: 'Search',
+                      onPressed: _loadingWalls ? null : _searchWalls,
+                    ),
+                  ],
                 ),
-                onSubmitted: (_) =>
-                    _selectedWall == null ? _searchWalls() : null,
-              ),
               const SizedBox(height: 8),
               if (_selectedWall != null)
                 Card(
@@ -353,6 +359,11 @@ class _LogSessionPageState extends State<LogSessionPage> {
           ),
         ),
       ),
+    );
+    if (widget.inPanel) return body;
+    return SizedBox(
+      height: MediaQuery.of(context).size.height * 0.9,
+      child: body,
     );
   }
 }

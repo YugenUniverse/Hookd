@@ -111,6 +111,7 @@ class _UserPageState extends State<UserPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Your profile'),
+        centerTitle: true,
         actions: [
           IconButton(
             tooltip: 'Log out',

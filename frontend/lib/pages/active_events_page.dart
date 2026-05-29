@@ -90,8 +90,18 @@ class _ActiveEventsPageState extends State<ActiveEventsPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Active Events'),
+        centerTitle: true,
       ),
-      body: content,
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [cs.surface, cs.surfaceContainerHighest.withValues(alpha: 0.85)],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          ),
+        ),
+        child: content,
+      ),
     );
   }
 }

@@ -75,17 +75,26 @@ class _GlobalLeaderboardPageState extends State<GlobalLeaderboardPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          'Global Rankings',
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
+        title: const Text('Global Rankings'),
         centerTitle: true,
         elevation: 0,
       ),
-      body: RefreshIndicator(
-        onRefresh: _fetchGlobalLeaderboard,
-        color: Theme.of(context).colorScheme.primary,
-        child: _buildBody(),
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              Theme.of(context).colorScheme.surface,
+              Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.85),
+            ],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          ),
+        ),
+        child: RefreshIndicator(
+          onRefresh: _fetchGlobalLeaderboard,
+          color: Theme.of(context).colorScheme.primary,
+          child: _buildBody(),
+        ),
       ),
     );
   }

@@ -26,6 +26,7 @@ class _PublicBodyIssuesPageState extends State<PublicBodyIssuesPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Critical Issues'),
+        centerTitle: true,
       ),
       body: Container(
         decoration: BoxDecoration(

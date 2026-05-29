@@ -83,6 +83,7 @@ class _PublicBodyPageState extends State<PublicBodyPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Your profile'),
+        centerTitle: true,
         actions: [
           IconButton(
             tooltip: 'Log out',
