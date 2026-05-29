@@ -8,14 +8,50 @@ const notificationService = require("./notification.service");
 
 const err = (msg, code) => Object.assign(new Error(msg), { statusCode: code });
 
-exports.createGroup = async (creatorId, { name, description }) => {
+exports.createGroup = async (creatorId, { name, description, visibility }) => {
     const group = await Group.create({
         name,
         description,
+        visibility: visibility === "public" ? "public" : "private",
         creator: creatorId,
         members: [{ user: creatorId, role: "admin", joinedAt: new Date() }],
     });
     return group;
+};
+
+exports.discoverGroups = async (userId, { search } = {}) => {
+    const query = {
+        visibility: "public",
+        "members.user": { $ne: userId },
+    };
+    if (search) {
+        query.name = { $regex: search.trim(), $options: "i" };
+    }
+    const groups = await Group.find(query)
+        .select("name description visibility members createdAt")
+        .sort({ createdAt: -1 })
+        .limit(50);
+    return groups.map((g) => ({
+        id: g.id,
+        name: g.name,
+        description: g.description,
+        visibility: g.visibility,
+        memberCount: g.members.length,
+        createdAt: g.createdAt,
+    }));
+};
+
+exports.joinPublicGroup = async (groupId, userId) => {
+    const group = await Group.findById(groupId);
+    if (!group) throw err("Group not found", 404);
+    if (group.visibility !== "public") throw err("This group is private", 403);
+    const alreadyMember = group.members.some((m) => m.user.toString() === userId.toString());
+    if (alreadyMember) throw err("Already a member", 409);
+    group.members.push({ user: userId, role: "member", joinedAt: new Date() });
+    await group.save();
+    return Group.findById(groupId)
+        .populate("members.user", "name username")
+        .populate("creator", "name username");
 };
 
 exports.getGroupsForUser = async (userId) => {
@@ -40,9 +76,10 @@ exports.updateGroup = async (groupId, adminId, patch) => {
     const group = await Group.findById(groupId);
     if (!group) throw err("Group not found", 404);
     _requireAdmin(group, adminId);
-    const { name, description } = patch;
+    const { name, description, visibility } = patch;
     if (name !== undefined) group.name = name;
     if (description !== undefined) group.description = description;
+    if (visibility === "public" || visibility === "private") group.visibility = visibility;
     return group.save();
 };
 
@@ -219,11 +256,30 @@ exports.removeMember = async (groupId, requesterId, targetId) => {
     );
     if (memberIndex === -1) throw err("User is not a member", 404);
 
-    // Prevent removing the last admin
     const isTargetAdmin = group.members[memberIndex].role === "admin";
-    const adminCount = group.members.filter((m) => m.role === "admin").length;
-    if (isTargetAdmin && adminCount === 1) {
-        throw err("Cannot remove the last admin", 409);
+
+    if (isSelf && isTargetAdmin) {
+        // Admin leaving: require at least one other member; auto-promote if no other admin
+        const others = group.members.filter(
+            (m) => m.user.toString() !== targetId.toString(),
+        );
+        if (others.length === 0) {
+            throw err("You are the only member. Delete the group instead.", 409);
+        }
+        const hasOtherAdmin = others.some((m) => m.role === "admin");
+        if (!hasOtherAdmin) {
+            const earliest = others.reduce((a, b) =>
+                new Date(a.joinedAt) <= new Date(b.joinedAt) ? a : b,
+            );
+            const toPromote = group.members.find(
+                (m) => m.user.toString() === earliest.user.toString(),
+            );
+            toPromote.role = "admin";
+        }
+    } else if (!isSelf && isTargetAdmin) {
+        // Admin forcibly removing another admin: keep last-admin guard
+        const adminCount = group.members.filter((m) => m.role === "admin").length;
+        if (adminCount === 1) throw err("Cannot remove the last admin", 409);
     }
 
     group.members.splice(memberIndex, 1);

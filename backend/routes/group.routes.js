@@ -17,6 +17,16 @@ router.post("/", async (req, res, next) => {
     }
 });
 
+// Discover public groups (excludes groups the requester already belongs to)
+router.get("/discover", async (req, res, next) => {
+    try {
+        const groups = await groupService.discoverGroups(req.user.id, { search: req.query.search });
+        res.json({ groups });
+    } catch (err) {
+        next(err);
+    }
+});
+
 // List groups the current user belongs to
 router.get("/mine", async (req, res, next) => {
     try {
@@ -83,6 +93,16 @@ router.delete("/:id", async (req, res, next) => {
     try {
         await groupService.deleteGroup(req.params.id, req.user.id);
         res.status(204).end();
+    } catch (err) {
+        next(err);
+    }
+});
+
+// Join a public group directly
+router.post("/:id/join", async (req, res, next) => {
+    try {
+        const group = await groupService.joinPublicGroup(req.params.id, req.user.id);
+        res.json({ group });
     } catch (err) {
         next(err);
     }
