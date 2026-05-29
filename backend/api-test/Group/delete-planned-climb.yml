@@ -1,0 +1,24 @@
+info:
+    name: delete-planned-climb
+    type: http
+    seq: 13
+
+http:
+    method: DELETE
+    url: http://localhost:3000/groups/:id/climbs/:climbId
+    params:
+        - name: id
+          value: 6a021092a362ceb8f7bd15fd
+          type: path
+        - name: climbId
+          value: 6a021092a362ceb8f7bd15ff
+          type: path
+    auth:
+        type: bearer
+        token:
+
+settings:
+    encodeUrl: true
+    timeout: 0
+    followRedirects: true
+    maxRedirects: 5

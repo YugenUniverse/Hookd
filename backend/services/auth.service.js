@@ -151,6 +151,13 @@ exports.register = async ({
         throw error;
     }
 
+    const existingUsername = await User.findOne({ username: username.toLowerCase().trim() });
+    if (existingUsername) {
+        const error = new Error("Username is already taken");
+        error.statusCode = 409;
+        throw error;
+    }
+
     let user;
     const normalizedUserType = (userType || "Climber").trim();
     const baseUserData = {

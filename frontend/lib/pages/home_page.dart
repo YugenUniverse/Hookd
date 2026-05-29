@@ -14,6 +14,7 @@ import '../pages/log_session_page.dart';
 import '../pages/public_body_issues_page.dart';
 import '../pages/public_body_page.dart';
 import '../pages/user_page.dart';
+import '../pages/groups_page.dart';
 import '../services/api_service.dart';
 import '../utils/image_helpers.dart';
 import 'package:geolocator/geolocator.dart';
@@ -164,6 +165,15 @@ class _MyHomePageState extends State<MyHomePage>
         builder: (_) => LogSessionPage(initialWall: wall),
       ),
     );
+  }
+
+  Future<void> _openGroups() async {
+    await _runProtectedAction(() async {
+      if (!mounted) return;
+      await Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const GroupsPage()),
+      );
+    });
   }
 
   void _openEvents() {
@@ -375,6 +385,13 @@ class _MyHomePageState extends State<MyHomePage>
                                       : null,
                                   t: t,
                                 ),
+                              if (!isOwnerType)
+                                navBtn(
+                                  icon: Icons.group_outlined,
+                                  label: 'Groups',
+                                  onTap: _openGroups,
+                                  t: t,
+                                ),
                               if (userType == 'PublicBody')
                                 navBtn(
                                   icon: Icons.warning_outlined,
@@ -453,6 +470,13 @@ class _MyHomePageState extends State<MyHomePage>
                     label: 'Log',
                     hint: isAuthenticated ? null : 'Login',
                     onTap: _openLogSessionSheet,
+                  ),
+                if (!isOwnerType)
+                  _NavItem(
+                    tooltip: 'My groups',
+                    icon: Icons.group_outlined,
+                    label: 'Groups',
+                    onTap: _openGroups,
                   ),
                 if (userType == 'PublicBody')
                   _NavItem(

@@ -1,0 +1,28 @@
+info:
+    name: update-group
+    type: http
+    seq: 4
+
+http:
+    method: PATCH
+    url: http://localhost:3000/groups/:id
+    params:
+        - name: id
+          value: 6a021092a362ceb8f7bd15fd
+          type: path
+    body:
+        type: json
+        data: |-
+            {
+                "name": "Updated Crew Name",
+                "description": "Updated description"
+            }
+    auth:
+        type: bearer
+        token:
+
+settings:
+    encodeUrl: true
+    timeout: 0
+    followRedirects: true
+    maxRedirects: 5

@@ -1,0 +1,24 @@
+info:
+    name: remove-member
+    type: http
+    seq: 7
+
+http:
+    method: DELETE
+    url: http://localhost:3000/groups/:id/members/:userId
+    params:
+        - name: id
+          value: 6a021092a362ceb8f7bd15fd
+          type: path
+        - name: userId
+          value: 6a021092a362ceb8f7bd15fe
+          type: path
+    auth:
+        type: bearer
+        token:
+
+settings:
+    encodeUrl: true
+    timeout: 0
+    followRedirects: true
+    maxRedirects: 5

@@ -9,7 +9,7 @@ const notificationSchema = new mongoose.Schema(
         },
         type: {
             type: String,
-            enum: ["new_event"],
+            enum: ["new_event", "new_issue", "group_invite"],
             required: true,
         },
         payload: {
