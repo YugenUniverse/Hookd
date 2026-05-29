@@ -183,6 +183,32 @@ exports.getReportById = async (req, res, next) => {
     }
 };
 
+exports.exportSavedReportCsv = async (req, res, next) => {
+    try {
+        const report = await reportService.getReportById(
+            req.params.id,
+            req.user.id,
+        );
+
+        const csv = reportService.generateSavedReportCsv(report, req.query);
+        const safeTitle = (report.title || "report")
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, "-")
+            .replace(/^-+|-+$/g, "")
+            .slice(0, 40);
+        const timestamp = new Date().toISOString().slice(0, 10);
+
+        res.setHeader("Content-Type", "text/csv; charset=utf-8");
+        res.setHeader(
+            "Content-Disposition",
+            `attachment; filename="${safeTitle || "report"}-${timestamp}.csv"`,
+        );
+        res.status(200).send(csv);
+    } catch (err) {
+        next(err);
+    }
+};
+
 exports.deleteReport = async (req, res, next) => {
     try {
         await reportService.deleteReport(req.params.id, req.user.id);

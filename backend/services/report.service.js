@@ -561,6 +561,250 @@ exports.saveGroupReport = async (ownerId, wallIds, title, notes) => {
     return newReport;
 };
 
+const EXPORT_SECTION_MAP = {
+    engagement: (report, rows) => {
+        const sectionData =
+            report.reportType === "GroupReport"
+                ? report.reportData?.aggregatedEngagement || {}
+                : report.reportData?.engagement || {};
+
+        Object.entries(sectionData).forEach(([metric, value]) => {
+            rows.push(["engagement", metric, "", value ?? "", ""]);
+        });
+    },
+    quality: (report, rows) => {
+        const sectionData =
+            report.reportType === "GroupReport"
+                ? report.reportData?.aggregatedQuality || {}
+                : report.reportData?.quality || {};
+
+        Object.entries(sectionData).forEach(([metric, value]) => {
+            if (metric === "distribution" && Array.isArray(value)) {
+                value.forEach((entry) => {
+                    rows.push([
+                        "quality",
+                        "distribution",
+                        `stars:${entry.stars}`,
+                        entry.count ?? "",
+                        "",
+                    ]);
+                });
+                return;
+            }
+
+            rows.push(["quality", metric, "", value ?? "", ""]);
+        });
+    },
+    trends: (report, rows) => {
+        const trendData =
+            report.reportType === "GroupReport"
+                ? report.reportData?.aggregatedTrends || {}
+                : report.reportData?.trends || {};
+
+        (trendData.last30Days || []).forEach((entry) => {
+            rows.push([
+                "trends",
+                "last30Days",
+                entry.date,
+                entry.sessions ?? "",
+                "",
+            ]);
+        });
+
+        (trendData.byDayOfWeek || []).forEach((entry) => {
+            rows.push([
+                "trends",
+                "byDayOfWeek",
+                `${entry.day}`,
+                entry.count ?? "",
+                "",
+            ]);
+        });
+
+        (trendData.byHourOfDay || []).forEach((entry) => {
+            rows.push([
+                "trends",
+                "byHourOfDay",
+                `${entry.hour}`,
+                entry.count ?? "",
+                "",
+            ]);
+        });
+    },
+    feedback: (report, rows) => {
+        const feedbackData =
+            report.reportType === "GroupReport"
+                ? report.reportData?.aggregatedFeedback || []
+                : report.reportData?.recentFeedback || [];
+
+        feedbackData.forEach((entry) => {
+            rows.push([
+                "feedback",
+                "rating",
+                entry.date || "",
+                entry.rating ?? "",
+                entry.body || "",
+            ]);
+        });
+    },
+    issues: (report, rows) => {
+        const issuesData =
+            report.reportType === "GroupReport"
+                ? report.reportData?.aggregatedIssues || []
+                : report.reportData?.recentIssues || [];
+
+        issuesData.forEach((entry) => {
+            rows.push([
+                "issues",
+                entry.status || "status",
+                entry.date || "",
+                entry.status ?? "",
+                entry.body || "",
+            ]);
+        });
+    },
+    demographics: (report, rows) => {
+        const demographicsData =
+            report.reportType === "GroupReport"
+                ? report.reportData?.aggregatedDemographics || []
+                : report.reportData?.demographics || [];
+
+        demographicsData.forEach((entry) => {
+            rows.push([
+                "demographics",
+                "bracket",
+                entry.bracket || "",
+                entry.count ?? "",
+                "",
+            ]);
+        });
+    },
+    wallComparisons: (report, rows) => {
+        if (report.reportType !== "GroupReport") return;
+
+        (report.reportData?.wallComparisons || []).forEach((comparison) => {
+            const wallName =
+                comparison.wallName || comparison.wallId || "Unknown Wall";
+
+            Object.entries(comparison.engagement || {}).forEach(
+                ([metric, value]) => {
+                    rows.push([
+                        "wallComparisons",
+                        `engagement.${metric}`,
+                        wallName,
+                        value ?? "",
+                        "",
+                    ]);
+                },
+            );
+
+            Object.entries(comparison.quality || {}).forEach(
+                ([metric, value]) => {
+                    if (metric === "distribution" && Array.isArray(value)) {
+                        value.forEach((entry) => {
+                            rows.push([
+                                "wallComparisons",
+                                "quality.distribution",
+                                wallName,
+                                entry.count ?? "",
+                                `stars:${entry.stars}`,
+                            ]);
+                        });
+                        return;
+                    }
+
+                    rows.push([
+                        "wallComparisons",
+                        `quality.${metric}`,
+                        wallName,
+                        value ?? "",
+                        "",
+                    ]);
+                },
+            );
+        });
+    },
+};
+
+const escapeCsvValue = (value) => {
+    if (value === null || value === undefined) return "";
+
+    const stringValue = Array.isArray(value) ? value.join("; ") : String(value);
+
+    if (/[",\n\r]/.test(stringValue)) {
+        return `"${stringValue.replace(/"/g, '""')}"`;
+    }
+
+    return stringValue;
+};
+
+exports.generateSavedReportCsv = (report, query = {}) => {
+    const requestedSections = (query.sections || "")
+        .split(",")
+        .map((section) => section.trim())
+        .filter(Boolean);
+
+    const availableSections = Object.keys(EXPORT_SECTION_MAP);
+    const selectedSections =
+        requestedSections.length > 0 ? requestedSections : availableSections;
+
+    const invalidSections = selectedSections.filter(
+        (section) => !availableSections.includes(section),
+    );
+
+    if (invalidSections.length > 0) {
+        const error = new Error(
+            `Unsupported export sections: ${invalidSections.join(", ")}`,
+        );
+        error.statusCode = 400;
+        throw error;
+    }
+
+    const rows = [["section", "metric", "sub_metric", "value", "detail"]];
+
+    selectedSections.forEach((section) => {
+        EXPORT_SECTION_MAP[section](report, rows);
+    });
+
+    const reportType = report.reportType || "BaseReport";
+    const wallNames =
+        report.wall_ids && Array.isArray(report.wall_ids)
+            ? report.wall_ids
+                  .map((wall) => wall?.name || wall?.toString())
+                  .filter(Boolean)
+            : report.wall_id
+              ? [report.wall_id?.name || report.wall_id?.toString()].filter(
+                    Boolean,
+                )
+              : [];
+
+    const metadataRows = [
+        [
+            "metadata",
+            "report_id",
+            "",
+            report._id?.toString() || report.id || "",
+            "",
+        ],
+        ["metadata", "report_type", "", reportType, ""],
+        ["metadata", "title", "", report.title || "", ""],
+        ["metadata", "notes", "", report.notes || "", ""],
+        [
+            "metadata",
+            "created_at",
+            "",
+            report.createdAt ? new Date(report.createdAt).toISOString() : "",
+            "",
+        ],
+        ["metadata", "walls", "", wallNames.join("; "), ""],
+    ];
+
+    const csvRows = [...metadataRows, ...rows];
+    return csvRows
+        .map((row) => row.map((cell) => escapeCsvValue(cell)).join(","))
+        .join("\n");
+};
+
 exports.getReportsList = async (ownerId) => {
     return await Report.find({ owner_id: ownerId })
         .select("-reportData")
