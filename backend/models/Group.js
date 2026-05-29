@@ -14,6 +14,7 @@ const groupSchema = new Schema(
     {
         name: { type: String, required: true, trim: true, maxlength: 100 },
         description: { type: String, trim: true, maxlength: 500 },
+        visibility: { type: String, enum: ["public", "private"], default: "private" },
         creator: { type: ObjectId, ref: "User", required: true },
         members: { type: [memberSchema], default: [] },
     },

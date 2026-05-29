@@ -15,6 +15,7 @@ class _CreateGroupPageState extends State<CreateGroupPage> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _descController = TextEditingController();
+  bool _isPublic = false;
   bool _saving = false;
 
   @override
@@ -32,6 +33,7 @@ class _CreateGroupPageState extends State<CreateGroupPage> {
           description: _descController.text.trim().isEmpty
               ? null
               : _descController.text.trim(),
+          visibility: _isPublic ? 'public' : 'private',
         );
     if (!mounted) return;
     setState(() => _saving = false);
@@ -91,7 +93,22 @@ class _CreateGroupPageState extends State<CreateGroupPage> {
                       border: OutlineInputBorder(),
                     ),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 8),
+                  SwitchListTile(
+                    value: _isPublic,
+                    onChanged: (v) => setState(() => _isPublic = v),
+                    title: const Text('Public group'),
+                    subtitle: Text(
+                      _isPublic
+                          ? 'Anyone can find and join this group.'
+                          : 'Invite-only — only admins can add members.',
+                    ),
+                    secondary: Icon(
+                      _isPublic ? Icons.public : Icons.lock_outline,
+                    ),
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                  const SizedBox(height: 16),
                   FilledButton(
                     onPressed: _saving ? null : _submit,
                     child: _saving

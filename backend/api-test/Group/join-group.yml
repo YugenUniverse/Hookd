@@ -1,0 +1,21 @@
+info:
+    name: join-group
+    type: http
+    seq: 16
+
+http:
+    method: POST
+    url: http://localhost:3000/groups/:id/join
+    params:
+        - name: id
+          value: 6a021092a362ceb8f7bd15fd
+          type: path
+    auth:
+        type: bearer
+        token:
+
+settings:
+    encodeUrl: true
+    timeout: 0
+    followRedirects: true
+    maxRedirects: 5

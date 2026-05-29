@@ -46,8 +46,10 @@ class Group {
   final String id;
   final String name;
   final String? description;
+  final String visibility; // "public" or "private"
   final String creatorId;
   final List<GroupMember> members;
+  final int? memberCount; // only set in discover results (no member list populated)
   final DateTime? createdAt;
 
   const Group({
@@ -56,8 +58,12 @@ class Group {
     required this.creatorId,
     required this.members,
     this.description,
+    this.visibility = 'private',
+    this.memberCount,
     this.createdAt,
   });
+
+  bool get isPublic => visibility == 'public';
 
   factory Group.fromJson(Map<String, dynamic> json) {
     final membersRaw = json['members'];
@@ -81,8 +87,10 @@ class Group {
       id: (json['id'] ?? json['_id'] ?? '').toString(),
       name: (json['name'] ?? '').toString(),
       description: json['description']?.toString(),
+      visibility: (json['visibility'] ?? 'private').toString(),
       creatorId: creatorId,
       members: members,
+      memberCount: json['memberCount'] as int?,
       createdAt: createdAt,
     );
   }

@@ -15,7 +15,8 @@ http:
         data: |-
             {
                 "name": "Updated Crew Name",
-                "description": "Updated description"
+                "description": "Updated description",
+                "visibility": "private"
             }
     auth:
         type: bearer
