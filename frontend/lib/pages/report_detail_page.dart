@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../services/report_service.dart';
 import '../models/report.dart';
+import '../utils/download_csv_helper.dart';
 
 class ReportDetailPage extends StatefulWidget {
   final String reportId;
@@ -20,6 +21,7 @@ class ReportDetailPage extends StatefulWidget {
 class ReportDetailPageState extends State<ReportDetailPage> {
   late Future<Report> futureReport;
   int _selectedChartIndex = 0;
+  bool _isExporting = false;
 
   @override
   void initState() {
@@ -29,6 +31,68 @@ class ReportDetailPageState extends State<ReportDetailPage> {
 
   String _formatMetric(num value, {int decimals = 2}) {
     return value.toStringAsFixed(decimals);
+  }
+
+  Widget _buildExportButton(BuildContext context, Report report) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return OutlinedButton.icon(
+      onPressed: _isExporting
+          ? null
+          : () async {
+              setState(() {
+                _isExporting = true;
+              });
+
+              final messenger = ScaffoldMessenger.of(context);
+
+              try {
+                final csvContent = await widget.reportService.exportReportCsv(
+                  report.id,
+                );
+                final safeTitle = report.title
+                    .replaceAll(RegExp(r'[^A-Za-z0-9_-]'), '_')
+                    .replaceAll(RegExp(r'_+'), '_')
+                    .replaceAll(RegExp(r'^_+|_+?$'), '')
+                    .trim();
+                final fileName =
+                    '${safeTitle.isEmpty ? 'report' : safeTitle}-${DateTime.now().toIso8601String().substring(0, 10)}.csv';
+
+                downloadCsvFile(fileName, csvContent);
+                if (mounted) {
+                  messenger.showSnackBar(
+                    SnackBar(content: Text('CSV exported as $fileName')),
+                  );
+                }
+              } catch (error) {
+                if (mounted) {
+                  messenger.showSnackBar(
+                    SnackBar(content: Text('Failed to export CSV: $error')),
+                  );
+                }
+              } finally {
+                if (mounted) {
+                  setState(() {
+                    _isExporting = false;
+                  });
+                }
+              }
+            },
+      icon: _isExporting
+          ? const SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : const Icon(Icons.download_rounded, size: 18),
+      label: Text(_isExporting ? 'Exporting...' : 'Export CSV'),
+      style: OutlinedButton.styleFrom(
+        foregroundColor: colorScheme.primary,
+        side: BorderSide(color: colorScheme.outlineVariant),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    );
   }
 
   @override
@@ -84,20 +148,36 @@ class ReportDetailPageState extends State<ReportDetailPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text(
-                  report.title,
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                if (report.notes.isNotEmpty)
-                  Text(
-                    report.notes,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            report.title,
+                            style: Theme.of(context).textTheme.headlineSmall
+                                ?.copyWith(fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(height: 8),
+                          if (report.notes.isNotEmpty)
+                            Text(
+                              report.notes,
+                              style: Theme.of(context).textTheme.bodyMedium
+                                  ?.copyWith(
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.onSurfaceVariant,
+                                  ),
+                            ),
+                        ],
+                      ),
                     ),
-                  ),
+                    const SizedBox(width: 12),
+                    _buildExportButton(context, report),
+                  ],
+                ),
                 const SizedBox(height: 16),
                 if (wallNames.isNotEmpty) ...[
                   Wrap(
