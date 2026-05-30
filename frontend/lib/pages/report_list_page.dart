@@ -31,7 +31,9 @@ class ReportListPageState extends State<ReportListPage> {
   }
 
   void _openNewReportSelector() async {
-    showModalBottomSheet(
+    final wallsFuture = widget.reportService.getWalls();
+    final scrollController = ScrollController();
+    await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
@@ -102,7 +104,7 @@ class ReportListPageState extends State<ReportListPage> {
                   if (_groupReportMode) const SizedBox(height: 8),
                   Expanded(
                     child: FutureBuilder<List<dynamic>>(
-                      future: widget.reportService.getWalls(),
+                      future: wallsFuture,
                       builder: (context, snapshot) {
                         if (snapshot.connectionState ==
                             ConnectionState.waiting) {
@@ -125,6 +127,7 @@ class ReportListPageState extends State<ReportListPage> {
 
                         final walls = snapshot.data!;
                         return ListView.builder(
+                          controller: scrollController,
                           itemCount: walls.length,
                           itemBuilder: (context, index) {
                             final wall = walls[index];
@@ -226,6 +229,7 @@ class ReportListPageState extends State<ReportListPage> {
         );
       },
     );
+    scrollController.dispose();
   }
 
   @override

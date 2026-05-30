@@ -142,6 +142,42 @@ describe("Report Routes", () => {
             wall_id: wall._id,
             title: "Saved Report",
             notes: "Report notes",
+            reportData: {
+                engagement: {
+                    totalSessions: 12,
+                    uniqueClimbers: 8,
+                    retentionRate: 1.5,
+                    avgTimeMins: 22,
+                    fastestTimeMins: 5,
+                    totalSends: 7,
+                    totalAttempts: 5,
+                },
+                quality: {
+                    avgRating: 4.5,
+                    totalReviews: 3,
+                    distribution: [{ stars: 5, count: 3 }],
+                },
+                trends: {
+                    last30Days: [{ date: "2026-05-01", sessions: 4 }],
+                    byDayOfWeek: [{ day: 1, count: 4 }],
+                    byHourOfDay: [{ hour: 10, count: 4 }],
+                },
+                recentFeedback: [
+                    {
+                        rating: 5,
+                        body: "Great wall",
+                        date: "2026-05-02",
+                    },
+                ],
+                recentIssues: [
+                    {
+                        body: "Loose hold",
+                        status: "OPEN",
+                        date: "2026-05-03",
+                    },
+                ],
+                demographics: [{ bracket: "20-29", count: 4 }],
+            },
         });
 
         const response = await request(app).get(`/reports/saved/${saved._id}`);
@@ -149,6 +185,67 @@ describe("Report Routes", () => {
         expect(response.status).toBe(200);
         expect(response.body.id).toBe(saved._id.toString());
         expect(response.body.wall_id).toHaveProperty("name", "Report Wall");
+    });
+
+    it("GET /reports/saved/:id/export should stream a filtered CSV export", async () => {
+        const saved = await BaseReport.create({
+            owner_id: owner._id,
+            wall_id: wall._id,
+            title: "Export Report",
+            notes: "Export notes",
+            reportData: {
+                engagement: {
+                    totalSessions: 12,
+                    uniqueClimbers: 8,
+                    retentionRate: 1.5,
+                    avgTimeMins: 22,
+                    fastestTimeMins: 5,
+                    totalSends: 7,
+                    totalAttempts: 5,
+                },
+                quality: {
+                    avgRating: 4.5,
+                    totalReviews: 3,
+                    distribution: [{ stars: 5, count: 3 }],
+                },
+                trends: {
+                    last30Days: [{ date: "2026-05-01", sessions: 4 }],
+                    byDayOfWeek: [{ day: 1, count: 4 }],
+                    byHourOfDay: [{ hour: 10, count: 4 }],
+                },
+                recentFeedback: [
+                    {
+                        rating: 5,
+                        body: "Great wall",
+                        date: "2026-05-02",
+                    },
+                ],
+                recentIssues: [
+                    {
+                        body: "Loose hold",
+                        status: "OPEN",
+                        date: "2026-05-03",
+                    },
+                ],
+                demographics: [{ bracket: "20-29", count: 4 }],
+            },
+        });
+
+        const response = await request(app).get(
+            `/reports/saved/${saved._id}/export?sections=engagement,quality`,
+        );
+
+        expect(response.status).toBe(200);
+        expect(response.headers["content-type"]).toContain("text/csv");
+        expect(response.headers["content-disposition"]).toContain(
+            "attachment; filename=",
+        );
+        expect(response.text).toContain(
+            "section,metric,sub_metric,value,detail",
+        );
+        expect(response.text).toContain("engagement,totalSessions");
+        expect(response.text).toContain("12");
+        expect(response.text).not.toContain("recentFeedback");
     });
 
     it("DELETE /reports/saved/:id should remove the saved report", async () => {

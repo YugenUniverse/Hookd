@@ -22,6 +22,9 @@ router.post("/walls/save", reportController.saveGroupReport);
 // GET list of all saved reports (lightweight list)
 router.get("/saved", reportController.getReports);
 
+// GET saved report as CSV
+router.get("/saved/:id/export", reportController.exportSavedReportCsv);
+
 // GET a specific saved report (includes full heavy data)
 router.get("/saved/:id", reportController.getReportById);
 

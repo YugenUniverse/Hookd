@@ -300,4 +300,26 @@ class ReportService {
       throw Exception('Failed to load report details');
     }
   }
+
+  Future<String> exportReportCsv(
+    String reportId, {
+    List<String>? sections,
+  }) async {
+    final uri = Uri.parse('$baseUrl/reports/saved/$reportId/export').replace(
+      queryParameters: sections == null || sections.isEmpty
+          ? null
+          : {'sections': sections.join(',')},
+    );
+
+    final response = await http.get(
+      uri,
+      headers: {'Authorization': 'Bearer $token', 'Accept': 'text/csv'},
+    );
+
+    if (response.statusCode == 200) {
+      return response.body;
+    } else {
+      throw Exception('Failed to export CSV report');
+    }
+  }
 }
