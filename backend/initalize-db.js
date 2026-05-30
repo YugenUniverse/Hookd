@@ -13,12 +13,15 @@ const Badge = require("./models/Badge");
 
 const BASE_URL = process.env.BASE_URL || "http://localhost:3000";
 
+const stopPhaseIdx = process.argv.indexOf('--stop-at');
+const stopPhase = stopPhaseIdx !== -1 ? process.argv[stopPhaseIdx + 1] : null;
+
 // ==========================================
 // --- SEED QUANTITIES & PROBABILITIES ---
 // ==========================================
-const NUM_CLIMBERS = 50; // Total climbers to register
-const MIN_SESSIONS_PER_CLIMBER = 3; // Minimum sessions logged per climber
-const MAX_SESSIONS_PER_CLIMBER = 12; // Maximum sessions logged per climber
+const NUM_CLIMBERS = 100; // Total climbers to register
+const MIN_SESSIONS_PER_CLIMBER = 15; // Minimum sessions logged per climber
+const MAX_SESSIONS_PER_CLIMBER = 25; // Maximum sessions logged per climber
 const SEND_PROBABILITY = 0.25; // 25% chance a session is a "send" (success)
 const REVIEW_PROBABILITY = 0.4; // 40% chance a climber leaves a review after a session
 const NUM_ISSUES = 10; // Total number of wall issues reported by random climbers
@@ -463,6 +466,88 @@ async function seedViaApi() {
             facility: createdFacility._id,
         });
         console.log("✅ Facility profile created");
+        
+        if (stopPhase === 'walls_and_facilities') {
+            console.log("\n🛑 Stopping at phase: walls_and_facilities");
+            return;
+        }
+
+        // --- ADD CUSTOM EVENTS AND BADGES ---
+        console.log("🏆 Seeding Custom Events and Badges...");
+        const Event = require('./models/Event');
+        
+        // 1. Create Local Event for the generated facility
+        let localEvent = await Event.findOne({ title: `API Gym Comp ${runId}` });
+        if (!localEvent) {
+            localEvent = await Event.create({
+                title: `API Gym Comp ${runId}`,
+                description: "Compete at the API Gym to be the best!",
+                startDate: new Date(),
+                endDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
+                createdBy: facilityUserId,
+                facility: createdFacility._id,
+                isGlobal: false,
+                status: "active"
+            });
+        }
+        const localBadgeExists = await Badge.findOne({ eventId: localEvent._id });
+        if (!localBadgeExists) {
+            await Badge.create({
+                name: "API Gym Champion",
+                description: "Top 3 at API Gym Comp",
+                icon: "medal",
+                type: "event",
+                eventId: localEvent._id,
+                winningCondition: {
+                    metric: "rank",
+                    operator: "top",
+                    value: 3
+                },
+                createdBy: facilityUserId
+            });
+        }
+
+        // 2. Create Global Challenge for PB (if PB exists)
+        const { PublicBody } = require('./models/User');
+        const regioneTrentino = await PublicBody.findOne({ username: "regione_trentino" });
+        if (regioneTrentino) {
+            let pbEvent = await Event.findOne({ title: "Global Summer Ascent Challenge" });
+            if (!pbEvent) {
+                pbEvent = await Event.create({
+                    title: "Global Summer Ascent Challenge",
+                    description: "Climb anywhere in the world and accumulate 1000 points this week!",
+                    startDate: new Date(),
+                    endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+                    createdBy: regioneTrentino._id,
+                    facility: null,
+                    isGlobal: true,
+                    status: "active"
+                });
+            }
+            const pbBadgeExists = await Badge.findOne({ eventId: pbEvent._id });
+            if (!pbBadgeExists) {
+                await Badge.create({
+                    name: "Summer Ascender",
+                    description: "Earned by reaching 1000 points during the Global Summer Ascent Challenge",
+                    icon: "trophy",
+                    type: "event",
+                    eventId: pbEvent._id,
+                    winningCondition: {
+                        metric: "score",
+                        operator: "gte",
+                        value: 1000
+                    },
+                    createdBy: regioneTrentino._id
+                });
+            }
+        }
+        console.log("✅ Seeded Custom Events and Badges.");
+        
+        if (stopPhase === 'badges_and_events') {
+            console.log("\n🛑 Stopping at phase: badges_and_events");
+            return;
+        }
+
 
         // 2. CREATE A WALL
         console.log("🧱 Creating Wall...");
@@ -578,7 +663,7 @@ async function seedViaApi() {
                     sessionRes.data?.session?.id ||
                     sessionRes.data?.session?._id;
 
-                if (sessionId && Math.random() < REVIEW_PROBABILITY) {
+                if (sessionId && Math.random() < REVIEW_PROBABILITY && stopPhase !== 'climbers_and_sessions') {
                     const rating =
                         timeTaken > 90
                             ? weightedRandom(
@@ -615,7 +700,8 @@ async function seedViaApi() {
         console.log("🚩 Generating Wall Issues...");
         let totalIssues = 0;
 
-        for (let k = 0; k < NUM_ISSUES; k++) {
+        if (stopPhase !== 'climbers_and_sessions') {
+                for (let k = 0; k < NUM_ISSUES; k++) {
             const randomClimberToken =
                 faker.helpers.arrayElement(climberTokens);
             const randomIssue = faker.helpers.arrayElement(CLIMBING_ISSUES);
@@ -665,8 +751,8 @@ async function seedViaApi() {
                     "⚠️ No OutdoorWall documents linked to Regione Trentino. Skipping public-body seeded activity.",
                 );
             } else {
-                const selectedWallCount = Math.max(
-                    1,
+                const selectedWallCount = Math.min(
+                    25,
                     Math.ceil(publicBodyWalls.length / 3),
                 );
                 const targetWalls = publicBodyWalls.slice(0, selectedWallCount);
@@ -696,13 +782,18 @@ async function seedViaApi() {
                 for (const wall of targetWalls) {
                     const wallId = wall.id || wall._id.toString();
 
-                    for (const token of climberTokens) {
+                    const selectedClimbers = faker.helpers.arrayElements(
+                        climberTokens,
+                        faker.number.int({ min: 3, max: 6 })
+                    );
+
+                    for (const token of selectedClimbers) {
                         const climberHeaders = {
                             Authorization: `Bearer ${token}`,
                         };
                         const numSessions = faker.number.int({
-                            min: MIN_SESSIONS_PER_CLIMBER,
-                            max: MAX_SESSIONS_PER_CLIMBER,
+                            min: 1,
+                            max: 3,
                         });
 
                         for (
@@ -802,6 +893,7 @@ async function seedViaApi() {
                     }
                 }
 
+                if (stopPhase !== 'climbers_and_sessions') {
                 for (let k = 0; k < NUM_ISSUES; k++) {
                     const randomWall =
                         targetWalls[
@@ -835,10 +927,20 @@ async function seedViaApi() {
                         );
                     }
                 }
+                } // end if stopPhase !== climbers_and_sessions
 
                 console.log(
                     `✅ Logged ${regionSessions} Regione Trentino sessions, ${regionReviews} reviews, and ${regionIssues} issues across ${targetWalls.length} walls.`,
                 );
+            if (stopPhase === 'climbers_and_sessions') {
+                console.log("\\n🛑 Stopping at phase: climbers_and_sessions");
+                return;
+            }
+            if (stopPhase === 'reviews_and_issues') {
+                console.log("\n🛑 Stopping at phase: reviews_and_issues");
+                return;
+            }
+            }
             }
         }
     } catch (error) {
@@ -864,9 +966,23 @@ async function runAll() {
             process.env.MONGO_URI || "mongodb://localhost:27017/hookd",
         );
 
+        console.log("\n--- PHASE: walls_and_facilities ---");
         await seedOverpass();
+
+        console.log("\n--- PHASE: badges_and_events ---");
         await seedSystemBadges();
+
         await seedViaApi();
+        
+        // Reports Phase
+        if (stopPhase !== 'reviews_and_issues') {
+            console.log("\n--- PHASE: reports ---");
+            await seedReports();
+            if (stopPhase === 'reports') {
+                console.log("\n🛑 Stopping at phase: reports");
+                return;
+            }
+        }
 
         console.log("\n🎉 ALL SEEDING COMPLETE! Check your Flutter App! 🎉\n");
     } catch (err) {
@@ -874,6 +990,54 @@ async function runAll() {
     } finally {
         await mongoose.disconnect();
         process.exit();
+    }
+}
+
+async function seedReports() {
+    console.log("📊 Seeding Reports using live API logic...");
+    const reportService = require('./services/report.service');
+    const { FacilityOwner, PublicBody } = require('./models/User');
+    const { Wall, OutdoorWall } = require('./models/Wall');
+
+    try {
+        // Generate reports for Facility Owners
+        const facilities = await FacilityOwner.find();
+        for (const f of facilities) {
+            const wall = await Wall.findOne({ facility: f.facility });
+            if (wall) {
+                await reportService.saveReport(
+                    f._id,
+                    wall._id.toString(),
+                    "Monthly Gym Analytics",
+                    "Traffic has increased by 15% this month."
+                );
+            }
+        }
+
+        // Generate reports for Public Bodies
+        const pbs = await PublicBody.find();
+        for (const pb of pbs) {
+            const pbWalls = await OutdoorWall.find({ publicBody: pb._id }).limit(5);
+            if (pbWalls.length >= 2) {
+                const wallIds = pbWalls.map(w => w._id.toString());
+                await reportService.saveGroupReport(
+                    pb._id,
+                    wallIds,
+                    "Regional Outdoor Crag Usage",
+                    "Significant traffic observed at Arco."
+                );
+            } else if (pbWalls.length === 1) {
+                await reportService.saveReport(
+                    pb._id,
+                    pbWalls[0]._id.toString(),
+                    "Regional Outdoor Crag Usage",
+                    "Significant traffic observed at Arco."
+                );
+            }
+        }
+        console.log("✅ Reports created successfully using live DB data via reportService!");
+    } catch (e) {
+        console.error("⚠️ Could not create reports:", e);
     }
 }
 
