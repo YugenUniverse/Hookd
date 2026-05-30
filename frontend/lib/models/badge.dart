@@ -1,3 +1,5 @@
+import 'package:flutter/material.dart';
+
 class WinningCondition {
   final String metric;
   final String operator;
@@ -48,6 +50,28 @@ class Badge {
     this.eventId,
     this.winningCondition,
   });
+
+  Color get badgeColor {
+    switch (level) {
+      case 1:
+        return Colors.amber; // Gold
+      case 2:
+        return Colors.blueGrey.shade300; // Silver
+      case 3:
+        return const Color(0xFFCD7F32); // Bronze
+      default:
+        return Colors.blue; // Standard
+    }
+  }
+
+  IconData get badgeIcon {
+    if (icon == 'trophy') return Icons.emoji_events;
+    if (icon == 'medal') return Icons.workspace_premium;
+    if (icon == 'star') return Icons.star;
+    if (icon == 'flash') return Icons.flash_on;
+    if (icon == 'mountain') return Icons.terrain;
+    return Icons.emoji_events;
+  }
 
   factory Badge.fromJson(Map<String, dynamic> json) {
     return Badge(

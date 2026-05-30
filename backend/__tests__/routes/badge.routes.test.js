@@ -106,7 +106,7 @@ describe("badge.routes", () => {
         expect(response.body.createdBy).toBe(facilityOwner._id.toString());
     });
 
-    it("POST /badges denies creation if authenticated as Climber", async () => {
+    it("POST /badges denies creation if authenticated as Climber for system badge", async () => {
         const payload = { name: "Test Badge" };
 
         const response = await request(app)
@@ -115,6 +115,45 @@ describe("badge.routes", () => {
             .send(payload);
 
         expect(response.status).toBe(403);
+    });
+
+    it("POST /badges allows creation if authenticated as Climber who is group admin", async () => {
+        const Group = require("../../models/Group");
+        const group = await Group.create({
+            name: "My Group",
+            creator: climber._id,
+            members: [{ user: climber._id, role: "admin" }],
+        });
+
+        const groupEvent = await Event.create({
+            title: "Group Event",
+            groupId: group._id,
+            createdBy: climber._id,
+            startDate: new Date(),
+            isGlobal: false
+        });
+
+        const payload = {
+            name: "Group Event Badge",
+            description: "A test badge",
+            score: 50,
+            type: "event",
+            eventId: groupEvent._id.toString(),
+            winningCondition: {
+                metric: "rank",
+                operator: "top",
+                value: 3
+            },
+            level: 3
+        };
+
+        const response = await request(app)
+            .post("/badges")
+            .set("Authorization", `Bearer ${climberToken}`)
+            .send(payload);
+
+        expect(response.status).toBe(201);
+        expect(response.body.name).toBe("Group Event Badge");
     });
 
     it("GET /badges retrieves all badges", async () => {

@@ -3,17 +3,20 @@ class GroupMember {
   final String? username;
   final String? name;
   final String role;
+  final int score;
   final DateTime? joinedAt;
 
   const GroupMember({
     required this.userId,
     required this.role,
+    this.score = 0,
     this.username,
     this.name,
     this.joinedAt,
   });
 
   bool get isAdmin => role == 'admin';
+  bool get isManager => role == 'manager' || role == 'admin';
 
   factory GroupMember.fromJson(Map<String, dynamic> json) {
     final userRaw = json['user'];
@@ -37,6 +40,7 @@ class GroupMember {
       username: username,
       name: name,
       role: (json['role'] ?? 'member').toString(),
+      score: (json['score'] ?? 0) as int,
       joinedAt: joinedAt,
     );
   }

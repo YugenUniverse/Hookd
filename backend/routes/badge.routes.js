@@ -1,10 +1,10 @@
 const express = require("express");
 const router = express.Router();
 const badgeController = require("../controllers/badge.controller");
-const { authenticateJwt, restrictTo } = require("../middleware/auth.middleware");
+const { authenticateJwt } = require("../middleware/auth.middleware");
 
 // Create a new badge (System or Custom)
-router.post("/", authenticateJwt, restrictTo("FacilityOwner", "PublicBody"), badgeController.createBadge);
+router.post("/", authenticateJwt, badgeController.createBadge);
 
 // Get all badges. Supports query filtering:
 // Example: GET /badges?type=system
@@ -15,9 +15,9 @@ router.get("/", badgeController.getBadges);
 router.get("/:id", badgeController.getBadgeById);
 
 // Update a badge's details (e.g., score or description)
-router.put("/:id", authenticateJwt, restrictTo("FacilityOwner", "PublicBody"), badgeController.updateBadge);
+router.put("/:id", authenticateJwt, badgeController.updateBadge);
 
 // Delete a badge from the system
-router.delete("/:id", authenticateJwt, restrictTo("FacilityOwner", "PublicBody"), badgeController.deleteBadge);
+router.delete("/:id", authenticateJwt, badgeController.deleteBadge);
 
 module.exports = router;

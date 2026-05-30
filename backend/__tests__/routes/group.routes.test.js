@@ -828,6 +828,83 @@ describe("group.routes", () => {
         });
     });
 
+    // ─── Events ───────────────────────────────────────────────────────────────
+
+    describe("POST /groups/:id/events", () => {
+        it("admin can create a group event", async () => {
+            const group = await Group.create({
+                name: "Event Group",
+                creator: climber1._id,
+                members: [{ user: climber1._id, role: "admin" }],
+            });
+
+            const res = await request(app)
+                .post(`/groups/${group._id}/events`)
+                .set("Authorization", `Bearer ${token1}`)
+                .send({ title: "Group Comp", startDate: "2026-10-01T10:00:00Z" });
+
+            expect(res.status).toBe(201);
+            expect(res.body.event.title).toBe("Group Comp");
+            expect(res.body.event.isGlobal).toBe(false);
+            expect(res.body.event.groupId).toBe(group._id.toString());
+        });
+
+        it("returns 403 when non-admin tries to create an event", async () => {
+            const group = await Group.create({
+                name: "Member Event Group",
+                creator: climber1._id,
+                members: [
+                    { user: climber1._id, role: "admin" },
+                    { user: climber2._id, role: "member" },
+                ],
+            });
+
+            const res = await request(app)
+                .post(`/groups/${group._id}/events`)
+                .set("Authorization", `Bearer ${token2}`)
+                .send({ title: "My Fake Event", startDate: "2026-10-01T10:00:00Z" });
+
+            expect(res.status).toBe(403);
+        });
+    });
+
+    describe("GET /groups/:id/events", () => {
+        it("member can list group events", async () => {
+            const group = await Group.create({
+                name: "List Events Group",
+                creator: climber1._id,
+                members: [
+                    { user: climber1._id, role: "admin" },
+                    { user: climber2._id, role: "member" },
+                ],
+            });
+            const Event = require("../../models/Event");
+            await Event.create({ title: "Event 1", groupId: group._id, createdBy: climber1._id, startDate: new Date("2026-09-10"), isGlobal: false });
+            await Event.create({ title: "Event 2", groupId: group._id, createdBy: climber1._id, startDate: new Date("2026-08-01"), isGlobal: false });
+
+            const res = await request(app)
+                .get(`/groups/${group._id}/events`)
+                .set("Authorization", `Bearer ${token2}`);
+
+            expect(res.status).toBe(200);
+            expect(res.body.events).toHaveLength(2);
+        });
+
+        it("returns 403 for non-members", async () => {
+            const group = await Group.create({
+                name: "Private Events Group",
+                creator: climber1._id,
+                members: [{ user: climber1._id, role: "admin" }],
+            });
+
+            const res = await request(app)
+                .get(`/groups/${group._id}/events`)
+                .set("Authorization", `Bearer ${token2}`);
+
+            expect(res.status).toBe(403);
+        });
+    });
+
     describe("DELETE /groups/:id/climbs/:climbId", () => {
         it("admin can delete a planned climb", async () => {
             const group = await Group.create({

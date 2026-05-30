@@ -515,7 +515,7 @@ async function seedViaApi() {
             if (!pbEvent) {
                 pbEvent = await Event.create({
                     title: "Global Summer Ascent Challenge",
-                    description: "Climb anywhere in the world and accumulate 1000 points this week!",
+                    description: "Climb anywhere in the world and accumulate points this week! Earn Bronze, Silver, and Gold tier badges.",
                     startDate: new Date(),
                     endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
                     createdBy: regioneTrentino._id,
@@ -526,19 +526,38 @@ async function seedViaApi() {
             }
             const pbBadgeExists = await Badge.findOne({ eventId: pbEvent._id });
             if (!pbBadgeExists) {
-                await Badge.create({
-                    name: "Summer Ascender",
-                    description: "Earned by reaching 1000 points during the Global Summer Ascent Challenge",
-                    icon: "trophy",
-                    type: "event",
-                    eventId: pbEvent._id,
-                    winningCondition: {
-                        metric: "score",
-                        operator: "gte",
-                        value: 1000
+                await Badge.insertMany([
+                    {
+                        name: "Summer Ascender (Bronze)",
+                        description: "Earned by reaching 1000 points during the Global Summer Ascent Challenge",
+                        icon: "medal",
+                        type: "event",
+                        level: 3,
+                        eventId: pbEvent._id,
+                        winningCondition: { metric: "score", operator: "gte", value: 1000 },
+                        createdBy: regioneTrentino._id
                     },
-                    createdBy: regioneTrentino._id
-                });
+                    {
+                        name: "Summer Ascender (Silver)",
+                        description: "Earned by reaching 2500 points during the Global Summer Ascent Challenge",
+                        icon: "medal",
+                        type: "event",
+                        level: 2,
+                        eventId: pbEvent._id,
+                        winningCondition: { metric: "score", operator: "gte", value: 2500 },
+                        createdBy: regioneTrentino._id
+                    },
+                    {
+                        name: "Summer Ascender (Gold)",
+                        description: "Earned by reaching 5000 points during the Global Summer Ascent Challenge",
+                        icon: "trophy",
+                        type: "event",
+                        level: 1,
+                        eventId: pbEvent._id,
+                        winningCondition: { metric: "score", operator: "gte", value: 5000 },
+                        createdBy: regioneTrentino._id
+                    }
+                ]);
             }
         }
         console.log("✅ Seeded Custom Events and Badges.");

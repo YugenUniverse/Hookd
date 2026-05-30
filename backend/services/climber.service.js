@@ -1,5 +1,6 @@
 const { Climber } = require("../models/User");
 const Badge = require("../models/Badge");
+const Group = require("../models/Group");
 
 exports.getGlobalLeaderboard = async (limit = 50) => {
     const rawLeaderboard = await Climber.aggregate([
@@ -56,7 +57,21 @@ exports.acquireBadge = async (climberId, badgeId) => {
     }
 
     climber.wallet.badges.push({ badge: badge._id });
-    climber.wallet.score += (badge.score || 0);
+
+    if (badge.groupId) {
+        // Group badge: update member's score inside the group
+        const group = await Group.findById(badge.groupId);
+        if (group) {
+            const memberIndex = group.members.findIndex(m => m.user.toString() === climberId.toString());
+            if (memberIndex !== -1) {
+                group.members[memberIndex].score += (badge.score || 0);
+                await group.save();
+            }
+        }
+    } else {
+        // Public badge: update global wallet score
+        climber.wallet.score += (badge.score || 0);
+    }
 
     await climber.save();
 

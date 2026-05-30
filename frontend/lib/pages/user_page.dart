@@ -13,6 +13,7 @@ import 'my_issues_page.dart';
 import 'notifications_page.dart';
 import 'wall_issues_page.dart';
 import '../providers/notification_provider.dart';
+import '../widgets/badge_icon.dart';
 
 class _UserPageData {
   const _UserPageData({required this.user, required this.sessions});
@@ -772,18 +773,6 @@ class _StatusChip extends StatelessWidget {
   }
 }
 
-IconData _getIconForBadge(String iconStr) {
-  final str = iconStr.toLowerCase();
-  if (str.contains('first_ascent')) return Icons.star;
-  if (str.contains('century_club')) return Icons.workspace_premium;
-  if (str.contains('weekend_warrior')) return Icons.weekend;
-  if (str.contains('super_climber')) return Icons.flash_on;
-  if (str.contains('dedicated'))
-    return Icons.link; // Closest default to carabiner
-  if (str.contains('streak')) return Icons.local_fire_department;
-  return Icons.emoji_events;
-}
-
 class _MedalCollectionWidget extends StatefulWidget {
   const _MedalCollectionWidget({
     required this.user,
@@ -895,9 +884,11 @@ class _MedalCollectionWidgetState extends State<_MedalCollectionWidget> {
                   for (int i = 0; i < displayCount; i++)
                     Padding(
                       padding: const EdgeInsets.only(right: spacing),
-                      child: _buildBadgeIcon(
-                        context,
-                        sortedEarnedBadges[i].badge,
+                      child: BadgeIcon(
+                        name: sortedEarnedBadges[i].badge.name,
+                        description: sortedEarnedBadges[i].badge.description,
+                        level: sortedEarnedBadges[i].badge.level,
+                        iconStr: sortedEarnedBadges[i].badge.icon,
                       ),
                     ),
                   if (needsShowMore)
@@ -932,87 +923,15 @@ class _MedalCollectionWidgetState extends State<_MedalCollectionWidget> {
         ],
       ),
     );
-  }
 
-  Widget _buildBadgeIcon(BuildContext context, dynamic badge) {
-    final bool isDark = Theme.of(context).brightness == Brightness.dark;
-    Color bgColor;
-    Color iconColor;
-    Color shadowColor;
-    Color borderColor;
-    double blurRadius;
-    double spreadRadius;
-
-    switch (badge.level) {
-      case 1:
-        bgColor = isDark
-            ? Colors.amber.withOpacity(0.15)
-            : Colors.amber.shade50;
-        iconColor = Colors.amber.shade400;
-        borderColor = Colors.amber.shade400;
-        shadowColor = Colors.amber.withOpacity(0.4);
-        blurRadius = 12;
-        spreadRadius = 2;
-        break;
-      case 2:
-        bgColor = isDark
-            ? Colors.blueGrey.withOpacity(0.2)
-            : Colors.blueGrey.shade50;
-        iconColor = Colors.blueGrey.shade300;
-        borderColor = Colors.blueGrey.shade300;
-        shadowColor = Colors.transparent;
-        blurRadius = 0;
-        spreadRadius = 0;
-        break;
-      case 3:
-        bgColor = isDark
-            ? Colors.deepOrange.withOpacity(0.15)
-            : Colors.orange.shade50;
-        iconColor = Colors.deepOrange.shade300;
-        borderColor = Colors.deepOrange.shade300;
-        shadowColor = Colors.transparent;
-        blurRadius = 0;
-        spreadRadius = 0;
-        break;
-      default:
-        bgColor = isDark ? const Color(0xFF2C2C2E) : Colors.white;
-        iconColor = isDark ? Colors.white70 : Colors.black54;
-        borderColor = isDark ? Colors.white12 : Colors.transparent;
-        shadowColor = Colors.transparent;
-        blurRadius = 0;
-        spreadRadius = 0;
-    }
-
-    return Tooltip(
-      message: '${badge.name}\n${badge.description ?? ""}'.trim(),
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: bgColor,
-          shape: BoxShape.circle,
-          border: borderColor != Colors.transparent
-              ? Border.all(color: borderColor, width: 2)
-              : null,
-          boxShadow: [
-            BoxShadow(
-              color: shadowColor,
-              blurRadius: blurRadius,
-              spreadRadius: spreadRadius,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Icon(_getIconForBadge(badge.icon), size: 28, color: iconColor),
-      ),
-    );
-  }
+}
 }
 
 class _BadgeProgressModal extends StatefulWidget {
   final User user;
   final List<dynamic> earnedBadges;
 
-  const _BadgeProgressModal({required this.user, required this.earnedBadges});
+  const _BadgeProgressModal({Key? key, required this.user, required this.earnedBadges}) : super(key: key);
 
   @override
   State<_BadgeProgressModal> createState() => _BadgeProgressModalState();
@@ -1157,8 +1076,8 @@ class _BadgeProgressModalState extends State<_BadgeProgressModal> {
         iconColor = Colors.deepOrange.shade300;
         break;
       default:
-        bgColor = isDark ? const Color(0xFF2C2C2E) : Colors.grey.shade200;
-        iconColor = isDark ? Colors.white70 : Colors.black54;
+        bgColor = isDark ? colorScheme.primaryContainer : colorScheme.primary.withOpacity(0.1);
+        iconColor = colorScheme.primary;
     }
 
     final bool isExpanded =
@@ -1557,11 +1476,11 @@ class ImageFilterWidget extends StatelessWidget {
   final double sigmaY;
 
   const ImageFilterWidget({
-    super.key,
+    Key? key,
     required this.child,
-    this.sigmaX = 3,
-    this.sigmaY = 3,
-  });
+    this.sigmaX = 3.0,
+    this.sigmaY = 3.0,
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -1572,4 +1491,26 @@ class ImageFilterWidget extends StatelessWidget {
       ),
     );
   }
+}
+
+IconData _getIconForBadge(String? iconStr) {
+  if (iconStr == null) return Icons.emoji_events;
+  final str = iconStr.toLowerCase();
+  
+  // Custom Event Badges
+  if (str == 'trophy') return Icons.emoji_events;
+  if (str == 'medal') return Icons.workspace_premium;
+  if (str == 'star') return Icons.star;
+  if (str == 'flash') return Icons.flash_on;
+  if (str == 'mountain') return Icons.terrain;
+  
+  // System Badges
+  if (str.contains('first_ascent')) return Icons.star;
+  if (str.contains('century_club')) return Icons.workspace_premium;
+  if (str.contains('weekend_warrior')) return Icons.weekend;
+  if (str.contains('super_climber')) return Icons.flash_on;
+  if (str.contains('dedicated')) return Icons.link; // Closest default to carabiner
+  if (str.contains('streak')) return Icons.local_fire_department;
+
+  return Icons.emoji_events;
 }

@@ -21,8 +21,12 @@ const eventSchema = new mongoose.Schema(
             type: mongoose.Schema.Types.ObjectId,
             ref: "Facility",
             required: function() {
-                return !this.isGlobal;
+                return !this.isGlobal && !this.groupId;
             },
+        },
+        groupId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Group",
         },
         createdBy: {
             type: mongoose.Schema.Types.ObjectId,
