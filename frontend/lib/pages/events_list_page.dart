@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'event_leaderboard_page.dart';
+import 'event_detail_page.dart';
 import 'package:intl/intl.dart';
 
 import '../models/event.dart';
@@ -126,7 +126,7 @@ class _EventsListPageState extends State<EventsListPage> {
   void _viewLeaderboard(Event event) {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => EventLeaderboardPage(event: event),
+        builder: (_) => EventDetailPage(event: event),
       ),
     );
   }

@@ -1,6 +1,6 @@
 const mongoose = require("mongoose");
 const Event = require("../models/Event");
-const { FacilityOwner } = require("../models/User");
+const { User, FacilityOwner } = require("../models/User");
 const notificationService = require("./notification.service");
 const followService = require("./follow.service");
 const ClimbingSession = require("../models/ClimbingSession");
@@ -17,9 +17,28 @@ exports.createEvent = async (userId, { title, description, startDate, endDate, w
         throw err;
     }
 
-    const owner = await FacilityOwner.findById(userId).select("facility");
-    if (!owner?.facility) {
-        const err = new Error("You must be linked to a facility to create events");
+    const user = await User.findById(userId);
+    if (!user) {
+        const err = new Error("User not found");
+        err.statusCode = 404;
+        throw err;
+    }
+
+    let isGlobal = false;
+    let facility = null;
+
+    if (user.userType === "PublicBody") {
+        isGlobal = true;
+    } else if (user.userType === "FacilityOwner") {
+        const owner = await FacilityOwner.findById(userId).select("facility");
+        if (!owner?.facility) {
+            const err = new Error("You must be linked to a facility to create local events");
+            err.statusCode = 403;
+            throw err;
+        }
+        facility = owner.facility;
+    } else {
+        const err = new Error("Unauthorized to create events");
         err.statusCode = 403;
         throw err;
     }
@@ -29,7 +48,8 @@ exports.createEvent = async (userId, { title, description, startDate, endDate, w
         description,
         startDate,
         endDate,
-        facility: owner.facility,
+        facility: facility,
+        isGlobal: isGlobal,
         createdBy: userId,
         walls: walls || [],
     });
@@ -40,7 +60,7 @@ exports.createEvent = async (userId, { title, description, startDate, endDate, w
     await notificationService.createBulk(recipientIds, "new_event", {
         eventId: event._id.toString(),
         eventTitle: event.title,
-        facilityId: owner.facility.toString(),
+        facilityId: facility ? facility.toString() : "global",
     });
 
     return event;
@@ -52,6 +72,12 @@ exports.getActiveEvents = async () => {
 };
 
 exports.getEventsForFacility = async (facilityId, { limit = 50, skip = 0 } = {}) => {
+    if (facilityId === 'global') {
+        return Event.find({ isGlobal: true })
+            .sort({ startDate: 1 })
+            .skip(skip)
+            .limit(limit);
+    }
     if (!isValidObjectId(facilityId)) {
         const err = new Error("Invalid facility id");
         err.statusCode = 400;
@@ -136,16 +162,6 @@ exports.deleteEvent = async (eventId, userId) => {
 
 
 async function computeLeaderboard(event) {
-    let walls = [];
-    if (event.walls && event.walls.length > 0) {
-        walls = await Wall.find({ _id: { $in: event.walls } });
-    } else {
-        walls = await Wall.find({ facility: event.facility });
-    }
-    const wallMap = {};
-    walls.forEach(w => { wallMap[w._id.toString()] = w.difficulty; });
-    const wallIds = walls.map(w => w._id);
-
     const difficultyWeights = {
         BEGINNER: 50,
         INTERMEDIATE: 75,
@@ -153,23 +169,56 @@ async function computeLeaderboard(event) {
         EXPERT: 150
     };
 
-    const sessions = await ClimbingSession.find({
-        wall_id: { $in: wallIds },
-        date: { $gte: event.startDate, $lte: event.endDate || new Date() }
-    });
-
+    let sessions = [];
     const climberStats = {};
-    sessions.forEach(s => {
-        const cId = s.climber_id.toString();
-        const diff = wallMap[s.wall_id.toString()] || "BEGINNER";
-        const points = difficultyWeights[diff] || 50;
 
-        if (!climberStats[cId]) {
-            climberStats[cId] = { climberId: cId, score: 0, sessions: 0 };
+    if (event.isGlobal) {
+        sessions = await ClimbingSession.find({
+            date: { $gte: event.startDate, $lte: event.endDate || new Date() }
+        }).populate("wall_id");
+
+        sessions.forEach(s => {
+            const cId = s.climber_id.toString();
+            // If wall_id was deleted or not found, default to BEGINNER
+            const diff = (s.wall_id && s.wall_id.difficulty) ? s.wall_id.difficulty : "BEGINNER";
+            const points = difficultyWeights[diff] || 50;
+
+            if (!climberStats[cId]) {
+                climberStats[cId] = { climberId: cId, score: 0, sessions: 0 };
+            }
+            climberStats[cId].score += points;
+            climberStats[cId].sessions += 1;
+        });
+    } else {
+        let walls = [];
+        if (event.walls && event.walls.length > 0) {
+            walls = await Wall.find({ _id: { $in: event.walls } });
+        } else {
+            walls = await Wall.find({ facility: event.facility });
         }
-        climberStats[cId].score += points;
-        climberStats[cId].sessions += 1;
-    });
+        const wallMap = {};
+        walls.forEach(w => { wallMap[w._id.toString()] = w.difficulty; });
+        const wallIds = walls.map(w => w._id);
+
+        sessions = await ClimbingSession.find({
+            wall_id: { $in: wallIds },
+            date: { $gte: event.startDate, $lte: event.endDate || new Date() }
+        });
+
+        sessions.forEach(s => {
+            const cId = s.climber_id.toString();
+            const diff = wallMap[s.wall_id.toString()] || "BEGINNER";
+            const points = difficultyWeights[diff] || 50;
+
+            if (!climberStats[cId]) {
+                climberStats[cId] = { climberId: cId, score: 0, sessions: 0 };
+            }
+            climberStats[cId].score += points;
+            climberStats[cId].sessions += 1;
+        });
+    }
+
+
 
     let leaderboard = Object.values(climberStats);
     leaderboard.sort((a, b) => b.score - a.score);

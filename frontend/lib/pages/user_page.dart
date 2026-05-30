@@ -1041,14 +1041,8 @@ class _BadgeProgressModalState extends State<_BadgeProgressModal> {
   }
 
   String _getBadgeFamily(dynamic badge) {
-    if (badge.type == 'custom' || badge.type == 'event') return 'Custom';
-    String name = badge.name.toLowerCase();
-    if (name.contains('streak')) return 'Streak';
-    if (name.contains('dedicated') ||
-        name.contains('hookd') ||
-        name.contains('century'))
-      return 'Dedicated';
-    return 'Other';
+    if (badge.type == 'custom' || badge.type == 'event') return 'Events';
+    return 'Challenges';
   }
 
   Future<void> _fetchAllBadges() async {
@@ -1060,7 +1054,7 @@ class _BadgeProgressModalState extends State<_BadgeProgressModal> {
 
       for (var eb in widget.earnedBadges) {
         if (eb.badge.type == 'custom' || eb.badge.type == 'event') {
-          earned.putIfAbsent('Custom', () => []).add(eb);
+          earned.putIfAbsent('Events', () => []).add(eb);
         }
       }
 
@@ -1464,7 +1458,7 @@ class _BadgeProgressModalState extends State<_BadgeProgressModal> {
 
     List<Widget> listItems = [];
 
-    final orderedFamilies = ['Custom', 'Streak', 'Dedicated', 'Other'];
+    final orderedFamilies = ['Challenges', 'Events'];
 
     for (String family in orderedFamilies) {
       final unearnedBadges = _unearnedFamilies[family] ?? [];
@@ -1477,7 +1471,7 @@ class _BadgeProgressModalState extends State<_BadgeProgressModal> {
         Padding(
           padding: const EdgeInsets.only(left: 4, bottom: 12, top: 8),
           child: Text(
-            family == 'Other' ? 'Miscellaneous' : '$family Badges',
+            family,
             style: theme.textTheme.titleLarge?.copyWith(
               fontWeight: FontWeight.bold,
               color: colorScheme.primary,

@@ -54,8 +54,8 @@ router.get("/:id/leaderboard", async (req, res, next) => {
 // All event routes below require authentication
 router.use(authenticateJwt);
 
-// Create event — FacilityOwner only
-router.post("/", restrictTo("FacilityOwner"), async (req, res, next) => {
+// Create event — FacilityOwner or PublicBody
+router.post("/", restrictTo("FacilityOwner", "PublicBody"), async (req, res, next) => {
     try {
         const event = await eventService.createEvent(req.user.id, req.body);
         res.status(201).json({ event });

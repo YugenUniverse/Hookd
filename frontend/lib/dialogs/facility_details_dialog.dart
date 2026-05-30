@@ -6,7 +6,7 @@ import '../models/poi.dart';
 import '../models/wall.dart';
 import '../pages/events_list_page.dart' show EventFormPage;
 import '../pages/manage_event_badges_page.dart';
-import '../pages/event_leaderboard_page.dart';
+import '../pages/event_detail_page.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
 import '../dialogs/wall_details_dialog.dart';
@@ -192,7 +192,7 @@ class _FacilityDetailsDialogState extends State<FacilityDetailsDialog>
   void _viewLeaderboard(int index) {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => EventLeaderboardPage(event: _events[index]),
+        builder: (_) => EventDetailPage(event: _events[index]),
       ),
     );
   }
