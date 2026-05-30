@@ -844,3 +844,372 @@ exports.deleteReport = async (reportId, ownerId) => {
     }
     return report;
 };
+
+/**
+ * Get statistics filtered by geographic zone and temporal range
+ * @param {number} minLat - Minimum latitude of bounding box
+ * @param {number} maxLat - Maximum latitude of bounding box
+ * @param {number} minLng - Minimum longitude of bounding box
+ * @param {number} maxLng - Maximum longitude of bounding box
+ * @param {Date|string} startDate - Start date for filtering sessions
+ * @param {Date|string} endDate - End date for filtering sessions
+ * @returns {Promise<object>} Aggregated statistics for the region and time period
+ */
+exports.getStatisticsByAreaAndTime = async (
+    minLat,
+    maxLat,
+    minLng,
+    maxLng,
+    startDate,
+    endDate,
+) => {
+    // Validate inputs
+    if (
+        typeof minLat !== "number" ||
+        typeof maxLat !== "number" ||
+        typeof minLng !== "number" ||
+        typeof maxLng !== "number"
+    ) {
+        const error = new Error(
+            "Geographic bounds must be numbers: minLat, maxLat, minLng, maxLng",
+        );
+        error.statusCode = 400;
+        throw error;
+    }
+
+    if (minLat >= maxLat || minLng >= maxLng) {
+        const error = new Error(
+            "Invalid bounds: minLat < maxLat and minLng < maxLng required",
+        );
+        error.statusCode = 400;
+        throw error;
+    }
+
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+        const error = new Error(
+            "Invalid dates: startDate and endDate must be valid dates",
+        );
+        error.statusCode = 400;
+        throw error;
+    }
+
+    if (start >= end) {
+        const error = new Error("startDate must be before endDate");
+        error.statusCode = 400;
+        throw error;
+    }
+
+    // Find walls within geographic bounds
+    // MongoDB geospatial query: longitude first, then latitude in coordinates
+    const wallsInArea = await Wall.find({
+        "location.coordinates": {
+            $geoWithin: {
+                $box: [
+                    [minLng, minLat],
+                    [maxLng, maxLat],
+                ],
+            },
+        },
+    }).select("_id name location");
+
+    if (wallsInArea.length === 0) {
+        return {
+            area: {
+                minLat,
+                maxLat,
+                minLng,
+                maxLng,
+            },
+            timeRange: {
+                startDate: start.toISOString(),
+                endDate: end.toISOString(),
+            },
+            wallCount: 0,
+            engagement: {
+                totalSessions: 0,
+                uniqueClimbers: 0,
+                retentionRate: 0,
+                avgTimeMins: 0,
+                fastestTimeMins: null,
+                totalSends: 0,
+                totalAttempts: 0,
+            },
+            quality: {
+                avgRating: 0,
+                totalReviews: 0,
+                distribution: [],
+            },
+            trends: {
+                byDate: [],
+                byDayOfWeek: [],
+                byHourOfDay: [],
+            },
+            recentFeedback: [],
+            demographics: [],
+            wallList: [],
+        };
+    }
+
+    const wallIds = wallsInArea.map((w) => w._id);
+
+    // Engagement & Benchmark Stats
+    const sessionStatsPromise = ClimbingSession.aggregate([
+        {
+            $match: {
+                wall_id: { $in: wallIds },
+                date: { $gte: start, $lte: end },
+            },
+        },
+        {
+            $group: {
+                _id: null,
+                totalSessions: { $sum: 1 },
+                uniqueClimbers: { $addToSet: "$climber_id" },
+                avgTime: { $avg: "$time" },
+                fastestTime: { $min: "$time" },
+                totalSends: { $sum: { $cond: ["$isSend", 1, 0] } },
+            },
+        },
+        {
+            $project: {
+                totalSessions: 1,
+                uniqueClimbersCount: { $size: "$uniqueClimbers" },
+                avgTime: { $round: ["$avgTime", 1] },
+                fastestTime: 1,
+                totalSends: 1,
+                totalAttempts: { $subtract: ["$totalSessions", "$totalSends"] },
+            },
+        },
+    ]);
+
+    // Temporal Trends
+    const temporalStatsPromise = ClimbingSession.aggregate([
+        {
+            $match: {
+                wall_id: { $in: wallIds },
+                date: { $gte: start, $lte: end },
+            },
+        },
+        {
+            $facet: {
+                byDate: [
+                    {
+                        $group: {
+                            _id: {
+                                $dateToString: {
+                                    format: "%Y-%m-%d",
+                                    date: "$date",
+                                },
+                            },
+                            count: { $sum: 1 },
+                        },
+                    },
+                    { $sort: { _id: 1 } },
+                ],
+                byDayOfWeek: [
+                    {
+                        $group: {
+                            _id: { $dayOfWeek: "$date" },
+                            count: { $sum: 1 },
+                        },
+                    },
+                    { $sort: { _id: 1 } },
+                ],
+                byHourOfDay: [
+                    { $group: { _id: { $hour: "$date" }, count: { $sum: 1 } } },
+                    { $sort: { _id: 1 } },
+                ],
+            },
+        },
+    ]);
+
+    // Quality & Review Stats
+    const reviewStatsPromise = ClimbingSession.aggregate([
+        {
+            $match: {
+                wall_id: { $in: wallIds },
+                date: { $gte: start, $lte: end },
+            },
+        },
+        {
+            $lookup: {
+                from: "reviews",
+                localField: "_id",
+                foreignField: "climbing_session_id",
+                as: "review",
+            },
+        },
+        { $unwind: "$review" },
+        {
+            $facet: {
+                overall: [
+                    {
+                        $group: {
+                            _id: null,
+                            avgRating: { $avg: "$review.rating" },
+                            totalReviews: { $sum: 1 },
+                        },
+                    },
+                ],
+                distribution: [
+                    { $group: { _id: "$review.rating", count: { $sum: 1 } } },
+                    { $sort: { _id: 1 } },
+                ],
+            },
+        },
+    ]);
+
+    // Demographics
+    const demographicsPromise = ClimbingSession.distinct("climber_id", {
+        wall_id: { $in: wallIds },
+        date: { $gte: start, $lte: end },
+    }).then(async (userIds) => {
+        const User = mongoose.model("User");
+        const users = await User.find({ _id: { $in: userIds } }).select(
+            "birthdate",
+        );
+
+        const brackets = { "< 20": 0, "20-29": 0, "30-39": 0, "40+": 0 };
+        const today = new Date();
+
+        users.forEach((user) => {
+            if (!user.birthdate) return;
+            const birthDate = new Date(user.birthdate);
+            let age = today.getFullYear() - birthDate.getFullYear();
+            const m = today.getMonth() - birthDate.getMonth();
+            if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+                age--;
+            }
+
+            if (age < 20) brackets["< 20"]++;
+            else if (age <= 29) brackets["20-29"]++;
+            else if (age <= 39) brackets["30-39"]++;
+            else brackets["40+"]++;
+        });
+
+        return Object.keys(brackets).map((key) => ({
+            bracket: key,
+            count: brackets[key],
+        }));
+    });
+
+    // Recent Feedback
+    const sessionIdsPromise = ClimbingSession.find({
+        wall_id: { $in: wallIds },
+        date: { $gte: start, $lte: end },
+    }).distinct("_id");
+
+    const recentFeedbackPromise = sessionIdsPromise.then(async (sessionIds) => {
+        const Review = mongoose.model("Review");
+        return Review.find({
+            climbing_session_id: { $in: sessionIds },
+            body: { $ne: "", $exists: true },
+        })
+            .sort({ createdAt: -1 })
+            .limit(5)
+            .select("rating body createdAt");
+    });
+
+    // Execute all aggregations in parallel
+    const [sessionStats, temporalStats, reviewStats, demographics, feedback] =
+        await Promise.all([
+            sessionStatsPromise,
+            temporalStatsPromise,
+            reviewStatsPromise,
+            demographicsPromise,
+            recentFeedbackPromise,
+        ]);
+
+    // Format results
+    const stats = sessionStats[0] || {
+        totalSessions: 0,
+        uniqueClimbersCount: 0,
+        avgTime: 0,
+        fastestTime: null,
+    };
+
+    const temporalData = temporalStats[0] || {
+        byDate: [],
+        byDayOfWeek: [],
+        byHourOfDay: [],
+    };
+
+    const reviews = reviewStats[0] || { overall: [], distribution: [] };
+    const overallReviews = reviews.overall[0] || {
+        avgRating: 0,
+        totalReviews: 0,
+    };
+
+    const retentionRate =
+        stats.uniqueClimbersCount > 0
+            ? parseFloat(
+                  (stats.totalSessions / stats.uniqueClimbersCount).toFixed(2),
+              )
+            : 0;
+
+    return {
+        area: {
+            minLat,
+            maxLat,
+            minLng,
+            maxLng,
+        },
+        timeRange: {
+            startDate: start.toISOString(),
+            endDate: end.toISOString(),
+        },
+        wallCount: wallsInArea.length,
+        engagement: {
+            totalSessions: stats.totalSessions,
+            uniqueClimbers: stats.uniqueClimbersCount,
+            retentionRate: retentionRate,
+            avgTimeMins: stats.avgTime,
+            fastestTimeMins: stats.fastestTime,
+            totalSends: stats.totalSends || 0,
+            totalAttempts: stats.totalAttempts || 0,
+        },
+        quality: {
+            avgRating: overallReviews.avgRating
+                ? parseFloat(overallReviews.avgRating.toFixed(1))
+                : 0,
+            totalReviews: overallReviews.totalReviews,
+            distribution: reviews.distribution.map((d) => ({
+                stars: d._id,
+                count: d.count,
+            })),
+        },
+        trends: {
+            byDate: temporalData.byDate.map((t) => ({
+                date: t._id,
+                sessions: t.count,
+            })),
+            byDayOfWeek: temporalData.byDayOfWeek.map((t) => ({
+                day: t._id,
+                count: t.count,
+            })),
+            byHourOfDay: temporalData.byHourOfDay.map((t) => ({
+                hour: t._id,
+                count: t.count,
+            })),
+        },
+        recentFeedback: feedback.map((r) => ({
+            rating: r.rating,
+            body: r.body,
+            date: r.createdAt
+                ? r.createdAt.toISOString().split("T")[0]
+                : "Recent",
+        })),
+        demographics: demographics,
+        wallList: wallsInArea.map((w) => ({
+            id: w._id,
+            name: w.name,
+            location: {
+                latitude: w.location.coordinates[1],
+                longitude: w.location.coordinates[0],
+            },
+        })),
+    };
+};

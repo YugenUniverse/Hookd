@@ -217,3 +217,61 @@ exports.deleteReport = async (req, res, next) => {
         next(err);
     }
 };
+
+/**
+ * Get statistics filtered by geographic area and time range
+ * Query params:
+ *   - minLat, maxLat, minLng, maxLng: geographic bounds
+ *   - startDate, endDate: time range (ISO 8601 format)
+ */
+exports.getStatisticsByAreaAndTime = async (req, res, next) => {
+    try {
+        const { minLat, maxLat, minLng, maxLng, startDate, endDate } =
+            req.query;
+
+        // Validate required parameters
+        const requiredParams = [
+            "minLat",
+            "maxLat",
+            "minLng",
+            "maxLng",
+            "startDate",
+            "endDate",
+        ];
+        const missingParams = requiredParams.filter((p) => !req.query[p]);
+
+        if (missingParams.length > 0) {
+            return res.status(400).json({
+                message: `Missing required query parameters: ${missingParams.join(", ")}`,
+            });
+        }
+
+        // Parse numeric values
+        const bounds = {
+            minLat: parseFloat(minLat),
+            maxLat: parseFloat(maxLat),
+            minLng: parseFloat(minLng),
+            maxLng: parseFloat(maxLng),
+        };
+
+        // Validate bounds are numbers
+        if (Object.values(bounds).some((val) => isNaN(val))) {
+            return res.status(400).json({
+                message: "Geographic bounds must be valid numbers",
+            });
+        }
+
+        const stats = await reportService.getStatisticsByAreaAndTime(
+            bounds.minLat,
+            bounds.maxLat,
+            bounds.minLng,
+            bounds.maxLng,
+            startDate,
+            endDate,
+        );
+
+        res.status(200).json(stats);
+    } catch (err) {
+        next(err);
+    }
+};
