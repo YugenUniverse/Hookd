@@ -10,6 +10,8 @@ import '../models/poi.dart';
 import '../providers/group_provider.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
+import 'chat_page.dart';
+import 'climber_profile_page.dart';
 
 class GroupDetailPage extends StatefulWidget {
   const GroupDetailPage({super.key, required this.groupId});
@@ -52,6 +54,21 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
 
   bool _isAdmin(Group group, String userId) =>
       group.members.any((m) => m.userId == userId && m.isAdmin);
+
+  Future<void> _openGroupChat(Group group) async {
+    try {
+      final conv = await ApiService().getGroupConversation(group.id);
+      if (!mounted) return;
+      await Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => ChatPage(conversation: conv)),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not open chat: $e')),
+      );
+    }
+  }
 
   Future<void> _inviteUser(Group group) async {
     final controller = TextEditingController();
@@ -329,6 +346,11 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
                 backgroundColor: Colors.transparent,
                 title: Text(group.name),
                 actions: [
+                  IconButton(
+                    icon: const Icon(Icons.chat_bubble_outline),
+                    tooltip: 'Group chat',
+                    onPressed: () => _openGroupChat(group),
+                  ),
                   if (isAdmin)
                     IconButton(
                       icon: const Icon(Icons.person_add_outlined),
@@ -446,6 +468,14 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
                       ),
                     ),
                     ...group.members.map((member) => _MemberTile(
+                          onTap: () => Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => ClimberProfilePage(
+                                userId: member.userId,
+                                initialUsername: member.username ?? member.name,
+                              ),
+                            ),
+                          ),
                           member: member,
                           currentUserId: currentUserId,
                           isCurrentUserAdmin: isAdmin,
@@ -936,12 +966,14 @@ class _MemberTile extends StatelessWidget {
     required this.currentUserId,
     required this.isCurrentUserAdmin,
     required this.onRemove,
+    required this.onTap,
   });
 
   final GroupMember member;
   final String currentUserId;
   final bool isCurrentUserAdmin;
   final VoidCallback onRemove;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -961,6 +993,7 @@ class _MemberTile extends StatelessWidget {
       ),
       color: cs.surfaceContainerHighest.withValues(alpha: 0.7),
       child: ListTile(
+        onTap: onTap,
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
         leading: CircleAvatar(
           backgroundColor: cs.primaryContainer,

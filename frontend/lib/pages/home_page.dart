@@ -14,8 +14,9 @@ import '../pages/log_session_page.dart';
 import '../pages/public_body_issues_page.dart';
 import '../pages/public_body_page.dart';
 import '../pages/user_page.dart';
-import '../pages/groups_page.dart';
+import '../pages/social_page.dart';
 import '../services/api_service.dart';
+import '../services/chat_service.dart';
 import '../utils/image_helpers.dart';
 import 'package:geolocator/geolocator.dart';
 import '../services/auth_service.dart';
@@ -52,6 +53,7 @@ class _MyHomePageState extends State<MyHomePage>
       _avatarLoadAttempted = true;
       _loadAvatar();
       if (AuthService().userType == 'PublicBody') _loadIssueCount();
+      if (AuthService().userType == 'Climber') ChatService().connect();
     }
   }
 
@@ -67,12 +69,14 @@ class _MyHomePageState extends State<MyHomePage>
     if (!AuthService().isAuthenticated) {
       _avatarLoadAttempted = false;
       _openIssueCount = null;
+      ChatService().disconnect();
       return;
     }
     if (!_avatarLoadAttempted) {
       _avatarLoadAttempted = true;
       _loadAvatar();
       if (AuthService().userType == 'PublicBody') _loadIssueCount();
+      if (AuthService().userType == 'Climber') ChatService().connect();
     }
   }
 
@@ -210,15 +214,15 @@ class _MyHomePageState extends State<MyHomePage>
     });
   }
 
-  Future<void> _openGroups() async {
+  Future<void> _openSocial() async {
     await _runProtectedAction(() async {
       if (!mounted) return;
       if (_usePanelNav) {
-        _showPanel(const GroupsPage(), 'groups');
+        _showPanel(const SocialPage(), 'social');
         return;
       }
       await Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => const GroupsPage()),
+        MaterialPageRoute(builder: (_) => const SocialPage()),
       );
     });
   }
@@ -531,10 +535,10 @@ class _MyHomePageState extends State<MyHomePage>
                                 ),
                               if (!isOwnerType)
                                 navBtn(
-                                  icon: Icons.group_outlined,
-                                  label: 'Groups',
-                                  onTap: _openGroups,
-                                  selected: _panelTag == 'groups',
+                                  icon: Icons.people_outlined,
+                                  label: 'Social',
+                                  onTap: _openSocial,
+                                  selected: _panelTag == 'social',
                                   t: t,
                                 ),
                               if (userType == 'PublicBody')
@@ -620,10 +624,10 @@ class _MyHomePageState extends State<MyHomePage>
                   ),
                 if (!isOwnerType)
                   _NavItem(
-                    tooltip: 'My groups',
-                    icon: Icons.group_outlined,
-                    label: 'Groups',
-                    onTap: _openGroups,
+                    tooltip: 'Social',
+                    icon: Icons.people_outlined,
+                    label: 'Social',
+                    onTap: _openSocial,
                   ),
                 if (userType == 'PublicBody')
                   _NavItem(

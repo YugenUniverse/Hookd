@@ -13,12 +13,20 @@ import 'my_issues_page.dart';
 import 'notifications_page.dart';
 import 'wall_issues_page.dart';
 import '../providers/notification_provider.dart';
+import '../widgets/follow_list_sheet.dart';
 
 class _UserPageData {
-  const _UserPageData({required this.user, required this.sessions});
+  const _UserPageData({
+    required this.user,
+    required this.sessions,
+    required this.followerCount,
+    required this.followingCount,
+  });
 
   final User user;
   final List<ClimbingSession> sessions;
+  final int followerCount;
+  final int followingCount;
 }
 
 class UserPage extends StatefulWidget {
@@ -60,9 +68,17 @@ class _UserPageState extends State<UserPage> {
       avatar: user.profilePictureUrl ?? '',
       username: user.username,
     );
+
+    final followResults = await Future.wait([
+      apiService.getMyFollowers(),
+      apiService.getFollowing(),
+    ]);
+
     return _UserPageData(
       user: user,
       sessions: results[1] as List<ClimbingSession>,
+      followerCount: (followResults[0] as List).length,
+      followingCount: (followResults[1] as List).length,
     );
   }
 
@@ -358,6 +374,41 @@ class _UserPageState extends State<UserPage> {
                                         title: 'Wallet Score',
                                         value: walletScore.toString(),
                                       ),
+                                      const SizedBox(height: 16),
+                                      const Divider(),
+                                      const SizedBox(height: 8),
+                                      Row(
+                                        children: [
+                                          Expanded(
+                                            child: _FollowCountButton(
+                                              count: pageData.followerCount,
+                                              label: 'Followers',
+                                              onTap: () => showFollowListSheet(
+                                                context,
+                                                userId: user.id,
+                                                type: FollowListType.followers,
+                                                count: pageData.followerCount,
+                                              ),
+                                            ),
+                                          ),
+                                          Container(width: 1, height: 36,
+                                              color: colorScheme.outlineVariant),
+                                          Expanded(
+                                            child: _FollowCountButton(
+                                              count: pageData.followingCount,
+                                              label: 'Following',
+                                              onTap: () => showFollowListSheet(
+                                                context,
+                                                userId: user.id,
+                                                type: FollowListType.following,
+                                                count: pageData.followingCount,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 8),
+                                      const Divider(),
                                       IconButton(
                                         tooltip: 'Edit profile',
                                         icon: const Icon(Icons.edit_outlined),
@@ -534,6 +585,46 @@ class _EmptyActivityState extends StatelessWidget {
         style: Theme.of(
           context,
         ).textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant),
+      ),
+    );
+  }
+}
+
+class _FollowCountButton extends StatelessWidget {
+  const _FollowCountButton({
+    required this.count,
+    required this.label,
+    required this.onTap,
+  });
+
+  final int count;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = Theme.of(context).colorScheme;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        child: Column(
+          children: [
+            Text(
+              '$count',
+              style: theme.textTheme.titleLarge
+                  ?.copyWith(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: theme.textTheme.bodySmall
+                  ?.copyWith(color: cs.onSurfaceVariant),
+            ),
+          ],
+        ),
       ),
     );
   }

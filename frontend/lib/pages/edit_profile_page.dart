@@ -30,6 +30,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
   Uint8List? _pickedImageBytes;
   bool _saving = false;
   String? _error;
+  late String _allowDmsFrom;
 
   String? get _userType => widget.user.userType;
 
@@ -46,6 +47,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
     _surnameCtrl = TextEditingController(text: widget.user.surname ?? '');
     _bioCtrl = TextEditingController(text: widget.user.bio ?? '');
     _birthdate = widget.user.birthdate;
+    _allowDmsFrom = widget.user.allowDmsFrom;
   }
 
   @override
@@ -136,6 +138,10 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
       final newBio = _bioCtrl.text.trim();
       if (newBio != (widget.user.bio ?? '')) updates['bio'] = newBio;
+
+      if (_userType == 'Climber' && _allowDmsFrom != widget.user.allowDmsFrom) {
+        updates['allowDmsFrom'] = _allowDmsFrom;
+      }
 
       if (_hasBirthdate && _birthdate != widget.user.birthdate) {
         updates['birthdate'] = _birthdate?.toIso8601String();
@@ -306,6 +312,32 @@ class _EditProfilePageState extends State<EditProfilePage> {
                     ?.copyWith(color: colorScheme.onSurfaceVariant),
               ),
             ),
+            if (_userType == 'Climber') ...[
+              const SizedBox(height: 20),
+              Text(
+                'Privacy',
+                style: theme.textTheme.titleSmall
+                    ?.copyWith(color: colorScheme.onSurfaceVariant),
+              ),
+              const SizedBox(height: 8),
+              DropdownButtonFormField<String>(
+                value: _allowDmsFrom,
+                decoration: const InputDecoration(
+                  labelText: 'Who can send you messages',
+                  border: OutlineInputBorder(),
+                ),
+                items: const [
+                  DropdownMenuItem(value: 'everyone', child: Text('Everyone')),
+                  DropdownMenuItem(
+                      value: 'followers',
+                      child: Text('People I follow')),
+                  DropdownMenuItem(value: 'nobody', child: Text('Nobody')),
+                ],
+                onChanged: (v) {
+                  if (v != null) setState(() => _allowDmsFrom = v);
+                },
+              ),
+            ],
           ],
         ),
       ),
