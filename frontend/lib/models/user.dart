@@ -128,6 +128,7 @@ class User {
   final Wallet? wallet;
   final int maxStreak;
   final int sessionCount;
+  final String allowDmsFrom;
 
   User({
     required this.id,
@@ -147,6 +148,7 @@ class User {
     this.wallet,
     this.maxStreak = 0,
     this.sessionCount = 0,
+    this.allowDmsFrom = 'everyone',
   });
 
   factory User.fromJson(Map<String, dynamic> json) {
@@ -251,6 +253,7 @@ class User {
       wallet: wallet,
       maxStreak: maxStreak,
       sessionCount: sessionCount,
+      allowDmsFrom: json['allowDmsFrom']?.toString() ?? 'everyone',
     );
   }
 

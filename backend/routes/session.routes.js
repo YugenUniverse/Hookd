@@ -151,6 +151,7 @@ router.post(
     sessionController.addReviewToSession,
 );
 router.get("/", sessionController.getSessions);
+router.get("/user/:userId", sessionController.getPublicSessionsByUser);
 router.get("/:sessionId", sessionController.getSessionById);
 router.put(
     "/:sessionId",

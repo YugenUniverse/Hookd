@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/leaderboard_entry.dart';
+import '../pages/climber_profile_page.dart';
 
 class LeaderboardTile extends StatelessWidget {
   final LeaderboardEntry entry;
@@ -51,6 +52,14 @@ class LeaderboardTile extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 4.0),
         child: ListTile(
+          onTap: entry.id.isNotEmpty
+              ? () => Navigator.of(context).push(MaterialPageRoute(
+                    builder: (_) => ClimberProfilePage(
+                      userId: entry.id,
+                      initialUsername: entry.username,
+                    ),
+                  ))
+              : null,
           leading: Row(
             mainAxisSize: MainAxisSize.min,
             children: [

@@ -101,7 +101,23 @@ exports.getSessionsByUser = async (userId, userType) => {
         throw error;
     }
 
-    return await ClimbingSession.find({ climber_id: userId });
+    return await ClimbingSession.find({ climber_id: userId })
+        .populate('wall_id', 'name wallType')
+        .populate('review_id', 'rating body')
+        .sort({ date: -1 });
+};
+
+exports.getPublicSessionsByUser = async (targetUserId, { limit = 20 } = {}) => {
+    if (!isValidObjectId(targetUserId)) {
+        const error = new Error("Invalid user id");
+        error.statusCode = 400;
+        throw error;
+    }
+    return await ClimbingSession.find({ climber_id: targetUserId, is_private: false })
+        .populate('wall_id', 'name wallType')
+        .populate('review_id', 'rating body')
+        .sort({ date: -1 })
+        .limit(Math.min(limit, 50));
 };
 
 exports.getSessionById = async (sessionId, userId, userType) => {

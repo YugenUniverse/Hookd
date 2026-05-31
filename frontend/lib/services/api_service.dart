@@ -11,6 +11,8 @@ import '../models/event.dart';
 import '../models/app_notification.dart';
 import '../models/badge.dart';
 import '../models/group.dart';
+import '../models/conversation.dart';
+import '../models/message.dart';
 import '../constants/api_config.dart';
 import 'auth_service.dart';
 
@@ -122,7 +124,15 @@ class ApiService {
   }
 
   Future<User> fetchUserProfile(String userId, {String? bearerToken}) async {
-    return fetchCurrentUserProfile(bearerToken: bearerToken);
+    final response = await _dio.get('/users/$userId');
+    final data = response.data;
+    if (data is! Map) throw StateError('Unexpected /users/$userId response');
+    final map = Map<String, dynamic>.from(data as Map);
+    // The public endpoint nests bio/description under 'profile' — flatten it
+    if (map['profile'] is Map) {
+      (map['profile'] as Map<dynamic, dynamic>).forEach((k, v) => map.putIfAbsent(k.toString(), () => v));
+    }
+    return User.fromJson(map);
   }
 
   Future<User> updateCurrentUserProfile(Map<String, dynamic> updates) async {
@@ -158,6 +168,18 @@ class ApiService {
           (session) =>
               ClimbingSession.fromJson(Map<String, dynamic>.from(session)),
         )
+        .toList();
+  }
+
+  Future<List<ClimbingSession>> getPublicSessions(String userId, {int limit = 20}) async {
+    final response = await _dio.get(
+      '/sessions/user/$userId',
+      queryParameters: {'limit': limit},
+    );
+    final data = response.data as Map<String, dynamic>;
+    final list = data['sessions'] as List<dynamic>? ?? [];
+    return list
+        .map((j) => ClimbingSession.fromJson(j as Map<String, dynamic>))
         .toList();
   }
 
@@ -829,6 +851,41 @@ class ApiService {
 
   // Follow endpoints
 
+  Future<List<Map<String, dynamic>>> getMyFollowers() async {
+    try {
+      final response = await _dio.get('/follows/me/followers');
+      final data = response.data;
+      final list = data is Map ? data['followers'] : null;
+      if (list is! List) return [];
+      return list.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getFollowers(String userId) async {
+    try {
+      final response = await _dio.get('/follows/$userId/followers');
+      final data = response.data;
+      final list = data is Map ? data['followers'] : null;
+      if (list is! List) return [];
+      return list.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getFollowingUsers(String userId) async {
+    try {
+      final response = await _dio.get('/follows/$userId/following');
+      final data = response.data;
+      final list = data is Map ? data['following'] : null;
+      if (list is! List) return [];
+      return list.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+    } catch (_) {
+      return [];
+    }
+  }
 
   Future<void> followUser(String userId) async {
     await _dio.post('/follows/$userId');
@@ -999,6 +1056,75 @@ class ApiService {
       data: {'status': status},
     );
     return PlannedClimb.fromJson(Map<String, dynamic>.from(response.data['climb']));
+  }
+
+  // Conversation / chat endpoints
+
+  Future<List<Map<String, dynamic>>> searchClimbers(String query) async {
+    final response = await _dio.get('/climbers/search', queryParameters: {'q': query});
+    final list = response.data is Map ? response.data['users'] : null;
+    if (list is! List) return [];
+    return list.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+  }
+
+  Future<Conversation> getGroupConversation(String groupId) async {
+    final response = await _dio.get('/conversations/group/$groupId');
+    return Conversation.fromJson(
+        Map<String, dynamic>.from(response.data['conversation']));
+  }
+
+  Future<List<Conversation>> getConversations() async {
+    final response = await _dio.get('/conversations');
+    final list = response.data is Map ? response.data['conversations'] : null;
+    if (list is! List) return [];
+    return list
+        .whereType<Map>()
+        .map((e) => Conversation.fromJson(Map<String, dynamic>.from(e)))
+        .toList();
+  }
+
+  Future<Conversation> getOrCreateDm(String targetUserId) async {
+    final response = await _dio.post('/conversations/dm/$targetUserId');
+    return Conversation.fromJson(
+        Map<String, dynamic>.from(response.data['conversation']));
+  }
+
+  Future<List<ChatMessage>> getMessages(
+    String conversationId, {
+    String? before,
+    int limit = 30,
+  }) async {
+    final response = await _dio.get(
+      '/conversations/$conversationId/messages',
+      queryParameters: {
+        'limit': limit,
+        if (before != null) 'before': before,
+      },
+    );
+    final list = response.data is Map ? response.data['messages'] : null;
+    if (list is! List) return [];
+    return list
+        .whereType<Map>()
+        .map((e) => ChatMessage.fromJson(Map<String, dynamic>.from(e)))
+        .toList();
+  }
+
+  Future<ChatMessage> sendMessageRest(
+      String conversationId, String content) async {
+    final response = await _dio.post(
+      '/conversations/$conversationId/messages',
+      data: {'content': content},
+    );
+    return ChatMessage.fromJson(
+        Map<String, dynamic>.from(response.data['message']));
+  }
+
+  Future<void> markConversationRead(String conversationId) async {
+    await _dio.patch('/conversations/$conversationId/read');
+  }
+
+  Future<void> updateDmPrivacy(String allowDmsFrom) async {
+    await _dio.patch('/climbers/me', data: {'allowDmsFrom': allowDmsFrom});
   }
 
   String _formatDate(DateTime date) {

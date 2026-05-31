@@ -5,6 +5,7 @@ const { User } = require("../models/User");
 const { Wall } = require("../models/Wall");
 const Facility = require("../models/Facility");
 const notificationService = require("./notification.service");
+const conversationService = require("./conversation.service");
 
 const err = (msg, code) => Object.assign(new Error(msg), { statusCode: code });
 
@@ -16,6 +17,7 @@ exports.createGroup = async (creatorId, { name, description, visibility }) => {
         creator: creatorId,
         members: [{ user: creatorId, role: "admin", joinedAt: new Date() }],
     });
+    await conversationService.createGroupConversation(group._id, [creatorId]);
     return group;
 };
 
@@ -49,15 +51,32 @@ exports.joinPublicGroup = async (groupId, userId) => {
     if (alreadyMember) throw err("Already a member", 409);
     group.members.push({ user: userId, role: "member", joinedAt: new Date() });
     await group.save();
+    await conversationService.addParticipant(groupId, userId);
     return Group.findById(groupId)
         .populate("members.user", "name username")
         .populate("creator", "name username");
 };
 
 exports.getGroupsForUser = async (userId) => {
-    return Group.find({ "members.user": userId })
+    const groups = await Group.find({ "members.user": userId })
         .populate("members.user", "name username")
         .sort({ createdAt: -1 });
+
+    const groupIds = groups.map((g) => g._id);
+    const now = new Date();
+    const upcomingIds = new Set(
+        groupIds.length > 0
+            ? (await PlannedClimb.distinct("group", {
+                  group: { $in: groupIds },
+                  date: { $gte: now },
+              })).map((id) => id.toString())
+            : [],
+    );
+
+    return groups.map((g) => ({
+        ...g.toJSON(),
+        hasUpcomingEvent: upcomingIds.has(g._id.toString()),
+    }));
 };
 
 exports.getGroupById = async (groupId, requesterId) => {
@@ -69,7 +88,11 @@ exports.getGroupById = async (groupId, requesterId) => {
         (m) => m.user._id.toString() === requesterId.toString(),
     );
     if (!isMember) throw err("Forbidden", 403);
-    return group;
+    const hasUpcomingEvent = !!(await PlannedClimb.exists({
+        group: groupId,
+        date: { $gte: new Date() },
+    }));
+    return { ...group.toJSON(), hasUpcomingEvent };
 };
 
 exports.updateGroup = async (groupId, adminId, patch) => {
@@ -89,6 +112,7 @@ exports.deleteGroup = async (groupId, adminId) => {
     _requireAdmin(group, adminId);
     await GroupInvitation.deleteMany({ group: groupId });
     await PlannedClimb.deleteMany({ group: groupId });
+    await conversationService.deleteGroupConversation(groupId);
     await group.deleteOne();
 };
 
@@ -227,6 +251,7 @@ exports.acceptInvite = async (inviteId, userId) => {
     if (!alreadyMember) {
         group.members.push({ user: userId, role: "member", joinedAt: new Date() });
         await group.save();
+        await conversationService.addParticipant(invite.group, userId);
     }
 
     invite.status = "accepted";
@@ -284,6 +309,7 @@ exports.removeMember = async (groupId, requesterId, targetId) => {
 
     group.members.splice(memberIndex, 1);
     await group.save();
+    await conversationService.removeParticipant(groupId, targetId);
 };
 
 function _requireAdmin(group, userId) {

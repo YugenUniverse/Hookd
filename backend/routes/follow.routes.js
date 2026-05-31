@@ -45,11 +45,31 @@ router.get("/me", async (req, res, next) => {
     }
 });
 
+// Followers of the current user
+router.get("/me/followers", async (req, res, next) => {
+    try {
+        const follows = await followService.getFollowers(req.user.id);
+        res.json({ followers: follows.map((f) => f.follower) });
+    } catch (err) {
+        next(err);
+    }
+});
+
 // Followers of a given user
 router.get("/:userId/followers", async (req, res, next) => {
     try {
         const follows = await followService.getFollowers(req.params.userId);
         res.json({ followers: follows.map((f) => f.follower) });
+    } catch (err) {
+        next(err);
+    }
+});
+
+// Who a given user follows
+router.get("/:userId/following", async (req, res, next) => {
+    try {
+        const follows = await followService.getFollowing(req.params.userId);
+        res.json({ following: follows.map((f) => f.following) });
     } catch (err) {
         next(err);
     }

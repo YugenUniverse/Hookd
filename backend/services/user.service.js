@@ -11,6 +11,11 @@ const SELECT_PUBLIC = {
     wallet: 1,
     facility: 1,
     walls: 1,
+    sessions: 1,
+    stats: 1,
+    name: 1,
+    surname: 1,
+    createdAt: 1,
 };
 
 async function getPublicUserById(id) {

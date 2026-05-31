@@ -89,11 +89,14 @@ describe("user.routes", () => {
         }
 
         expect(response.status).toBe(200);
-        expect(response.body).toEqual({
+        expect(response.body).toMatchObject({
             id: climber.id,
             username: "publicclimber",
             avatar: "https://example.com/avatar.png",
             userType: "Climber",
+            name: "Public",
+            surname: "Climber",
+            sessionCount: 0,
             profile: {
                 bio: "Loves overhang routes",
                 description: "",
@@ -105,10 +108,12 @@ describe("user.routes", () => {
             },
         });
 
+        // Sensitive fields must never be exposed
         expect(response.body.email).toBeUndefined();
         expect(response.body.password).toBeUndefined();
         expect(response.body.googleId).toBeUndefined();
         expect(response.body.authMethods).toBeUndefined();
+        // name/surname are at top level, not nested inside profile
         expect(response.body.profile.name).toBeUndefined();
         expect(response.body.profile.surname).toBeUndefined();
     });
