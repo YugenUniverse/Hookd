@@ -95,6 +95,11 @@ const climberSchema = new mongoose.Schema(
                 default: 0,
             },
         },
+        allowDmsFrom: {
+            type: String,
+            enum: ["everyone", "followers", "nobody"],
+            default: "everyone",
+        },
     },
     {
         toJSON: {

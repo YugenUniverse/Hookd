@@ -24,8 +24,11 @@ exports.getPublicUserById = async (req, res, next) => {
         const publicUser = {
             id: user._id.toString(),
             username: user.username,
+            name: user.name || null,
+            surname: user.surname || null,
             avatar: user.avatar || "",
             userType: user.userType,
+            createdAt: user.createdAt,
             profile: {
                 bio: user.bio || "",
                 description: user.description || "",
@@ -56,6 +59,8 @@ exports.getPublicUserById = async (req, res, next) => {
                 }
                 break;
             case "Climber":
+                publicUser.sessionCount = user.sessions?.length ?? 0;
+                publicUser.stats = user.stats ?? {};
                 if (user.wallet) {
                     await mongoose.model("User").populate(user, { path: "wallet.badges.badge" });
                     publicUser.wallet = user.wallet;
