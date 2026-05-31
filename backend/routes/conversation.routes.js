@@ -3,6 +3,7 @@ const router = express.Router();
 const { authenticateJwt, restrictTo } = require("../middleware/auth.middleware");
 const conversationService = require("../services/conversation.service");
 const Conversation = require("../models/Conversation");
+const PlannedClimb = require("../models/PlannedClimb");
 
 router.use(authenticateJwt);
 
@@ -62,7 +63,11 @@ router.get("/group/:groupId", async (req, res, next) => {
             if (!isMember) return res.status(403).json({ error: "Forbidden" });
         }
 
-        res.json({ conversation: conv });
+        const hasUpcomingEvent = !!(await PlannedClimb.exists({
+            group: req.params.groupId,
+            date: { $gte: new Date() },
+        }));
+        res.json({ conversation: { ...conv.toJSON(), hasUpcomingEvent } });
     } catch (err) {
         next(err);
     }

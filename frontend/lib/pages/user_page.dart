@@ -487,16 +487,18 @@ class _SessionActivityCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final dateLabel = _formatDate(session.date);
-    final privacyLabel = session.isPrivate ? 'Private' : 'Public';
+    final cs = theme.colorScheme;
+    final day = session.date.day.toString().padLeft(2, '0');
+    final month = session.date.month.toString().padLeft(2, '0');
+    final dateLabel = '$day/$month/${session.date.year}';
+    final hasReview = session.reviewRating != null && session.reviewRating! > 0;
 
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest.withOpacity(0.7),
+        color: cs.surfaceContainerHighest.withValues(alpha: 0.7),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: colorScheme.outlineVariant.withOpacity(0.25)),
+        border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.25)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -506,38 +508,65 @@ class _SessionActivityCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   dateLabel,
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
+                  style: theme.textTheme.titleMedium
+                      ?.copyWith(fontWeight: FontWeight.w700),
                 ),
               ),
-              _MiniBadge(label: privacyLabel),
+              if (session.isPrivate)
+                _MiniBadge(label: 'Private'),
+              Icon(Icons.terrain_outlined, size: 18, color: cs.onSurfaceVariant),
             ],
           ),
-          const SizedBox(height: 10),
-          Text(
-            'Wall: ${session.wallId.isNotEmpty ? session.wallId : 'Unknown'}',
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: colorScheme.onSurfaceVariant,
+          const SizedBox(height: 8),
+          if (session.wallName?.isNotEmpty == true)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Text(
+                session.wallName!,
+                style: theme.textTheme.bodyMedium
+                    ?.copyWith(fontWeight: FontWeight.w600),
+              ),
             ),
-          ),
-          const SizedBox(height: 6),
           Text(
             'Duration: ${session.time} min',
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: colorScheme.onSurfaceVariant,
-            ),
+            style: theme.textTheme.bodyMedium
+                ?.copyWith(color: cs.onSurfaceVariant),
           ),
+          if (hasReview) ...[
+            const SizedBox(height: 10),
+            const Divider(height: 1),
+            const SizedBox(height: 10),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: List.generate(5, (i) {
+                    final filled = i < session.reviewRating!;
+                    return Icon(
+                      filled ? Icons.star_rounded : Icons.star_outline_rounded,
+                      size: 16,
+                      color: filled
+                          ? Colors.amber.shade400
+                          : cs.outlineVariant,
+                    );
+                  }),
+                ),
+                if (session.reviewBody?.isNotEmpty == true) ...[
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      session.reviewBody!,
+                      style: theme.textTheme.bodySmall
+                          ?.copyWith(color: cs.onSurfaceVariant),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ],
         ],
       ),
     );
-  }
-
-  String _formatDate(DateTime date) {
-    final day = date.day.toString().padLeft(2, '0');
-    final month = date.month.toString().padLeft(2, '0');
-    final year = date.year.toString();
-    return '$day/$month/$year';
   }
 }
 

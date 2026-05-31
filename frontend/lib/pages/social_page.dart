@@ -12,7 +12,6 @@ import '../services/auth_service.dart';
 import 'chat_page.dart';
 import 'climber_profile_page.dart';
 import 'create_group_page.dart';
-import 'group_detail_page.dart';
 
 class SocialPage extends StatefulWidget {
   const SocialPage({super.key});
@@ -81,7 +80,7 @@ class _SocialPageState extends State<SocialPage>
   void _onSearchChanged(String value) {
     _debounce?.cancel();
     final q = value.trim();
-    if (_discoverSegment == 0) {
+    if (_discoverSegment == 1) {
       _debounce = Timer(const Duration(milliseconds: 350), () {
         if (mounted) {
           context
@@ -116,19 +115,14 @@ class _SocialPageState extends State<SocialPage>
     }
   }
 
-  Future<void> _openGroupDetail(Group group) async {
-    await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => GroupDetailPage(groupId: group.id)),
-    );
-    if (mounted) {
-      context.read<GroupProvider>().loadMyGroups();
-      _loadChats();
-    }
-  }
 
   Future<void> _openGroupChat(Group group) async {
     try {
-      final conv = await ApiService().getGroupConversation(group.id);
+      // Prefer the already-loaded conversation so hasUpcomingEvent is preserved
+      final cached = _conversations
+          .where((c) => c.type == 'group' && c.groupId == group.id)
+          .firstOrNull;
+      final conv = cached ?? await ApiService().getGroupConversation(group.id);
       if (!mounted) return;
       await Navigator.of(context)
           .push(MaterialPageRoute(builder: (_) => ChatPage(conversation: conv)));
@@ -194,7 +188,7 @@ class _SocialPageState extends State<SocialPage>
               child: const Icon(Icons.edit_outlined),
             );
           }
-          if (_discoverSegment == 0) {
+          if (_discoverSegment == 1) {
             return FloatingActionButton.extended(
               heroTag: 'social_new_group',
               onPressed: _openCreate,
@@ -225,7 +219,6 @@ class _SocialPageState extends State<SocialPage>
               currentUserId: currentUserId,
               onOpenDm: _openDmConversation,
               onOpenGroupChat: _openGroupChat,
-              onOpenGroupDetail: _openGroupDetail,
               onRefresh: _loadChats,
             ),
             _DiscoverTab(
@@ -238,7 +231,7 @@ class _SocialPageState extends State<SocialPage>
                   _userResults = [];
                   _userSearchDone = false;
                 });
-                if (v == 0) {
+                if (v == 1) {
                   context.read<GroupProvider>().discoverGroups();
                 }
               },
@@ -377,7 +370,6 @@ class _ChatsTab extends StatelessWidget {
     required this.currentUserId,
     required this.onOpenDm,
     required this.onOpenGroupChat,
-    required this.onOpenGroupDetail,
     required this.onRefresh,
   });
 
@@ -386,7 +378,6 @@ class _ChatsTab extends StatelessWidget {
   final String currentUserId;
   final Future<void> Function(Conversation) onOpenDm;
   final Future<void> Function(Group) onOpenGroupChat;
-  final Future<void> Function(Group) onOpenGroupDetail;
   final Future<void> Function() onRefresh;
 
   Future<void> _refresh(BuildContext context) {
@@ -479,7 +470,6 @@ class _ChatsTab extends StatelessWidget {
                         conversation: conv,
                         currentUserId: currentUserId,
                         onOpenChat: () => onOpenGroupChat(g),
-                        onOpenDetail: () => onOpenGroupDetail(g),
                       );
                     },
                   ),
@@ -535,14 +525,12 @@ class _GroupChatCard extends StatelessWidget {
     required this.conversation,
     required this.currentUserId,
     required this.onOpenChat,
-    required this.onOpenDetail,
   });
 
   final Group group;
   final Conversation? conversation;
   final String currentUserId;
   final VoidCallback onOpenChat;
-  final VoidCallback onOpenDetail;
 
   @override
   Widget build(BuildContext context) {
@@ -562,7 +550,7 @@ class _GroupChatCard extends StatelessWidget {
         onTap: onOpenChat,
         borderRadius: BorderRadius.circular(20),
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
           child: Row(
             children: [
               CircleAvatar(
@@ -578,12 +566,30 @@ class _GroupChatCard extends StatelessWidget {
                     Row(
                       children: [
                         Expanded(
-                          child: Text(
-                            group.name,
-                            style: theme.textTheme.titleSmall?.copyWith(
-                              fontWeight: FontWeight.w700,
-                            ),
-                            overflow: TextOverflow.ellipsis,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  group.name,
+                                  style: theme.textTheme.titleSmall?.copyWith(
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              if (group.hasUpcomingEvent) ...[
+                                const SizedBox(width: 6),
+                                Tooltip(
+                                  message: 'Upcoming planned climb',
+                                  child: Icon(
+                                    Icons.event_outlined,
+                                    size: 15,
+                                    color: cs.primary,
+                                  ),
+                                ),
+                              ],
+                            ],
                           ),
                         ),
                         if (lastMsg != null)
@@ -630,14 +636,7 @@ class _GroupChatCard extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(width: 4),
-              IconButton(
-                icon: Icon(Icons.info_outline,
-                    size: 20, color: cs.onSurfaceVariant),
-                tooltip: 'Group details',
-                visualDensity: VisualDensity.compact,
-                onPressed: onOpenDetail,
-              ),
+              Icon(Icons.chevron_right, color: cs.onSurfaceVariant),
             ],
           ),
         ),
@@ -801,13 +800,13 @@ class _DiscoverTab extends StatelessWidget {
             segments: const [
               ButtonSegment(
                 value: 0,
-                label: Text('Groups'),
-                icon: Icon(Icons.group_outlined),
+                label: Text('People'),
+                icon: Icon(Icons.person_search_outlined),
               ),
               ButtonSegment(
                 value: 1,
-                label: Text('People'),
-                icon: Icon(Icons.person_search_outlined),
+                label: Text('Groups'),
+                icon: Icon(Icons.group_outlined),
               ),
             ],
             selected: {segment},
@@ -819,8 +818,8 @@ class _DiscoverTab extends StatelessWidget {
           child: SearchBar(
             controller: searchCtrl,
             hintText: segment == 0
-                ? 'Search public groups…'
-                : 'Search by username…',
+                ? 'Search by username…'
+                : 'Search public groups…',
             leading: const Icon(Icons.search),
             trailing: [
               if (searchCtrl.text.isNotEmpty)
@@ -837,15 +836,15 @@ class _DiscoverTab extends StatelessWidget {
         ),
         Expanded(
           child: segment == 0
-              ? _GroupsResults(
-                  searchCtrl: searchCtrl,
-                  onJoin: onJoinGroup,
-                )
-              : _PeopleResults(
+              ? _PeopleResults(
                   results: userResults,
                   loading: usersLoading,
                   searchDone: userSearchDone,
                   query: searchCtrl.text,
+                )
+              : _GroupsResults(
+                  searchCtrl: searchCtrl,
+                  onJoin: onJoinGroup,
                 ),
         ),
       ],

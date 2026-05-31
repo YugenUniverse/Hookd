@@ -171,6 +171,18 @@ class ApiService {
         .toList();
   }
 
+  Future<List<ClimbingSession>> getPublicSessions(String userId, {int limit = 20}) async {
+    final response = await _dio.get(
+      '/sessions/user/$userId',
+      queryParameters: {'limit': limit},
+    );
+    final data = response.data as Map<String, dynamic>;
+    final list = data['sessions'] as List<dynamic>? ?? [];
+    return list
+        .map((j) => ClimbingSession.fromJson(j as Map<String, dynamic>))
+        .toList();
+  }
+
   Future<Map<String, dynamic>> checkServerHealth() async {
     try {
       final response = await _dio

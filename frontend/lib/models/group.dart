@@ -51,6 +51,7 @@ class Group {
   final List<GroupMember> members;
   final int? memberCount; // only set in discover results (no member list populated)
   final DateTime? createdAt;
+  final bool hasUpcomingEvent;
 
   const Group({
     required this.id,
@@ -61,6 +62,7 @@ class Group {
     this.visibility = 'private',
     this.memberCount,
     this.createdAt,
+    this.hasUpcomingEvent = false,
   });
 
   bool get isPublic => visibility == 'public';
@@ -92,6 +94,7 @@ class Group {
       members: members,
       memberCount: json['memberCount'] as int?,
       createdAt: createdAt,
+      hasUpcomingEvent: json['hasUpcomingEvent'] == true,
     );
   }
 }

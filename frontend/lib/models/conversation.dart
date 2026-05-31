@@ -9,6 +9,7 @@ class Conversation {
   final ChatMessage? lastMessage;
   final DateTime lastActivity;
   final bool hasUnread;
+  final bool hasUpcomingEvent;
 
   Conversation({
     required this.id,
@@ -19,6 +20,7 @@ class Conversation {
     this.lastMessage,
     required this.lastActivity,
     this.hasUnread = false,
+    this.hasUpcomingEvent = false,
   });
 
   factory Conversation.fromJson(Map<String, dynamic> json) {
@@ -42,6 +44,7 @@ class Conversation {
           : null,
       lastActivity: _parseDate(json['lastActivity'] ?? json['updatedAt']),
       hasUnread: json['hasUnread'] == true,
+      hasUpcomingEvent: json['hasUpcomingEvent'] == true,
     );
   }
 

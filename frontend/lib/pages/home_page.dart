@@ -37,6 +37,8 @@ class _MyHomePageState extends State<MyHomePage>
   bool _avatarLoadAttempted = false;
   int? _openIssueCount;
   String? _worstSeverity; // 'HIGH', 'MEDIUM', 'LOW', or null
+  int _unreadChatCount = 0;
+  StreamSubscription? _chatMsgSub;
   Widget? _panelContent;
   String? _panelTag;
 
@@ -53,13 +55,18 @@ class _MyHomePageState extends State<MyHomePage>
       _avatarLoadAttempted = true;
       _loadAvatar();
       if (AuthService().userType == 'PublicBody') _loadIssueCount();
-      if (AuthService().userType == 'Climber') ChatService().connect();
+      if (AuthService().userType == 'Climber') {
+        ChatService().connect();
+        _loadUnreadChatCount();
+        _subscribeChatMessages();
+      }
     }
   }
 
   @override
   void dispose() {
     AuthService().removeListener(_onAuthChanged);
+    _chatMsgSub?.cancel();
     _navExpand.dispose();
     super.dispose();
   }
@@ -69,6 +76,9 @@ class _MyHomePageState extends State<MyHomePage>
     if (!AuthService().isAuthenticated) {
       _avatarLoadAttempted = false;
       _openIssueCount = null;
+      _unreadChatCount = 0;
+      _chatMsgSub?.cancel();
+      _chatMsgSub = null;
       ChatService().disconnect();
       return;
     }
@@ -76,11 +86,31 @@ class _MyHomePageState extends State<MyHomePage>
       _avatarLoadAttempted = true;
       _loadAvatar();
       if (AuthService().userType == 'PublicBody') _loadIssueCount();
-      if (AuthService().userType == 'Climber') ChatService().connect();
+      if (AuthService().userType == 'Climber') {
+        ChatService().connect();
+        _loadUnreadChatCount();
+        _subscribeChatMessages();
+      }
     }
   }
 
+  void _subscribeChatMessages() {
+    _chatMsgSub?.cancel();
+    _chatMsgSub = ChatService().onNewMessage.listen((_) {
+      if (mounted) _loadUnreadChatCount();
+    });
+  }
+
   Future<void> _loadAvatar() => ApiService().loadAndCacheAvatar();
+
+  Future<void> _loadUnreadChatCount() async {
+    try {
+      final convs = await ApiService().getConversations();
+      if (mounted) {
+        setState(() => _unreadChatCount = convs.where((c) => c.hasUnread).length);
+      }
+    } catch (_) {}
+  }
 
   Future<void> _loadIssueCount() async {
     try {
@@ -224,6 +254,7 @@ class _MyHomePageState extends State<MyHomePage>
       await Navigator.of(context).push(
         MaterialPageRoute(builder: (_) => const SocialPage()),
       );
+      if (mounted) _loadUnreadChatCount();
     });
   }
 
@@ -315,6 +346,7 @@ class _MyHomePageState extends State<MyHomePage>
       _panelTag = null;
     });
     if (closingTag == 'issues') _loadIssueCount();
+    if (closingTag == 'social') _loadUnreadChatCount();
     _navExpand.reverse();
   }
 
@@ -539,6 +571,14 @@ class _MyHomePageState extends State<MyHomePage>
                                   label: 'Social',
                                   onTap: _openSocial,
                                   selected: _panelTag == 'social',
+                                  customIcon: _unreadChatCount > 0
+                                      ? Badge(
+                                          label: Text('$_unreadChatCount'),
+                                          child: Icon(Icons.people_outlined,
+                                              size: 24,
+                                              color: cs.onSurfaceVariant),
+                                        )
+                                      : null,
                                   t: t,
                                 ),
                               if (userType == 'PublicBody')
@@ -628,6 +668,12 @@ class _MyHomePageState extends State<MyHomePage>
                     icon: Icons.people_outlined,
                     label: 'Social',
                     onTap: _openSocial,
+                    customIcon: _unreadChatCount > 0
+                        ? Badge(
+                            label: Text('$_unreadChatCount'),
+                            child: const Icon(Icons.people_outlined, size: 24),
+                          )
+                        : null,
                   ),
                 if (userType == 'PublicBody')
                   _NavItem(

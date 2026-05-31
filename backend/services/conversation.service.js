@@ -2,6 +2,7 @@ const Conversation = require("../models/Conversation");
 const Message = require("../models/Message");
 const { Climber } = require("../models/User");
 const Follow = require("../models/Follow");
+const PlannedClimb = require("../models/PlannedClimb");
 require("../models/Group"); // ensure Group schema is registered for population
 
 const err = (msg, code) => Object.assign(new Error(msg), { statusCode: code });
@@ -81,11 +82,28 @@ exports.getConversationsForUser = async (userId) => {
         .sort({ lastActivity: -1 })
         .limit(50);
 
+    // Collect group IDs to check for upcoming planned climbs in one query
+    const groupIds = conversations
+        .filter((c) => c.type === "group" && c.group)
+        .map((c) => c.group._id ?? c.group);
+
+    const now = new Date();
+    const upcomingGroupIds = new Set(
+        groupIds.length > 0
+            ? (await PlannedClimb.distinct("group", {
+                  group: { $in: groupIds },
+                  date: { $gte: now },
+              })).map((id) => id.toString())
+            : [],
+    );
+
     return conversations.map((c) => {
         const unread = c.lastMessage
             ? !c.lastMessage.readBy.some((r) => r.user.toString() === userId.toString())
             : false;
-        return { ...c.toJSON(), hasUnread: unread };
+        const groupId = c.group ? (c.group._id ?? c.group).toString() : null;
+        const hasUpcomingEvent = groupId ? upcomingGroupIds.has(groupId) : false;
+        return { ...c.toJSON(), hasUnread: unread, hasUpcomingEvent };
     });
 };
 

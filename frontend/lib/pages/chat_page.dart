@@ -224,6 +224,15 @@ class _ChatPageState extends State<ChatPage> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(_title()),
+                  if (widget.conversation.type == 'group' &&
+                      widget.conversation.hasUpcomingEvent) ...[
+                    const SizedBox(width: 6),
+                    Tooltip(
+                      message: 'Upcoming planned climb',
+                      child: Icon(Icons.event_outlined,
+                          size: 15, color: cs.primary),
+                    ),
+                  ],
                   const SizedBox(width: 4),
                   Icon(Icons.chevron_right, size: 18, color: cs.onSurfaceVariant),
                 ],

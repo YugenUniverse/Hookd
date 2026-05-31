@@ -58,9 +58,25 @@ exports.joinPublicGroup = async (groupId, userId) => {
 };
 
 exports.getGroupsForUser = async (userId) => {
-    return Group.find({ "members.user": userId })
+    const groups = await Group.find({ "members.user": userId })
         .populate("members.user", "name username")
         .sort({ createdAt: -1 });
+
+    const groupIds = groups.map((g) => g._id);
+    const now = new Date();
+    const upcomingIds = new Set(
+        groupIds.length > 0
+            ? (await PlannedClimb.distinct("group", {
+                  group: { $in: groupIds },
+                  date: { $gte: now },
+              })).map((id) => id.toString())
+            : [],
+    );
+
+    return groups.map((g) => ({
+        ...g.toJSON(),
+        hasUpcomingEvent: upcomingIds.has(g._id.toString()),
+    }));
 };
 
 exports.getGroupById = async (groupId, requesterId) => {
@@ -72,7 +88,11 @@ exports.getGroupById = async (groupId, requesterId) => {
         (m) => m.user._id.toString() === requesterId.toString(),
     );
     if (!isMember) throw err("Forbidden", 403);
-    return group;
+    const hasUpcomingEvent = !!(await PlannedClimb.exists({
+        group: groupId,
+        date: { $gte: new Date() },
+    }));
+    return { ...group.toJSON(), hasUpcomingEvent };
 };
 
 exports.updateGroup = async (groupId, adminId, patch) => {

@@ -2,10 +2,13 @@ class ClimbingSession {
   final String id;
   final String climberId;
   final String wallId;
+  final String? wallName;
   final DateTime date;
   final num time;
   final bool isPrivate;
   final String? reviewId;
+  final int? reviewRating;
+  final String? reviewBody;
 
   ClimbingSession({
     required this.id,
@@ -13,8 +16,11 @@ class ClimbingSession {
     required this.wallId,
     required this.date,
     required this.time,
+    this.wallName,
     this.isPrivate = false,
     this.reviewId,
+    this.reviewRating,
+    this.reviewBody,
   });
 
   factory ClimbingSession.fromJson(Map<String, dynamic> json) {
@@ -43,15 +49,43 @@ class ClimbingSession {
       return text == '1' || text == 'true' || text == 'yes';
     }
 
+    // wall_id may be a populated object or a plain id string
+    final rawWall = json['wall_id'] ?? json['wallId'];
+    final String wallId;
+    String? wallName;
+    if (rawWall is Map) {
+      wallId = (rawWall['id'] ?? rawWall['_id'] ?? '').toString();
+      wallName = rawWall['name']?.toString();
+    } else {
+      wallId = (rawWall ?? '').toString();
+    }
+
+    // review_id may be a populated object or a plain id string
+    final rawReview = json['review_id'] ?? json['reviewId'];
+    String? reviewId;
+    int? reviewRating;
+    String? reviewBody;
+    if (rawReview is Map) {
+      reviewId = (rawReview['id'] ?? rawReview['_id'])?.toString();
+      final r = rawReview['rating'];
+      reviewRating = r is num ? r.toInt() : int.tryParse(r?.toString() ?? '');
+      reviewBody = rawReview['body']?.toString();
+    } else {
+      reviewId = rawReview?.toString();
+    }
+
     return ClimbingSession(
       id: (json['id'] ?? json['_id'] ?? '').toString(),
       climberId: (json['climber_id'] ?? json['climberId'] ?? json['userId'] ?? '')
           .toString(),
-      wallId: (json['wall_id'] ?? json['wallId'] ?? '').toString(),
+      wallId: wallId,
+      wallName: wallName,
       date: parseDate(json['date']),
       time: parseTime(json['time']),
       isPrivate: parseBool(json['is_private'] ?? json['isPrivate']),
-      reviewId: (json['review_id'] ?? json['reviewId'])?.toString(),
+      reviewId: reviewId,
+      reviewRating: reviewRating,
+      reviewBody: reviewBody,
     );
   }
 
