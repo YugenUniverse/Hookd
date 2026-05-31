@@ -7,6 +7,10 @@ import 'package:intl/intl.dart';
 
 import '../models/group.dart';
 import '../models/poi.dart';
+import '../models/event.dart';
+import 'create_event_page.dart';
+import 'event_detail_page.dart';
+import 'manage_event_badges_page.dart';
 import '../providers/group_provider.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
@@ -24,12 +28,15 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
   late Future<Group> _groupFuture;
   List<PlannedClimb> _climbs = [];
   bool _climbsLoading = false;
+  List<Event> _events = [];
+  bool _eventsLoading = false;
 
   @override
   void initState() {
     super.initState();
     _groupFuture = ApiService().getGroupById(widget.groupId);
     _loadClimbs();
+    _loadEvents();
   }
 
   Future<void> _loadClimbs() async {
@@ -43,11 +50,23 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
     }
   }
 
+  Future<void> _loadEvents() async {
+    setState(() => _eventsLoading = true);
+    try {
+      final events = await ApiService().getEventsForGroup(widget.groupId);
+      if (mounted) setState(() => _events = events);
+    } catch (_) {
+    } finally {
+      if (mounted) setState(() => _eventsLoading = false);
+    }
+  }
+
   void _refresh() {
     setState(() {
       _groupFuture = ApiService().getGroupById(widget.groupId);
     });
     _loadClimbs();
+    _loadEvents();
   }
 
   bool _isAdmin(Group group, String userId) =>
@@ -84,11 +103,18 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
     controller.dispose();
     if (username == null || username.isEmpty || !mounted) return;
 
-    final ok = await context.read<GroupProvider>().inviteUser(group.id, username);
+    final ok = await context.read<GroupProvider>().inviteUser(
+      group.id,
+      username,
+    );
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(ok ? 'Invitation sent!' : 'User not found or invite already sent.'),
-    ));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          ok ? 'Invitation sent!' : 'User not found or invite already sent.',
+        ),
+      ),
+    );
   }
 
   Future<void> _removeMember(Group group, GroupMember member) async {
@@ -120,9 +146,9 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
     if (confirmed != true || !mounted) return;
 
     final ok = await context.read<GroupProvider>().leaveOrRemoveMember(
-          group.id,
-          member.userId,
-        );
+      group.id,
+      member.userId,
+    );
     if (!mounted) return;
     if (ok) {
       if (isSelf) {
@@ -139,14 +165,18 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
 
   Future<void> _leaveGroup(Group group, String currentUserId) async {
     final isAdmin = _isAdmin(group, currentUserId);
-    final others = group.members.where((m) => m.userId != currentUserId).toList();
+    final others = group.members
+        .where((m) => m.userId != currentUserId)
+        .toList();
 
     if (isAdmin && others.isEmpty) {
       showDialog(
         context: context,
         builder: (ctx) => AlertDialog(
           title: const Text('Cannot leave'),
-          content: Text('You are the only member of "${group.name}". Delete the group instead.'),
+          content: Text(
+            'You are the only member of "${group.name}". Delete the group instead.',
+          ),
           actions: [
             FilledButton(
               onPressed: () => Navigator.of(ctx).pop(),
@@ -160,10 +190,13 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
 
     String content = 'Are you sure you want to leave "${group.name}"?';
     if (isAdmin && others.every((m) => !m.isAdmin)) {
-      final earliest = (others.toList()
-            ..sort((a, b) => (a.joinedAt ?? DateTime(0))
-                .compareTo(b.joinedAt ?? DateTime(0))))
-          .first;
+      final earliest =
+          (others.toList()..sort(
+                (a, b) => (a.joinedAt ?? DateTime(0)).compareTo(
+                  b.joinedAt ?? DateTime(0),
+                ),
+              ))
+              .first;
       final name = earliest.name ?? earliest.username ?? 'another member';
       content += '\n\n$name will become the new admin.';
     }
@@ -187,15 +220,18 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
     );
     if (confirmed != true || !mounted) return;
 
-    final ok = await context
-        .read<GroupProvider>()
-        .leaveOrRemoveMember(group.id, currentUserId);
+    final ok = await context.read<GroupProvider>().leaveOrRemoveMember(
+      group.id,
+      currentUserId,
+    );
     if (!mounted) return;
     if (ok) {
       Navigator.of(context).pop();
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not leave group. Please try again.')),
+        const SnackBar(
+          content: Text('Could not leave group. Please try again.'),
+        ),
       );
     }
   }
@@ -205,7 +241,9 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Delete group?'),
-        content: Text('This will permanently delete "${group.name}" and all its data.'),
+        content: Text(
+          'This will permanently delete "${group.name}" and all its data.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
@@ -229,17 +267,17 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
     if (ok) {
       Navigator.of(context).pop();
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to delete group.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Failed to delete group.')));
     }
   }
 
   Future<void> _addPlannedClimb() async {
-    final result = await showDialog<({DateTime date, String? venueId, String? venueType, String? notes})>(
-      context: context,
-      builder: (ctx) => const _AddClimbDialog(),
-    );
+    final result =
+        await showDialog<
+          ({DateTime date, String? venueId, String? venueType, String? notes})
+        >(context: context, builder: (ctx) => const _AddClimbDialog());
     if (result == null || !mounted) return;
 
     try {
@@ -252,7 +290,8 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
       );
       if (mounted) {
         setState(() {
-          _climbs = [..._climbs, climb]..sort((a, b) => a.date.compareTo(b.date));
+          _climbs = [..._climbs, climb]
+            ..sort((a, b) => a.date.compareTo(b.date));
         });
       }
     } catch (_) {
@@ -277,7 +316,11 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
 
   Future<void> _rsvpClimb(PlannedClimb climb, String status) async {
     try {
-      final updated = await ApiService().rsvpPlannedClimb(widget.groupId, climb.id, status);
+      final updated = await ApiService().rsvpPlannedClimb(
+        widget.groupId,
+        climb.id,
+        status,
+      );
       if (mounted) {
         setState(() {
           final idx = _climbs.indexWhere((c) => c.id == climb.id);
@@ -286,9 +329,9 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
       }
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to update RSVP.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Failed to update RSVP.')));
     }
   }
 
@@ -301,7 +344,10 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
       body: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: [cs.surface, cs.surfaceContainerHighest.withValues(alpha: 0.85)],
+            colors: [
+              cs.surface,
+              cs.surfaceContainerHighest.withValues(alpha: 0.85),
+            ],
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
           ),
@@ -310,7 +356,9 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
           future: _groupFuture,
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Scaffold(body: Center(child: CircularProgressIndicator()));
+              return const Scaffold(
+                body: Center(child: CircularProgressIndicator()),
+              );
             }
             if (snapshot.hasError) {
               return Scaffold(
@@ -323,134 +371,439 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
             final isAdmin = _isAdmin(group, currentUserId);
             final isSolo = group.members.length == 1;
 
-            return Scaffold(
-              backgroundColor: Colors.transparent,
-              appBar: AppBar(
+            final isManager = group.members.any(
+              (m) => m.userId == currentUserId && m.isManager,
+            );
+
+            return DefaultTabController(
+              length: 4,
+              child: Scaffold(
                 backgroundColor: Colors.transparent,
-                title: Text(group.name),
-                actions: [
-                  if (isAdmin)
-                    IconButton(
-                      icon: const Icon(Icons.person_add_outlined),
-                      tooltip: 'Invite',
-                      onPressed: () => _inviteUser(group),
-                    ),
-                  if (!isSolo)
-                    IconButton(
-                      icon: const Icon(Icons.exit_to_app),
-                      tooltip: 'Leave group',
-                      onPressed: () => _leaveGroup(group, currentUserId),
-                    ),
-                  if (isAdmin)
-                    IconButton(
-                      icon: Icon(Icons.delete_outline, color: cs.error),
-                      tooltip: 'Delete group',
-                      onPressed: () => _deleteGroup(group),
-                    ),
-                ],
-              ),
-              floatingActionButton: isAdmin
-                  ? FloatingActionButton.extended(
-                      onPressed: _addPlannedClimb,
-                      icon: const Icon(Icons.event_available_outlined),
-                      label: const Text('Plan a climb'),
-                    )
-                  : null,
-              body: RefreshIndicator(
-                onRefresh: () async => _refresh(),
-                child: ListView(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
-                  children: [
-                    if (group.description != null && group.description!.isNotEmpty) ...[
-                      Card(
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.35)),
-                        ),
-                        color: cs.surfaceContainerHighest.withValues(alpha: 0.7),
-                        child: Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Text(group.description!),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
+                appBar: AppBar(
+                  backgroundColor: Colors.transparent,
+                  title: Text(group.name),
+                  bottom: const TabBar(
+                    isScrollable: true,
+                    tabs: [
+                      Tab(text: 'Climbs'),
+                      Tab(text: 'Events'),
+                      Tab(text: 'Leaderboard'),
+                      Tab(text: 'Members'),
                     ],
-
-                    // ─── Planned Climbs ──────────────────────────────────
-                    Padding(
-                      padding: const EdgeInsets.only(left: 4, bottom: 8),
-                      child: Text(
-                        'Planned Climbs',
-                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                              color: cs.onSurfaceVariant,
-                              fontWeight: FontWeight.w600,
-                            ),
+                  ),
+                  actions: [
+                    if (isAdmin)
+                      IconButton(
+                        icon: const Icon(Icons.person_add_outlined),
+                        tooltip: 'Invite',
+                        onPressed: () => _inviteUser(group),
                       ),
-                    ),
-                    if (_climbsLoading)
-                      const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 12),
-                        child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                    if (!isSolo)
+                      IconButton(
+                        icon: const Icon(Icons.exit_to_app),
+                        tooltip: 'Leave group',
+                        onPressed: () => _leaveGroup(group, currentUserId),
+                      ),
+                    if (isAdmin)
+                      IconButton(
+                        icon: Icon(Icons.delete_outline, color: cs.error),
+                        tooltip: 'Delete group',
+                        onPressed: () => _deleteGroup(group),
+                      ),
+                  ],
+                ),
+                floatingActionButton: isManager
+                    ? FloatingActionButton.extended(
+                        onPressed: () async {
+                          final result = await showDialog<int>(
+                            context: context,
+                            builder: (ctx) => AlertDialog(
+                              title: const Text('Create New'),
+                              content: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  ListTile(
+                                    leading: const Icon(
+                                      Icons.event_available_outlined,
+                                    ),
+                                    title: const Text('Plan a climb'),
+                                    onTap: () => Navigator.of(ctx).pop(1),
+                                  ),
+                                  ListTile(
+                                    leading: const Icon(
+                                      Icons.emoji_events_outlined,
+                                    ),
+                                    title: const Text(
+                                      'Group Event / Challenge',
+                                    ),
+                                    onTap: () => Navigator.of(ctx).pop(2),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                          if (result == 1) {
+                            _addPlannedClimb();
+                          } else if (result == 2) {
+                            final newEvent = await Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                    CreateEventPage(groupId: widget.groupId),
+                              ),
+                            );
+                            if (newEvent != null && newEvent is Event) {
+                              _refresh();
+                            }
+                          }
+                        },
+                        icon: const Icon(Icons.add),
+                        label: const Text('Create'),
                       )
-                    else if (_climbs.isEmpty)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 16),
-                        child: Card(
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                            side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.25)),
-                          ),
-                          color: cs.surfaceContainerHighest.withValues(alpha: 0.5),
-                          child: Padding(
-                            padding: const EdgeInsets.all(20),
-                            child: Row(
-                              children: [
-                                Icon(Icons.hiking_outlined, color: cs.onSurfaceVariant, size: 28),
-                                const SizedBox(width: 12),
-                                Text(
-                                  isAdmin
-                                      ? 'No climbs planned yet. Tap "Plan a climb" to add one.'
-                                      : 'No climbs planned yet.',
-                                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                        color: cs.onSurfaceVariant,
-                                      ),
+                    : null,
+                body: TabBarView(
+                  children: [
+                    // Tab 1: Climbs
+                    RefreshIndicator(
+                      onRefresh: () async => _refresh(),
+                      child: ListView(
+                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+                        children: [
+                          if (group.description != null &&
+                              group.description!.isNotEmpty) ...[
+                            Card(
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                                side: BorderSide(
+                                  color: cs.outlineVariant.withValues(
+                                    alpha: 0.35,
+                                  ),
                                 ),
-                              ],
+                              ),
+                              color: cs.surfaceContainerHighest.withValues(
+                                alpha: 0.7,
+                              ),
+                              child: Padding(
+                                padding: const EdgeInsets.all(16),
+                                child: Text(group.description!),
+                              ),
                             ),
-                          ),
-                        ),
-                      )
-                    else
-                      ..._climbs.map((climb) => _PlannedClimbTile(
-                            climb: climb,
-                            groupName: group.name,
-                            isAdmin: isAdmin,
-                            currentUserId: currentUserId,
-                            onDelete: () => _deletePlannedClimb(climb),
-                            onRsvp: (status) => _rsvpClimb(climb, status),
-                          )),
-
-                    const SizedBox(height: 16),
-
-                    // ─── Members ─────────────────────────────────────────
-                    Padding(
-                      padding: const EdgeInsets.only(left: 4, bottom: 8),
-                      child: Text(
-                        'Members (${group.members.length})',
-                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                              color: cs.onSurfaceVariant,
-                              fontWeight: FontWeight.w600,
+                            const SizedBox(height: 16),
+                          ],
+                          if (_climbsLoading)
+                            const Padding(
+                              padding: EdgeInsets.symmetric(vertical: 12),
+                              child: Center(
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              ),
+                            )
+                          else if (_climbs.isEmpty)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 16),
+                              child: Card(
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                  side: BorderSide(
+                                    color: cs.outlineVariant.withValues(
+                                      alpha: 0.25,
+                                    ),
+                                  ),
+                                ),
+                                color: cs.surfaceContainerHighest.withValues(
+                                  alpha: 0.5,
+                                ),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(20),
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        Icons.hiking_outlined,
+                                        color: cs.onSurfaceVariant,
+                                        size: 28,
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Text(
+                                          isManager
+                                              ? 'No climbs planned yet. Tap "Create" to add one.'
+                                              : 'No climbs planned yet.',
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .bodyMedium
+                                              ?.copyWith(
+                                                color: cs.onSurfaceVariant,
+                                              ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            )
+                          else
+                            ..._climbs.map(
+                              (climb) => _PlannedClimbTile(
+                                climb: climb,
+                                groupName: group.name,
+                                isAdmin: isAdmin,
+                                currentUserId: currentUserId,
+                                onDelete: () => _deletePlannedClimb(climb),
+                                onRsvp: (status) => _rsvpClimb(climb, status),
+                              ),
                             ),
+                        ],
                       ),
                     ),
-                    ...group.members.map((member) => _MemberTile(
-                          member: member,
-                          currentUserId: currentUserId,
-                          isCurrentUserAdmin: isAdmin,
-                          onRemove: () => _removeMember(group, member),
-                        )),
+
+                    // Tab 2: Events
+                    RefreshIndicator(
+                      onRefresh: () async => _refresh(),
+                      child: ListView(
+                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+                        children: [
+                          if (_eventsLoading)
+                            const Padding(
+                              padding: EdgeInsets.symmetric(vertical: 12),
+                              child: Center(
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              ),
+                            )
+                          else if (_events.isEmpty)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 16),
+                              child: Card(
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                  side: BorderSide(
+                                    color: cs.outlineVariant.withValues(
+                                      alpha: 0.25,
+                                    ),
+                                  ),
+                                ),
+                                color: cs.surfaceContainerHighest.withValues(
+                                  alpha: 0.5,
+                                ),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(20),
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        Icons.emoji_events_outlined,
+                                        color: cs.onSurfaceVariant,
+                                        size: 28,
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Text(
+                                          isManager
+                                              ? 'No events yet. Tap "Create" to add one.'
+                                              : 'No events yet.',
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .bodyMedium
+                                              ?.copyWith(
+                                                color: cs.onSurfaceVariant,
+                                              ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            )
+                          else
+                            ..._events.map(
+                              (evt) => Card(
+                                elevation: 0,
+                                margin: const EdgeInsets.only(bottom: 8),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                  side: BorderSide(
+                                    color: cs.outlineVariant.withValues(
+                                      alpha: 0.25,
+                                    ),
+                                  ),
+                                ),
+                                color: cs.surfaceContainerHighest.withValues(
+                                  alpha: 0.7,
+                                ),
+                                child: ListTile(
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) =>
+                                            EventDetailPage(event: evt),
+                                      ),
+                                    );
+                                  },
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 8,
+                                  ),
+                                  leading: Container(
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      color: cs.primaryContainer,
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: Icon(
+                                      Icons.emoji_events,
+                                      color: cs.onPrimaryContainer,
+                                      size: 24,
+                                    ),
+                                  ),
+                                  title: Text(
+                                    evt.title,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  subtitle: Text(
+                                    DateFormat(
+                                      'MMM d, yyyy',
+                                    ).format(evt.startDate.toLocal()),
+                                  ),
+                                  trailing: (isAdmin || isManager)
+                                      ? IconButton(
+                                          icon: const Icon(Icons.military_tech),
+                                          tooltip: 'Manage Badges',
+                                          onPressed: () {
+                                            Navigator.push(
+                                              context,
+                                              MaterialPageRoute(
+                                                builder: (_) =>
+                                                    ManageEventBadgesPage(
+                                                        event: evt),
+                                              ),
+                                            );
+                                          },
+                                        )
+                                      : const Icon(Icons.chevron_right),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+
+                    // Tab 3: Leaderboard
+                    RefreshIndicator(
+                      onRefresh: () async => _refresh(),
+                      child: ListView.builder(
+                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+                        itemCount: group.members.length,
+                        itemBuilder: (context, index) {
+                          final sortedMembers = List<GroupMember>.from(
+                            group.members,
+                          )..sort((a, b) => b.score.compareTo(a.score));
+                          final member = sortedMembers[index];
+                          final isSelf = member.userId == currentUserId;
+                          final displayName =
+                              member.name ?? member.username ?? member.userId;
+                          final initial = displayName.isNotEmpty
+                              ? displayName[0].toUpperCase()
+                              : '?';
+
+                          return Card(
+                            elevation: 0,
+                            margin: const EdgeInsets.only(bottom: 8),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                              side: BorderSide(
+                                color: cs.outlineVariant.withValues(
+                                  alpha: 0.25,
+                                ),
+                              ),
+                            ),
+                            color: isSelf
+                                ? cs.primaryContainer
+                                : cs.surfaceContainerHighest.withValues(
+                                    alpha: 0.7,
+                                  ),
+                            child: ListTile(
+                              leading: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    '${index + 1}',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 18,
+                                      color: index == 0
+                                          ? Colors.amber
+                                          : index == 1
+                                          ? Colors.grey[400]
+                                          : index == 2
+                                          ? Colors.brown[300]
+                                          : cs.onSurfaceVariant,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  CircleAvatar(
+                                    backgroundColor: isSelf
+                                        ? cs.onPrimaryContainer
+                                        : cs.primaryContainer,
+                                    child: Text(
+                                      initial,
+                                      style: TextStyle(
+                                        color: isSelf
+                                            ? cs.primaryContainer
+                                            : cs.onPrimaryContainer,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              title: Text(
+                                displayName,
+                                style: Theme.of(context).textTheme.titleSmall
+                                    ?.copyWith(
+                                      fontWeight: FontWeight.w600,
+                                      color: isSelf
+                                          ? cs.onPrimaryContainer
+                                          : null,
+                                    ),
+                              ),
+                              trailing: Text(
+                                '${member.score} pts',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: isSelf
+                                      ? cs.onPrimaryContainer
+                                      : cs.primary,
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+
+                    // Tab 4: Members
+                    RefreshIndicator(
+                      onRefresh: () async => _refresh(),
+                      child: ListView(
+                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+                        children: [
+                          ...group.members.map(
+                            (member) => _MemberTile(
+                              member: member,
+                              currentUserId: currentUserId,
+                              isCurrentUserAdmin: isAdmin,
+                              onRemove: () => _removeMember(group, member),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -511,13 +864,20 @@ class _AddClimbDialogState extends State<_AddClimbDialog> {
   void _onSearchChanged(String query) {
     _debounce?.cancel();
     if (query.trim().isEmpty) {
-      setState(() { _searchResults = []; _isSearching = false; });
+      setState(() {
+        _searchResults = [];
+        _isSearching = false;
+      });
       return;
     }
     _debounce = Timer(const Duration(milliseconds: 350), () async {
       setState(() => _isSearching = true);
       final results = await ApiService().searchPois(query.trim());
-      if (mounted) setState(() { _searchResults = results; _isSearching = false; });
+      if (mounted)
+        setState(() {
+          _searchResults = results;
+          _isSearching = false;
+        });
     });
   }
 
@@ -558,8 +918,12 @@ class _AddClimbDialogState extends State<_AddClimbDialog> {
                 onPressed: _pickDate,
                 icon: const Icon(Icons.calendar_today_outlined),
                 label: Text(
-                  _selectedDate == null ? 'Pick a date *' : _formatDate(_selectedDate!),
-                  style: _selectedDate == null ? TextStyle(color: cs.onSurfaceVariant) : null,
+                  _selectedDate == null
+                      ? 'Pick a date *'
+                      : _formatDate(_selectedDate!),
+                  style: _selectedDate == null
+                      ? TextStyle(color: cs.onSurfaceVariant)
+                      : null,
                 ),
               ),
               const SizedBox(height: 8),
@@ -568,8 +932,12 @@ class _AddClimbDialogState extends State<_AddClimbDialog> {
                 onPressed: _pickTime,
                 icon: const Icon(Icons.access_time_outlined),
                 label: Text(
-                  _selectedTime == null ? 'Pick a time (optional)' : _formatTime(_selectedTime!),
-                  style: _selectedTime == null ? TextStyle(color: cs.onSurfaceVariant) : null,
+                  _selectedTime == null
+                      ? 'Pick a time (optional)'
+                      : _formatTime(_selectedTime!),
+                  style: _selectedTime == null
+                      ? TextStyle(color: cs.onSurfaceVariant)
+                      : null,
                 ),
               ),
               const SizedBox(height: 12),
@@ -591,7 +959,11 @@ class _AddClimbDialogState extends State<_AddClimbDialog> {
                     suffixIcon: _isSearching
                         ? const Padding(
                             padding: EdgeInsets.all(12),
-                            child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+                            child: SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
                           )
                         : null,
                   ),
@@ -602,7 +974,9 @@ class _AddClimbDialogState extends State<_AddClimbDialog> {
                     decoration: BoxDecoration(
                       color: cs.surfaceContainerHighest,
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.4)),
+                      border: Border.all(
+                        color: cs.outlineVariant.withValues(alpha: 0.4),
+                      ),
                     ),
                     constraints: const BoxConstraints(maxHeight: 200),
                     child: ListView.builder(
@@ -616,25 +990,39 @@ class _AddClimbDialogState extends State<_AddClimbDialog> {
                         return InkWell(
                           onTap: () => _selectVenue(poi),
                           borderRadius: BorderRadius.vertical(
-                            top: i == 0 ? const Radius.circular(12) : Radius.zero,
-                            bottom: isLast ? const Radius.circular(12) : Radius.zero,
+                            top: i == 0
+                                ? const Radius.circular(12)
+                                : Radius.zero,
+                            bottom: isLast
+                                ? const Radius.circular(12)
+                                : Radius.zero,
                           ),
                           child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 10,
+                            ),
                             child: Row(
                               children: [
                                 Icon(
-                                  isGym ? Icons.fitness_center_outlined : Icons.terrain_outlined,
+                                  isGym
+                                      ? Icons.fitness_center_outlined
+                                      : Icons.terrain_outlined,
                                   size: 18,
                                   color: cs.onSurfaceVariant,
                                 ),
                                 const SizedBox(width: 10),
                                 Expanded(
-                                  child: Text(poi.name, style: theme.textTheme.bodyMedium),
+                                  child: Text(
+                                    poi.name,
+                                    style: theme.textTheme.bodyMedium,
+                                  ),
                                 ),
                                 Text(
                                   isGym ? 'Gym' : 'Outdoor',
-                                  style: theme.textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
+                                  style: theme.textTheme.labelSmall?.copyWith(
+                                    color: cs.onSurfaceVariant,
+                                  ),
                                 ),
                               ],
                             ),
@@ -670,13 +1058,21 @@ class _AddClimbDialogState extends State<_AddClimbDialog> {
               : () {
                   var date = _selectedDate!;
                   if (_selectedTime != null) {
-                    date = DateTime(date.year, date.month, date.day, _selectedTime!.hour, _selectedTime!.minute);
+                    date = DateTime(
+                      date.year,
+                      date.month,
+                      date.day,
+                      _selectedTime!.hour,
+                      _selectedTime!.minute,
+                    );
                   }
                   final notes = _notesController.text.trim();
                   Navigator.of(context).pop((
                     date: date,
                     venueId: _selectedVenue?.id,
-                    venueType: _selectedVenue is FacilityPoi ? 'Facility' : (_selectedVenue != null ? 'Wall' : null),
+                    venueType: _selectedVenue is FacilityPoi
+                        ? 'Facility'
+                        : (_selectedVenue != null ? 'Wall' : null),
                     notes: notes.isEmpty ? null : notes,
                   ));
                 },
@@ -707,8 +1103,19 @@ class _SelectedVenueTile extends StatelessWidget {
           isGym ? Icons.fitness_center_outlined : Icons.terrain_outlined,
           color: cs.onSecondaryContainer,
         ),
-        title: Text(venue.name, style: TextStyle(color: cs.onSecondaryContainer, fontWeight: FontWeight.w600)),
-        subtitle: Text(isGym ? 'Gym' : 'Outdoor wall', style: TextStyle(color: cs.onSecondaryContainer.withValues(alpha: 0.7))),
+        title: Text(
+          venue.name,
+          style: TextStyle(
+            color: cs.onSecondaryContainer,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        subtitle: Text(
+          isGym ? 'Gym' : 'Outdoor wall',
+          style: TextStyle(
+            color: cs.onSecondaryContainer.withValues(alpha: 0.7),
+          ),
+        ),
         trailing: IconButton(
           icon: Icon(Icons.close, color: cs.onSecondaryContainer, size: 18),
           onPressed: onClear,
@@ -755,13 +1162,19 @@ class _PlannedClimbTile extends StatelessWidget {
     final theme = Theme.of(context);
     final hasTime = climb.date.hour != 0 || climb.date.minute != 0;
     final dateStr = DateFormat('EEE, MMM d, yyyy').format(climb.date.toLocal());
-    final timeStr = hasTime ? DateFormat('HH:mm').format(climb.date.toLocal()) : null;
+    final timeStr = hasTime
+        ? DateFormat('HH:mm').format(climb.date.toLocal())
+        : null;
 
-    final myAttendee = climb.attendees.where((a) => a.userId == currentUserId).firstOrNull;
+    final myAttendee = climb.attendees
+        .where((a) => a.userId == currentUserId)
+        .firstOrNull;
     final myStatus = myAttendee?.status; // "going", "not_going", or null
 
     final goingCount = climb.attendees.where((a) => a.status == 'going').length;
-    final notGoingCount = climb.attendees.where((a) => a.status == 'not_going').length;
+    final notGoingCount = climb.attendees
+        .where((a) => a.status == 'not_going')
+        .length;
 
     return Card(
       elevation: 0,
@@ -785,7 +1198,11 @@ class _PlannedClimbTile extends StatelessWidget {
                     color: cs.tertiaryContainer,
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: Icon(Icons.terrain_outlined, color: cs.onTertiaryContainer, size: 20),
+                  child: Icon(
+                    Icons.terrain_outlined,
+                    color: cs.onTertiaryContainer,
+                    size: 20,
+                  ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -794,30 +1211,50 @@ class _PlannedClimbTile extends StatelessWidget {
                     children: [
                       Row(
                         children: [
-                          Text(dateStr, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
+                          Text(
+                            dateStr,
+                            style: theme.textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                           if (timeStr != null) ...[
                             const SizedBox(width: 8),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
                               decoration: BoxDecoration(
                                 color: cs.secondaryContainer,
                                 borderRadius: BorderRadius.circular(6),
                               ),
-                              child: Text(timeStr, style: theme.textTheme.labelSmall?.copyWith(color: cs.onSecondaryContainer)),
+                              child: Text(
+                                timeStr,
+                                style: theme.textTheme.labelSmall?.copyWith(
+                                  color: cs.onSecondaryContainer,
+                                ),
+                              ),
                             ),
                           ],
                         ],
                       ),
-                      if (climb.wallName != null && climb.wallName!.isNotEmpty) ...[
+                      if (climb.wallName != null &&
+                          climb.wallName!.isNotEmpty) ...[
                         const SizedBox(height: 4),
                         Row(
                           children: [
-                            Icon(Icons.location_on_outlined, size: 14, color: cs.onSurfaceVariant),
+                            Icon(
+                              Icons.location_on_outlined,
+                              size: 14,
+                              color: cs.onSurfaceVariant,
+                            ),
                             const SizedBox(width: 4),
                             Expanded(
                               child: Text(
                                 climb.wallName!,
-                                style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: cs.onSurfaceVariant,
+                                ),
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
@@ -826,20 +1263,33 @@ class _PlannedClimbTile extends StatelessWidget {
                       ],
                       if (climb.notes != null && climb.notes!.isNotEmpty) ...[
                         const SizedBox(height: 4),
-                        Text(climb.notes!, style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+                        Text(
+                          climb.notes!,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: cs.onSurfaceVariant,
+                          ),
+                        ),
                       ],
                     ],
                   ),
                 ),
                 IconButton(
-                  icon: Icon(Icons.calendar_today_outlined, size: 18, color: cs.onSurfaceVariant),
+                  icon: Icon(
+                    Icons.calendar_today_outlined,
+                    size: 18,
+                    color: cs.onSurfaceVariant,
+                  ),
                   tooltip: 'Add to calendar',
                   onPressed: _addToCalendar,
                   visualDensity: VisualDensity.compact,
                 ),
                 if (isAdmin)
                   IconButton(
-                    icon: Icon(Icons.close, size: 18, color: cs.onSurfaceVariant),
+                    icon: Icon(
+                      Icons.close,
+                      size: 18,
+                      color: cs.onSurfaceVariant,
+                    ),
                     tooltip: 'Remove',
                     onPressed: onDelete,
                     visualDensity: VisualDensity.compact,
@@ -853,11 +1303,25 @@ class _PlannedClimbTile extends StatelessWidget {
                 if (climb.attendees.isNotEmpty) ...[
                   Icon(Icons.check_circle_outline, size: 14, color: cs.primary),
                   const SizedBox(width: 3),
-                  Text('$goingCount', style: theme.textTheme.labelSmall?.copyWith(color: cs.primary)),
+                  Text(
+                    '$goingCount',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: cs.primary,
+                    ),
+                  ),
                   const SizedBox(width: 8),
-                  Icon(Icons.cancel_outlined, size: 14, color: cs.onSurfaceVariant),
+                  Icon(
+                    Icons.cancel_outlined,
+                    size: 14,
+                    color: cs.onSurfaceVariant,
+                  ),
                   const SizedBox(width: 3),
-                  Text('$notGoingCount', style: theme.textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant)),
+                  Text(
+                    '$notGoingCount',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: cs.onSurfaceVariant,
+                    ),
+                  ),
                   const Spacer(),
                 ] else
                   const Spacer(),
@@ -966,12 +1430,17 @@ class _MemberTile extends StatelessWidget {
           backgroundColor: cs.primaryContainer,
           child: Text(
             initial,
-            style: TextStyle(color: cs.onPrimaryContainer, fontWeight: FontWeight.w700),
+            style: TextStyle(
+              color: cs.onPrimaryContainer,
+              fontWeight: FontWeight.w700,
+            ),
           ),
         ),
         title: Text(
           displayName,
-          style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+          style: theme.textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
         ),
         subtitle: member.username != null && member.name != null
             ? Text('@${member.username}', style: theme.textTheme.bodySmall)

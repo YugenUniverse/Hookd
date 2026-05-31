@@ -35,9 +35,7 @@ describe("event & notification routes", () => {
     beforeAll(async () => {
         jest.spyOn(console, "error").mockImplementation(() => {});
         await mongoose.connect(process.env.MONGO_URI, { dbName: "hookd" });
-    });
 
-    beforeEach(async () => {
         facility = await Facility.create({
             name: "Test Gym",
             description: "A test gym",
@@ -69,11 +67,11 @@ describe("event & notification routes", () => {
         await Event.deleteMany({});
         await Notification.deleteMany({});
         await Follow.deleteMany({});
-        await User.deleteMany({});
-        await Facility.deleteMany({});
     });
 
     afterAll(async () => {
+        await User.deleteMany({});
+        await Facility.deleteMany({});
         console.error.mockRestore();
         await mongoose.disconnect();
     });

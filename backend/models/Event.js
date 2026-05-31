@@ -13,10 +13,20 @@ const eventSchema = new mongoose.Schema(
             trim: true,
             maxlength: [1000, "Description cannot exceed 1000 characters"],
         },
+        isGlobal: {
+            type: Boolean,
+            default: false,
+        },
         facility: {
             type: mongoose.Schema.Types.ObjectId,
             ref: "Facility",
-            required: [true, "Facility is required"],
+            required: function() {
+                return !this.isGlobal && !this.groupId;
+            },
+        },
+        groupId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Group",
         },
         createdBy: {
             type: mongoose.Schema.Types.ObjectId,

@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const { authenticateJwt, restrictTo } = require("../middleware/auth.middleware");
 const groupService = require("../services/group.service");
+const eventService = require("../services/event.service");
 
 router.use(authenticateJwt);
 router.use(restrictTo("Climber"));
@@ -132,6 +133,39 @@ router.delete("/:id/members/:userId", async (req, res, next) => {
         await groupService.removeMember(req.params.id, req.user.id, req.params.userId);
         res.status(204).end();
     } catch (err) {
+        next(err);
+    }
+});
+
+// Update member role (admin only)
+router.patch("/:id/members/:userId/role", async (req, res, next) => {
+    try {
+        const group = await groupService.updateMemberRole(req.params.id, req.user.id, req.params.userId, req.body.role);
+        res.json({ group });
+    } catch (err) {
+        next(err);
+    }
+});
+
+// List events for the group (members only)
+router.get("/:id/events", async (req, res, next) => {
+    try {
+        const group = await groupService.getGroupById(req.params.id, req.user.id); // Validates membership
+        const events = await eventService.getEventsForGroup(req.params.id);
+        res.json({ events });
+    } catch (err) {
+        next(err);
+    }
+});
+
+// Create an event for the group (admin/manager only)
+router.post("/:id/events", async (req, res, next) => {
+    try {
+        const payload = { ...req.body, groupId: req.params.id };
+        const event = await eventService.createEvent(req.user.id, payload);
+        res.status(201).json({ event });
+    } catch (err) {
+        if (err.name === "ValidationError") err.statusCode = 400;
         next(err);
     }
 });

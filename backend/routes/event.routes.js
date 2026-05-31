@@ -54,8 +54,8 @@ router.get("/:id/leaderboard", async (req, res, next) => {
 // All event routes below require authentication
 router.use(authenticateJwt);
 
-// Create event — FacilityOwner only
-router.post("/", restrictTo("FacilityOwner"), async (req, res, next) => {
+// Create event — FacilityOwner or PublicBody
+router.post("/", restrictTo("FacilityOwner", "PublicBody"), async (req, res, next) => {
     try {
         const event = await eventService.createEvent(req.user.id, req.body);
         res.status(201).json({ event });
@@ -65,8 +65,8 @@ router.post("/", restrictTo("FacilityOwner"), async (req, res, next) => {
     }
 });
 
-// Edit event — FacilityOwner only (must own the event)
-router.patch("/:id", restrictTo("FacilityOwner"), async (req, res, next) => {
+// Edit event — must own the event
+router.patch("/:id", async (req, res, next) => {
     try {
         const event = await eventService.updateEvent(req.params.id, req.user.id, req.body);
         res.json({ event });
@@ -76,8 +76,8 @@ router.patch("/:id", restrictTo("FacilityOwner"), async (req, res, next) => {
     }
 });
 
-// Delete event — FacilityOwner only (must own the event)
-router.delete("/:id", restrictTo("FacilityOwner"), async (req, res, next) => {
+// Delete event — must own the event
+router.delete("/:id", async (req, res, next) => {
     try {
         await eventService.deleteEvent(req.params.id, req.user.id);
         res.status(204).end();
@@ -86,8 +86,8 @@ router.delete("/:id", restrictTo("FacilityOwner"), async (req, res, next) => {
     }
 });
 
-// Close event — FacilityOwner only (must own the event)
-router.post("/:id/close", restrictTo("FacilityOwner"), async (req, res, next) => {
+// Close event — must own the event
+router.post("/:id/close", async (req, res, next) => {
     try {
         const event = await eventService.closeEvent(req.params.id, req.user.id);
         res.json({ event, message: "Event closed and badges distributed successfully" });

@@ -13,7 +13,9 @@ http:
               "title": "Summer Comp",
               "description": "Fun competition",
               "startDate": "2026-07-01T00:00:00.000Z",
-              "endDate": "2026-07-02T00:00:00.000Z"
+              "endDate": "2026-07-02T00:00:00.000Z",
+              "facilityId": "FACILITY_ID_HERE",
+              "walls": ["WALL_ID_1", "WALL_ID_2"]
             }
     auth:
         type: bearer

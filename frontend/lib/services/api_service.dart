@@ -740,6 +740,8 @@ class ApiService {
     required DateTime startDate,
     DateTime? endDate,
     List<String> walls = const [],
+    String? groupId,
+    String? facilityId,
   }) async {
     final payload = <String, dynamic>{
       'title': title,
@@ -748,8 +750,10 @@ class ApiService {
         'description': description.trim(),
       if (endDate != null) 'endDate': endDate.toIso8601String(),
       'walls': walls,
+      if (facilityId != null) 'facilityId': facilityId,
     };
-    final response = await _dio.post('/events', data: payload);
+    final url = groupId != null ? '/groups/$groupId/events' : '/events';
+    final response = await _dio.post(url, data: payload);
     final data = response.data;
     if (data is Map<String, dynamic> && data['event'] is Map<String, dynamic>) {
       return Event.fromJson(data['event'] as Map<String, dynamic>);
@@ -759,6 +763,17 @@ class ApiService {
 
   Future<List<Event>> getEventsForFacility(String facilityId) async {
     final response = await _dio.get('/events', queryParameters: {'facilityId': facilityId});
+    final data = response.data;
+    final list = data is Map ? data['events'] : null;
+    if (list is! List) return [];
+    return list
+        .whereType<Map<String, dynamic>>()
+        .map((m) => Event.fromJson(m))
+        .toList();
+  }
+
+  Future<List<Event>> getEventsForGroup(String groupId) async {
+    final response = await _dio.get('/groups/$groupId/events');
     final data = response.data;
     final list = data is Map ? data['events'] : null;
     if (list is! List) return [];

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/event.dart';
 import '../services/api_service.dart';
-import 'event_leaderboard_page.dart';
+import 'event_detail_page.dart';
 
 class ActiveEventsPage extends StatefulWidget {
   const ActiveEventsPage({super.key});
@@ -64,21 +64,32 @@ class _ActiveEventsPageState extends State<ActiveEventsPage> {
               ? '${_formatDate(event.startDate)} – ${_formatDate(event.endDate!)}'
               : _formatDate(event.startDate);
 
+          final isGlobal = event.isGlobal;
+          final avatarColor = isGlobal ? Colors.amber.shade700 : cs.primary;
+          final icon = isGlobal ? Icons.public : Icons.event;
+          final subtitleText = isGlobal
+              ? 'Global Challenge • $dateLabel'
+              : dateLabel;
+
           return Card(
-            elevation: 0,
-            color: cs.surfaceContainerHighest,
+            elevation: isGlobal ? 4 : 0,
+            color: isGlobal ? cs.primaryContainer : cs.surfaceContainerHighest,
             margin: const EdgeInsets.only(bottom: 12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: isGlobal ? BorderSide(color: Colors.amber.shade700, width: 2) : BorderSide.none,
+            ),
             child: ListTile(
               leading: CircleAvatar(
-                backgroundColor: cs.primary,
-                child: Icon(Icons.event, color: cs.onPrimary),
+                backgroundColor: avatarColor,
+                child: Icon(icon, color: Colors.white),
               ),
               title: Text(event.title, style: const TextStyle(fontWeight: FontWeight.bold)),
-              subtitle: Text(dateLabel),
+              subtitle: Text(subtitleText),
               trailing: const Icon(Icons.chevron_right),
               onTap: () {
                 Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => EventLeaderboardPage(event: event)),
+                  MaterialPageRoute(builder: (_) => EventDetailPage(event: event)),
                 );
               },
             ),

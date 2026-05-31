@@ -9,6 +9,7 @@ import '../services/auth_service.dart';
 import '../dialogs/login_dialog.dart';
 import '../pages/report_list_page.dart';
 import '../services/report_service.dart';
+import '../pages/events_list_page.dart';
 
 const _kMaxPreviewWalls = 5;
 
@@ -210,6 +211,22 @@ class _PublicBodyPageState extends State<PublicBodyPage> {
                                           reportService: ReportService(
                                             token: token,
                                           ),
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
+                                const SizedBox(height: 20),
+                                _NavButton(
+                                  icon: Icons.public,
+                                  label: 'Global Challenges',
+                                  onTap: () {
+                                    Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder: (_) => EventsListPage(
+                                          facilityId: 'global',
+                                          facilityName: 'Global Challenges',
+                                          canCreate: true,
                                         ),
                                       ),
                                     );

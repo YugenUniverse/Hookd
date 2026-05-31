@@ -4,8 +4,9 @@ const { Schema, Types: { ObjectId } } = mongoose;
 const memberSchema = new Schema(
     {
         user: { type: ObjectId, ref: "User", required: true },
-        role: { type: String, enum: ["admin", "member"], default: "member" },
+        role: { type: String, enum: ["admin", "manager", "member"], default: "member" },
         joinedAt: { type: Date, default: Date.now },
+        score: { type: Number, default: 0 },
     },
     { _id: false },
 );

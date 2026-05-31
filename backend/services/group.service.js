@@ -132,7 +132,7 @@ exports.rsvpPlannedClimb = async (groupId, climbId, userId, status) => {
 exports.createPlannedClimb = async (groupId, adminId, { date, venueId, venueType, notes }) => {
     const group = await Group.findById(groupId);
     if (!group) throw err("Group not found", 404);
-    _requireAdmin(group, adminId);
+    _requireAdminOrManager(group, adminId);
     if (!date) throw err("date is required", 400);
     const parsedDate = new Date(date);
     if (isNaN(parsedDate.getTime())) throw err("Invalid date", 400);
@@ -158,7 +158,7 @@ exports.createPlannedClimb = async (groupId, adminId, { date, venueId, venueType
 exports.deletePlannedClimb = async (groupId, adminId, climbId) => {
     const group = await Group.findById(groupId);
     if (!group) throw err("Group not found", 404);
-    _requireAdmin(group, adminId);
+    _requireAdminOrManager(group, adminId);
     const climb = await PlannedClimb.findOne({ _id: climbId, group: groupId });
     if (!climb) throw err("Planned climb not found", 404);
     await climb.deleteOne();
@@ -167,7 +167,7 @@ exports.deletePlannedClimb = async (groupId, adminId, climbId) => {
 exports.inviteUser = async (groupId, adminId, username) => {
     const group = await Group.findById(groupId);
     if (!group) throw err("Group not found", 404);
-    _requireAdmin(group, adminId);
+    _requireAdminOrManager(group, adminId);
 
     const invitee = await User.findOne({ username: username.toLowerCase().trim() });
     if (!invitee) throw err("User not found", 404);
@@ -294,3 +294,39 @@ function _requireAdmin(group, userId) {
         throw err("Forbidden: admin only", 403);
     }
 }
+
+function _requireAdminOrManager(group, userId) {
+    const member = group.members.find(
+        (m) => m.user.toString() === userId.toString(),
+    );
+    if (!member || (member.role !== "admin" && member.role !== "manager")) {
+        throw err("Forbidden: admin or manager only", 403);
+    }
+}
+
+exports.updateMemberRole = async (groupId, adminId, targetUserId, newRole) => {
+    const group = await Group.findById(groupId);
+    if (!group) throw err("Group not found", 404);
+    _requireAdmin(group, adminId); // Only admins can change roles
+
+    const memberIndex = group.members.findIndex(
+        (m) => m.user.toString() === targetUserId.toString(),
+    );
+    if (memberIndex === -1) throw err("User is not a member", 404);
+
+    if (!["admin", "manager", "member"].includes(newRole)) {
+        throw err("Invalid role", 400);
+    }
+
+    // Prevent demoting the last admin
+    if (group.members[memberIndex].role === "admin" && newRole !== "admin") {
+        const adminCount = group.members.filter((m) => m.role === "admin").length;
+        if (adminCount <= 1) {
+            throw err("Cannot demote the last admin", 409);
+        }
+    }
+
+    group.members[memberIndex].role = newRole;
+    await group.save();
+    return group;
+};

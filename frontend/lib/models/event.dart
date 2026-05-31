@@ -2,7 +2,9 @@ class Event {
   final String id;
   final String title;
   final String? description;
-  final String facilityId;
+  final String? facilityId;
+  final String? groupId;
+  final bool isGlobal;
   final DateTime startDate;
   final DateTime? endDate;
   final DateTime? createdAt;
@@ -13,7 +15,9 @@ class Event {
     required this.id,
     required this.title,
     this.description,
-    required this.facilityId,
+    this.facilityId,
+    this.groupId,
+    this.isGlobal = false,
     required this.startDate,
     this.endDate,
     this.createdAt,
@@ -32,7 +36,9 @@ class Event {
       id: (json['id'] ?? json['_id'] ?? '').toString(),
       title: (json['title'] ?? '').toString(),
       description: json['description']?.toString(),
-      facilityId: (json['facility'] ?? '').toString(),
+      facilityId: json['facility'] != null ? json['facility'].toString() : null,
+      groupId: json['groupId']?.toString(),
+      isGlobal: json['isGlobal'] ?? false,
       startDate: parseDate(json['startDate']) ?? DateTime.now(),
       endDate: parseDate(json['endDate']),
       createdAt: parseDate(json['createdAt']),
