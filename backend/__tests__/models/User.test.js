@@ -196,6 +196,27 @@ describe("User model suite", () => {
         });
     });
 
+    describe("fcmTokens field", () => {
+        it("defaults to an empty array", async () => {
+            const user = await User.create({ email: "fcm@example.com", username: "fcmtest" });
+            const reloaded = await User.findById(user._id).select("+fcmTokens");
+            expect(reloaded.fcmTokens).toEqual([]);
+        });
+
+        it("is not returned by default queries (select: false)", async () => {
+            await User.create({ email: "fcmhidden@example.com", username: "fcmhidden" });
+            const found = await User.findOne({ email: "fcmhidden@example.com" });
+            expect(found.fcmTokens).toBeUndefined();
+        });
+
+        it("can store string tokens when explicitly selected", async () => {
+            const user = await User.create({ email: "fcmstore@example.com", username: "fcmstore" });
+            await User.findByIdAndUpdate(user._id, { $addToSet: { fcmTokens: "token-abc" } });
+            const reloaded = await User.findById(user._id).select("+fcmTokens");
+            expect(reloaded.fcmTokens).toContain("token-abc");
+        });
+    });
+
     describe("Cross-Type Logic", () => {
         it("prevents two different users from having the same email regardless of type", async () => {
             await Climber.create({

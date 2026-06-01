@@ -113,6 +113,7 @@ describe("user.routes", () => {
         expect(response.body.password).toBeUndefined();
         expect(response.body.googleId).toBeUndefined();
         expect(response.body.authMethods).toBeUndefined();
+        expect(response.body.fcmTokens).toBeUndefined();
         // name/surname are at top level, not nested inside profile
         expect(response.body.profile.name).toBeUndefined();
         expect(response.body.profile.surname).toBeUndefined();
@@ -164,6 +165,7 @@ describe("user.routes", () => {
             }),
         );
         expect(response.body.password).toBeUndefined();
+        expect(response.body.fcmTokens).toBeUndefined();
     });
 
     it("PATCH /users/me requires authentication", async () => {
@@ -492,7 +494,7 @@ describe("POST /users/fcm-token", () => {
 
         expect(res.status).toBe(204);
 
-        const updated = await Climber.findById(climber._id);
+        const updated = await Climber.findById(climber._id).select("+fcmTokens");
         expect(updated.fcmTokens).toContain("test-fcm-token-abc");
     });
 
@@ -519,7 +521,7 @@ describe("POST /users/fcm-token", () => {
             .set("Authorization", `Bearer ${token}`)
             .send({ token: "dup-token" });
 
-        const updated = await Climber.findById(climber._id);
+        const updated = await Climber.findById(climber._id).select("+fcmTokens");
         expect(updated.fcmTokens.filter((t) => t === "dup-token")).toHaveLength(1);
     });
 
