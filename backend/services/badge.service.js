@@ -2,6 +2,7 @@ const Badge = require("../models/Badge");
 const ClimbingSession = require("../models/ClimbingSession");
 const { Climber } = require("../models/User");
 const climberService = require("./climber.service");
+const notificationService = require("./notification.service");
 
 const createBadge = async (badgeData) => {
     const badge = new Badge(badgeData);
@@ -50,13 +51,17 @@ const evaluateSystemBadges = async (userId) => {
     const awardBadge = async (badgeName) => {
         const badge = badgeMap[badgeName];
         if (!badge) return;
-        
+
         if (!badge.reEarnable && acquiredMap[badgeName]) return;
-        
+
         try {
             await climberService.acquireBadge(userId, badge._id);
             acquiredMap[badgeName] = (acquiredMap[badgeName] || 0) + 1;
             console.log(`Badge '${badgeName}' awarded to user ${userId}`);
+            await notificationService.createBulk([userId], "badge_awarded", {
+                badgeName: badge.name,
+                badgeLevel: badge.level,
+            });
         } catch (error) {
             console.error(`Error awarding badge ${badgeName}:`, error.message);
         }

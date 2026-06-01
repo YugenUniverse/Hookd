@@ -333,6 +333,12 @@ exports.closeEvent = async (eventId, userId) => {
             try {
                 await climberService.acquireBadge(winnerId, badge._id);
                 console.log(`Badge ${badge._id} assigned to ${winnerId} for event ${event._id}`);
+                await notificationService.createBulk([winnerId], "badge_awarded", {
+                    badgeName: badge.name,
+                    badgeLevel: badge.level,
+                    eventId: event._id.toString(),
+                    eventTitle: event.title,
+                });
             } catch (e) {
                 // Ignore if they already have it
             }

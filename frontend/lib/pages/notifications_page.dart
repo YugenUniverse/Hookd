@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../models/app_notification.dart';
 import '../providers/group_provider.dart';
-import '../services/api_service.dart';
+import '../providers/notification_provider.dart';
 
 class NotificationsPage extends StatefulWidget {
   const NotificationsPage({super.key});
@@ -13,33 +13,21 @@ class NotificationsPage extends StatefulWidget {
 }
 
 class _NotificationsPageState extends State<NotificationsPage> {
-  late Future<List<AppNotification>> _future;
-
   @override
   void initState() {
     super.initState();
-    _future = ApiService().getNotifications();
-  }
-
-  void _refresh() {
-    setState(() {
-      _future = ApiService().getNotifications();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) context.read<NotificationProvider>().loadNotifications();
     });
   }
 
   Future<void> _markAllRead() async {
-    try {
-      await ApiService().markAllNotificationsRead();
-      _refresh();
-    } catch (_) {}
+    await context.read<NotificationProvider>().markAllAsRead();
   }
 
   Future<void> _markRead(AppNotification notif) async {
     if (notif.read) return;
-    try {
-      await ApiService().markNotificationRead(notif.id);
-      _refresh();
-    } catch (_) {}
+    await context.read<NotificationProvider>().markAsRead(notif.id);
   }
 
   @override
@@ -64,16 +52,12 @@ class _NotificationsPageState extends State<NotificationsPage> {
             end: Alignment.bottomCenter,
           ),
         ),
-        child: FutureBuilder<List<AppNotification>>(
-          future: _future,
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
+        child: Consumer<NotificationProvider>(
+          builder: (context, provider, _) {
+            if (provider.isLoading) {
               return const Center(child: CircularProgressIndicator());
             }
-            if (snapshot.hasError) {
-              return Center(child: Text('Error: ${snapshot.error}'));
-            }
-            final notifications = snapshot.data ?? [];
+            final notifications = provider.notifications;
             if (notifications.isEmpty) {
               return const Center(child: Text('No notifications.'));
             }
@@ -112,21 +96,52 @@ class _NotificationTile extends StatelessWidget {
   final AppNotification notification;
   final VoidCallback onTap;
 
+  ({IconData icon, String title}) get _content => switch (notification.type) {
+    'new_event' => (
+      icon: Icons.event_note,
+      title: notification.eventTitle.isNotEmpty
+          ? 'New event: ${notification.eventTitle}'
+          : 'New event',
+    ),
+    'badge_awarded' => (
+      icon: Icons.emoji_events_outlined,
+      title: notification.badgeName.isNotEmpty
+          ? 'You earned: ${notification.badgeName}'
+          : 'New badge earned!',
+    ),
+    'new_follower' => (
+      icon: Icons.person_add_outlined,
+      title: notification.followerName.isNotEmpty
+          ? '${notification.followerName} started following you'
+          : 'Someone followed you',
+    ),
+    'issue_status_changed' => (
+      icon: Icons.update,
+      title: notification.wallName.isNotEmpty
+          ? 'Issue on ${notification.wallName} is now '
+              '${notification.newStatus.isNotEmpty ? notification.newStatus : "updated"}'
+          : 'An issue status was updated',
+    ),
+    'new_issue' => (
+      icon: Icons.warning_outlined,
+      title: notification.wallName.isNotEmpty
+          ? 'New issue on ${notification.wallName}'
+          : 'New issue reported',
+    ),
+    _ => (icon: Icons.notifications_outlined, title: 'Notification'),
+  };
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final unread = !notification.read;
+    final (:icon, :title) = _content;
     return ListTile(
       onTap: onTap,
       tileColor: unread ? theme.colorScheme.primaryContainer.withAlpha(60) : null,
-      leading: Icon(
-        Icons.event_note,
-        color: unread ? theme.colorScheme.primary : null,
-      ),
+      leading: Icon(icon, color: unread ? theme.colorScheme.primary : null),
       title: Text(
-        notification.eventTitle.isNotEmpty
-            ? 'New event: ${notification.eventTitle}'
-            : 'New event',
+        title,
         style: TextStyle(fontWeight: unread ? FontWeight.bold : FontWeight.normal),
       ),
       subtitle: notification.createdAt != null

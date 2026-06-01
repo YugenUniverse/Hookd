@@ -426,6 +426,8 @@ class _UserPageState extends State<UserPage> {
                                   ),
                                 ),
                                 const SizedBox(height: 20),
+                                const _NotificationsButton(),
+                                const SizedBox(height: 12),
                                 _IssuesButton(userType: AuthService().userType),
                                 const SizedBox(height: 20),
                                 Text(

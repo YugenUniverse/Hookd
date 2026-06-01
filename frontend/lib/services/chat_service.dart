@@ -4,6 +4,7 @@ import 'package:socket_io_client/socket_io_client.dart' as io;
 
 import '../constants/api_config.dart';
 import '../models/message.dart';
+import 'api_service.dart';
 import 'auth_service.dart';
 
 class ChatService extends ChangeNotifier {
@@ -17,10 +18,13 @@ class ChatService extends ChangeNotifier {
   final _messageController = StreamController<ChatMessage>.broadcast();
   final _typingController = StreamController<Map<String, dynamic>>.broadcast();
   final _readController = StreamController<Map<String, dynamic>>.broadcast();
+  final _joinedController = StreamController<String>.broadcast();
 
   Stream<ChatMessage> get onNewMessage => _messageController.stream;
   Stream<Map<String, dynamic>> get onTyping => _typingController.stream;
   Stream<Map<String, dynamic>> get onRead => _readController.stream;
+  /// Fires the conversationId whenever the user opens a conversation.
+  Stream<String> get onConversationJoined => _joinedController.stream;
 
   bool get isConnected => _socket?.connected == true;
 
@@ -41,6 +45,7 @@ class ChatService extends ChangeNotifier {
 
     _socket!.onConnect((_) {
       debugPrint('ChatService: connected');
+      _joinAllConversations();
       notifyListeners();
     });
 
@@ -83,8 +88,20 @@ class ChatService extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> _joinAllConversations() async {
+    try {
+      final conversations = await ApiService().getConversations();
+      for (final conv in conversations) {
+        _socket?.emit('join_conversation', conv.id);
+      }
+    } catch (e) {
+      debugPrint('ChatService: failed to auto-join conversations: $e');
+    }
+  }
+
   void joinConversation(String conversationId) {
     _socket?.emit('join_conversation', conversationId);
+    _joinedController.add(conversationId);
   }
 
   void leaveConversation(String conversationId) {
@@ -137,6 +154,7 @@ class ChatService extends ChangeNotifier {
     _messageController.close();
     _typingController.close();
     _readController.close();
+    _joinedController.close();
     disconnect();
     super.dispose();
   }

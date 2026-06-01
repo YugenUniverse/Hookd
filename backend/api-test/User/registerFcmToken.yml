@@ -1,0 +1,23 @@
+info:
+  name: registerFcmToken
+  type: http
+  seq: 4
+
+http:
+  method: POST
+  url: http://localhost:3000/users/fcm-token
+  auth:
+    type: bearer
+    token:
+  body:
+    mode: json
+    json: |-
+      {
+        "token": "fcm-device-token-here"
+      }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

@@ -6,9 +6,11 @@ import 'package:provider/provider.dart';
 
 import '../models/conversation.dart';
 import '../models/group.dart';
+import '../models/message.dart';
 import '../providers/group_provider.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
+import '../services/chat_service.dart';
 import 'chat_page.dart';
 import 'climber_profile_page.dart';
 import 'create_group_page.dart';
@@ -27,6 +29,8 @@ class _SocialPageState extends State<SocialPage>
   // Chats
   List<Conversation> _conversations = [];
   bool _chatsLoading = true;
+  StreamSubscription<ChatMessage>? _msgSub;
+  StreamSubscription<String>? _readSub;
 
   // Discover
   final _searchCtrl = TextEditingController();
@@ -47,10 +51,44 @@ class _SocialPageState extends State<SocialPage>
       p.loadMyGroups();
       p.loadPendingInvites();
     });
+    _msgSub = ChatService().onNewMessage.listen(_onNewMessage);
+    _readSub = ChatService().onConversationJoined.listen(_onConversationJoined);
+  }
+
+  void _onConversationJoined(String convId) {
+    if (!mounted) return;
+    setState(() {
+      final idx = _conversations.indexWhere((c) => c.id == convId);
+      if (idx != -1) {
+        _conversations[idx] = _conversations[idx].copyWith(hasUnread: false);
+      }
+    });
+  }
+
+  void _onNewMessage(ChatMessage msg) {
+    if (!mounted) return;
+    setState(() {
+      final idx = _conversations.indexWhere((c) => c.id == msg.conversationId);
+      if (idx == -1) {
+        // Unknown conversation — do a full reload to pick it up
+        _loadChats();
+        return;
+      }
+      final updated = _conversations[idx].copyWith(
+        lastMessage: msg,
+        hasUnread: true,
+        lastActivity: msg.createdAt,
+      );
+      _conversations
+        ..removeAt(idx)
+        ..insert(0, updated);
+    });
   }
 
   @override
   void dispose() {
+    _msgSub?.cancel();
+    _readSub?.cancel();
     _tabController
       ..removeListener(_onTabChanged)
       ..dispose();

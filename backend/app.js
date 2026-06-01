@@ -1,6 +1,17 @@
 var express = require("express");
 require("dotenv").config();
 var path = require("path");
+
+// Initialize Firebase Admin as early as possible so push.service.js works
+const admin = require("firebase-admin");
+if (!admin.apps.length && process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
+    try {
+        const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
+        admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
+    } catch (e) {
+        console.warn("Firebase Admin init failed:", e.message);
+    }
+}
 var cookieParser = require("cookie-parser");
 var logger = require("morgan");
 var createError = require("http-errors");

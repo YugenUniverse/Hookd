@@ -6,6 +6,7 @@ const router = express.Router();
 
 router.get("/me", authenticateJwt, userController.getCurrentUser);
 router.patch("/me", authenticateJwt, userController.updateCurrentUser);
+router.post("/fcm-token", authenticateJwt, userController.registerFcmToken);
 router.get("/:id([0-9a-fA-F]{24})", userController.getPublicUserById);
 
 module.exports = router;

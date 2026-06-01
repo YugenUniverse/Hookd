@@ -113,6 +113,7 @@ describe("user.routes", () => {
         expect(response.body.password).toBeUndefined();
         expect(response.body.googleId).toBeUndefined();
         expect(response.body.authMethods).toBeUndefined();
+        expect(response.body.fcmTokens).toBeUndefined();
         // name/surname are at top level, not nested inside profile
         expect(response.body.profile.name).toBeUndefined();
         expect(response.body.profile.surname).toBeUndefined();
@@ -164,6 +165,7 @@ describe("user.routes", () => {
             }),
         );
         expect(response.body.password).toBeUndefined();
+        expect(response.body.fcmTokens).toBeUndefined();
     });
 
     it("PATCH /users/me requires authentication", async () => {
@@ -457,5 +459,98 @@ describe("user.routes", () => {
         expect(response.body.facility).toBeDefined();
         expect(response.body.facility.walls).toHaveLength(1);
         expect(response.body.facility.walls[0].description).toBe("Steep training wall");
+    });
+});
+
+describe("POST /users/fcm-token", () => {
+    beforeAll(async () => {
+        await mongoose.connect(process.env.MONGO_URI, { dbName: "hookd" });
+    });
+
+    afterEach(async () => {
+        await User.deleteMany({});
+    });
+
+    afterAll(async () => {
+        await mongoose.disconnect();
+    });
+    it("returns 204 and stores the token", async () => {
+        const climber = await Climber.create({
+            email: "fcm@example.com",
+            username: "fcmuser",
+            userType: "Climber",
+            password: "Secret123!",
+        });
+        const token = createAuthToken({
+            _id: { toString: () => climber.id },
+            email: climber.email,
+            userType: climber.userType,
+        });
+
+        const res = await request(app)
+            .post("/users/fcm-token")
+            .set("Authorization", `Bearer ${token}`)
+            .send({ token: "test-fcm-token-abc" });
+
+        expect(res.status).toBe(204);
+
+        const updated = await Climber.findById(climber._id).select("+fcmTokens");
+        expect(updated.fcmTokens).toContain("test-fcm-token-abc");
+    });
+
+    it("is idempotent — registering the same token twice stores it only once", async () => {
+        const climber = await Climber.create({
+            email: "fcm2@example.com",
+            username: "fcmuser2",
+            userType: "Climber",
+            password: "Secret123!",
+        });
+        const token = createAuthToken({
+            _id: { toString: () => climber.id },
+            email: climber.email,
+            userType: climber.userType,
+        });
+
+        await request(app)
+            .post("/users/fcm-token")
+            .set("Authorization", `Bearer ${token}`)
+            .send({ token: "dup-token" });
+
+        await request(app)
+            .post("/users/fcm-token")
+            .set("Authorization", `Bearer ${token}`)
+            .send({ token: "dup-token" });
+
+        const updated = await Climber.findById(climber._id).select("+fcmTokens");
+        expect(updated.fcmTokens.filter((t) => t === "dup-token")).toHaveLength(1);
+    });
+
+    it("returns 400 when token field is missing", async () => {
+        const climber = await Climber.create({
+            email: "fcm3@example.com",
+            username: "fcmuser3",
+            userType: "Climber",
+            password: "Secret123!",
+        });
+        const token = createAuthToken({
+            _id: { toString: () => climber.id },
+            email: climber.email,
+            userType: climber.userType,
+        });
+
+        const res = await request(app)
+            .post("/users/fcm-token")
+            .set("Authorization", `Bearer ${token}`)
+            .send({});
+
+        expect(res.status).toBe(400);
+    });
+
+    it("returns 401 without a JWT", async () => {
+        const res = await request(app)
+            .post("/users/fcm-token")
+            .send({ token: "some-token" });
+
+        expect(res.status).toBe(401);
     });
 });

@@ -53,4 +53,15 @@ class AppNotification {
   String get groupName => payload['groupName']?.toString() ?? '';
   String get invitationId => payload['invitationId']?.toString() ?? '';
   String get invitedByName => payload['invitedByName']?.toString() ?? '';
+
+  // Badge fields
+  String get badgeName => payload['badgeName']?.toString() ?? '';
+  String get badgeLevel => payload['badgeLevel']?.toString() ?? '';
+
+  // Follower fields
+  String get followerName => payload['followerName']?.toString() ?? '';
+  String get followerId => payload['followerId']?.toString() ?? '';
+
+  // Issue status fields
+  String get newStatus => payload['newStatus']?.toString() ?? '';
 }
