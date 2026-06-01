@@ -1,7 +1,7 @@
 const mongoose = require("mongoose");
 const userService = require("../services/user.service");
 const Facility = require("../models/Facility");
-const { FacilityOwner } = require("../models/User");
+const { User, FacilityOwner } = require("../models/User");
 
 exports.getPublicUserById = async (req, res, next) => {
     try {
@@ -146,6 +146,21 @@ exports.updateCurrentUser = async (req, res, next) => {
         }
 
         res.status(200).json(updatedUser.toJSON());
+    } catch (err) {
+        next(err);
+    }
+};
+
+exports.registerFcmToken = async (req, res, next) => {
+    try {
+        const { token } = req.body;
+        if (!token || typeof token !== "string") {
+            const error = new Error("token is required");
+            error.statusCode = 400;
+            throw error;
+        }
+        await User.findByIdAndUpdate(req.user.id, { $addToSet: { fcmTokens: token } });
+        res.status(204).end();
     } catch (err) {
         next(err);
     }

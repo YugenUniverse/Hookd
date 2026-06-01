@@ -1,0 +1,26 @@
+info:
+  name: updateCurrentUser
+  type: http
+  seq: 3
+
+http:
+  method: PATCH
+  url: http://localhost:3000/users/me
+  auth:
+    type: bearer
+    token:
+  body:
+    mode: json
+    json: |-
+      {
+        "username": "newUsername",
+        "name": "Mario",
+        "surname": "Rossi",
+        "bio": "Loves bouldering"
+      }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

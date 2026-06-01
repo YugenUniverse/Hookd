@@ -312,7 +312,21 @@ exports.updateIssueStatus = async (issueId, newStatus, userId, userType) => {
         throw error;
     }
 
-    return await issue.updateStatus(newStatus);
+    const updated = await issue.updateStatus(newStatus);
+
+    // Notify the climber who filed the issue — fire-and-forget
+    Wall.findById(issue.wall_id, "name")
+        .then((wall) =>
+            notificationService.createBulk([issue.climber_id], "issue_status_changed", {
+                issueId: issueId.toString(),
+                wallId: issue.wall_id.toString(),
+                wallName: wall?.name || "a wall",
+                newStatus,
+            })
+        )
+        .catch((err) => console.error("issue.service: issue_status_changed notification error:", err.message));
+
+    return updated;
 };
 
 exports.deleteIssue = async (issueId, userId) => {

@@ -1,4 +1,6 @@
 const Follow = require("../models/Follow");
+const { User } = require("../models/User");
+const notificationService = require("./notification.service");
 
 exports.follow = async (followerId, followingId) => {
     if (followerId.toString() === followingId.toString()) {
@@ -12,6 +14,17 @@ exports.follow = async (followerId, followingId) => {
         if (err.code === 11000) return; // already following — idempotent
         throw err;
     }
+
+    // Notify the followed user — fire-and-forget
+    User.findById(followerId, "username")
+        .then((follower) => {
+            if (!follower) return;
+            return notificationService.createBulk([followingId], "new_follower", {
+                followerId: followerId.toString(),
+                followerName: follower.username,
+            });
+        })
+        .catch((err) => console.error("follow.service: new_follower notification error:", err.message));
 };
 
 exports.unfollow = async (followerId, followingId) => {

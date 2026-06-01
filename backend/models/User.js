@@ -22,6 +22,7 @@ const userSchema = new mongoose.Schema(
         password: { type: String, select: false },
         googleId: { type: String, unique: true, sparse: true },
         authMethods: [{ type: String, enum: ["local", "google"] }],
+        fcmTokens: [{ type: String }],
     },
     {
         timestamps: true,
