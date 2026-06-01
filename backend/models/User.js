@@ -133,6 +133,11 @@ const facilityOwnerSchema = new mongoose.Schema(
             type: mongoose.Schema.Types.ObjectId,
             ref: "Facility",
         },
+        approvalStatus: {
+            type: String,
+            enum: ["pending", "approved", "rejected"],
+            default: "pending",
+        },
     },
     {
         toJSON: {
@@ -192,6 +197,11 @@ const publicBodySchema = new mongoose.Schema(
                 ref: "OutdoorWall",
             },
         ],
+        approvalStatus: {
+            type: String,
+            enum: ["pending", "approved", "rejected"],
+            default: "pending",
+        },
     },
     {
         toJSON: {
@@ -207,9 +217,27 @@ publicBodySchema.methods.editUser = function (updates) {};
 
 const PublicBody = User.discriminator("PublicBody", publicBodySchema);
 
+// --- ADMIN ---
+const adminSchema = new mongoose.Schema(
+    {},
+    {
+        toJSON: {
+            transform: function (doc, ret) {
+                baseUserTransform(doc, ret);
+                return ret;
+            },
+        },
+    },
+);
+
+adminSchema.methods.editUser = function (updates) {};
+
+const Admin = User.discriminator("Admin", adminSchema);
+
 module.exports = {
     User,
     Climber,
     FacilityOwner,
     PublicBody,
+    Admin,
 };
