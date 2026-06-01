@@ -641,6 +641,37 @@ class ApiService {
     }
   }
 
+  // Admin Endpoints
+  Future<List<User>> getPendingApprovals() async {
+    try {
+      final response = await _dio.get('/admin/approvals/pending');
+      final data = response.data;
+      if (data is List) {
+        return data
+            .map((e) => User.fromJson(Map<String, dynamic>.from(e)))
+            .toList();
+      }
+      return [];
+    } catch (e) {
+      print('Error fetching pending approvals: $e');
+      return [];
+    }
+  }
+
+  Future<void> approveAccount(String userId) async {
+    final response = await _dio.put('/admin/approvals/$userId/approve');
+    if (response.statusCode != 200) {
+      throw Exception('Failed to approve account');
+    }
+  }
+
+  Future<void> rejectAccount(String userId) async {
+    final response = await _dio.put('/admin/approvals/$userId/reject');
+    if (response.statusCode != 200) {
+      throw Exception('Failed to reject account');
+    }
+  }
+
   Future<int> getUnreadNotificationCount() async {
     try {
       final response = await _dio.get('/notifications/unread-count');

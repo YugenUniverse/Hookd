@@ -1,0 +1,17 @@
+info:
+  name: rejectAccount
+  type: http
+  seq: 3
+
+http:
+  method: PUT
+  url: http://localhost:3000/admin/approvals/{{userId}}/reject
+  auth:
+    type: bearer
+    token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
