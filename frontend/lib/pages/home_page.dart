@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../dialogs/login_dialog.dart';
 import '../models/poi.dart';
@@ -15,11 +16,12 @@ import '../pages/public_body_issues_page.dart';
 import '../pages/public_body_page.dart';
 import '../pages/user_page.dart';
 import '../pages/social_page.dart';
+import '../providers/notification_provider.dart';
 import '../services/api_service.dart';
-import '../services/chat_service.dart';
-import '../utils/image_helpers.dart';
-import 'package:geolocator/geolocator.dart';
 import '../services/auth_service.dart';
+import '../services/chat_service.dart';
+import '../services/push_notification_service.dart';
+import 'package:geolocator/geolocator.dart';
 import '../widgets/poi_map.dart';
 
 class MyHomePage extends StatefulWidget {
@@ -30,7 +32,7 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   final WallMapController _mapController = WallMapController();
   late final AnimationController _navExpand;
   late final Animation<double> _navAnim;
@@ -38,13 +40,19 @@ class _MyHomePageState extends State<MyHomePage>
   int? _openIssueCount;
   String? _worstSeverity; // 'HIGH', 'MEDIUM', 'LOW', or null
   int _unreadChatCount = 0;
+  final Set<String> _unreadConvIds = {};
   StreamSubscription? _chatMsgSub;
+  StreamSubscription? _chatReadSub;
+  StreamSubscription? _pushMsgSub;
   Widget? _panelContent;
   String? _panelTag;
+  ImageProvider? _cachedAvatarProvider;
+  String? _cachedAvatarUrl;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     AuthService().addListener(_onAuthChanged);
     _navExpand = AnimationController(
       vsync: this,
@@ -60,13 +68,31 @@ class _MyHomePageState extends State<MyHomePage>
         _loadUnreadChatCount();
         _subscribeChatMessages();
       }
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _refreshNotifCount();
+      });
+      _subscribePushMessages();
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final isClimber = AuthService().userType == 'Climber';
+    if (!isClimber) return;
+    if (state == AppLifecycleState.hidden || state == AppLifecycleState.paused) {
+      ChatService().disconnect();
+    } else if (state == AppLifecycleState.resumed) {
+      if (AuthService().isAuthenticated) ChatService().connect();
     }
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     AuthService().removeListener(_onAuthChanged);
     _chatMsgSub?.cancel();
+    _chatReadSub?.cancel();
+    _pushMsgSub?.cancel();
     _navExpand.dispose();
     super.dispose();
   }
@@ -77,8 +103,13 @@ class _MyHomePageState extends State<MyHomePage>
       _avatarLoadAttempted = false;
       _openIssueCount = null;
       _unreadChatCount = 0;
+      _unreadConvIds.clear();
       _chatMsgSub?.cancel();
       _chatMsgSub = null;
+      _chatReadSub?.cancel();
+      _chatReadSub = null;
+      _pushMsgSub?.cancel();
+      _pushMsgSub = null;
       ChatService().disconnect();
       return;
     }
@@ -92,12 +123,47 @@ class _MyHomePageState extends State<MyHomePage>
         _subscribeChatMessages();
       }
     }
+    _refreshNotifCount();
+    _subscribePushMessages();
   }
+
+  void _subscribePushMessages() {
+    _pushMsgSub?.cancel();
+    _pushMsgSub = PushNotificationService().onForegroundMessage.listen((message) {
+      if (!mounted) return;
+      if (message.data['type'] == 'new_message') {
+        _loadUnreadChatCount();
+      } else {
+        _refreshNotifCount();
+      }
+    });
+  }
+
+  Future<void> _refreshNotifCount() async {
+    if (!mounted) return;
+    try {
+      final provider = context.read<NotificationProvider>();
+      await provider.loadNotifications();
+    } catch (_) {}
+  }
+
 
   void _subscribeChatMessages() {
     _chatMsgSub?.cancel();
-    _chatMsgSub = ChatService().onNewMessage.listen((_) {
-      if (mounted) _loadUnreadChatCount();
+    _chatMsgSub = ChatService().onNewMessage.listen((msg) {
+      if (!mounted) return;
+      setState(() {
+        _unreadConvIds.add(msg.conversationId);
+        _unreadChatCount = _unreadConvIds.length;
+      });
+    });
+    _chatReadSub?.cancel();
+    _chatReadSub = ChatService().onConversationJoined.listen((convId) {
+      if (!mounted) return;
+      setState(() {
+        _unreadConvIds.remove(convId);
+        _unreadChatCount = _unreadConvIds.length;
+      });
     });
   }
 
@@ -107,7 +173,12 @@ class _MyHomePageState extends State<MyHomePage>
     try {
       final convs = await ApiService().getConversations();
       if (mounted) {
-        setState(() => _unreadChatCount = convs.where((c) => c.hasUnread).length);
+        setState(() {
+          _unreadConvIds
+            ..clear()
+            ..addAll(convs.where((c) => c.hasUnread).map((c) => c.id));
+          _unreadChatCount = _unreadConvIds.length;
+        });
       }
     } catch (_) {}
   }
@@ -282,18 +353,27 @@ class _MyHomePageState extends State<MyHomePage>
 
   Widget? _buildAvatarWidget({double radius = 14}) {
     final avatarUrl = AuthService().avatar;
-    if (avatarUrl == null || avatarUrl.isEmpty) return null;
-    ImageProvider? provider;
-    if (avatarUrl.startsWith('data:image')) {
-      try {
-        final base64Str = avatarUrl.split(',').last;
-        provider = MemoryImage(base64Decode(base64Str));
-      } catch (_) {}
-    } else if (avatarUrl.startsWith('http')) {
-      provider = NetworkImage(avatarUrl);
+    if (avatarUrl == null || avatarUrl.isEmpty) {
+      _cachedAvatarProvider = null;
+      _cachedAvatarUrl = null;
+      return null;
     }
-    if (provider == null) return null;
-    return CircleAvatar(radius: radius, backgroundImage: provider);
+    if (avatarUrl != _cachedAvatarUrl) {
+      _cachedAvatarUrl = avatarUrl;
+      if (avatarUrl.startsWith('data:image')) {
+        try {
+          _cachedAvatarProvider = MemoryImage(base64Decode(avatarUrl.split(',').last));
+        } catch (_) {
+          _cachedAvatarProvider = null;
+        }
+      } else if (avatarUrl.startsWith('http')) {
+        _cachedAvatarProvider = NetworkImage(avatarUrl);
+      } else {
+        _cachedAvatarProvider = null;
+      }
+    }
+    if (_cachedAvatarProvider == null) return null;
+    return CircleAvatar(radius: radius, backgroundImage: _cachedAvatarProvider!);
   }
 
   void _openAccountPage() async {
@@ -365,6 +445,8 @@ class _MyHomePageState extends State<MyHomePage>
   Widget build(BuildContext context) {
     final isAuthenticated = AuthService().isAuthenticated;
     final userType = AuthService().userType;
+    final unreadGroupInviteCount =
+        context.watch<NotificationProvider>().unreadGroupInviteCount;
     final isOwnerType = userType == 'FacilityOwner' || userType == 'PublicBody';
     if (_isDesktopLike) {
       final cs = Theme.of(context).colorScheme;
@@ -571,9 +653,9 @@ class _MyHomePageState extends State<MyHomePage>
                                   label: 'Social',
                                   onTap: _openSocial,
                                   selected: _panelTag == 'social',
-                                  customIcon: _unreadChatCount > 0
+                                  customIcon: (_unreadChatCount + unreadGroupInviteCount) > 0
                                       ? Badge(
-                                          label: Text('$_unreadChatCount'),
+                                          label: Text('${_unreadChatCount + unreadGroupInviteCount}'),
                                           child: Icon(Icons.people_outlined,
                                               size: 24,
                                               color: cs.onSurfaceVariant),
@@ -668,9 +750,9 @@ class _MyHomePageState extends State<MyHomePage>
                     icon: Icons.people_outlined,
                     label: 'Social',
                     onTap: _openSocial,
-                    customIcon: _unreadChatCount > 0
+                    customIcon: (_unreadChatCount + unreadGroupInviteCount) > 0
                         ? Badge(
-                            label: Text('$_unreadChatCount'),
+                            label: Text('${_unreadChatCount + unreadGroupInviteCount}'),
                             child: const Icon(Icons.people_outlined, size: 24),
                           )
                         : null,

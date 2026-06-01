@@ -172,15 +172,21 @@ class ApiService {
   }
 
   Future<List<ClimbingSession>> getPublicSessions(String userId, {int limit = 20}) async {
-    final response = await _dio.get(
-      '/sessions/user/$userId',
-      queryParameters: {'limit': limit},
-    );
-    final data = response.data as Map<String, dynamic>;
-    final list = data['sessions'] as List<dynamic>? ?? [];
-    return list
-        .map((j) => ClimbingSession.fromJson(j as Map<String, dynamic>))
-        .toList();
+    try {
+      final response = await _dio.get(
+        '/sessions/user/$userId',
+        queryParameters: {'limit': limit},
+      );
+      final data = response.data;
+      if (data is! Map) return [];
+      final list = (data['sessions'] as List<dynamic>?) ?? [];
+      return list
+          .whereType<Map>()
+          .map((j) => ClimbingSession.fromJson(Map<String, dynamic>.from(j)))
+          .toList();
+    } catch (_) {
+      return [];
+    }
   }
 
   Future<Map<String, dynamic>> checkServerHealth() async {
@@ -935,6 +941,10 @@ class ApiService {
 
   Future<void> markAllNotificationsRead() async {
     await _dio.patch('/notifications/read-all');
+  }
+
+  Future<void> registerFcmToken(String token) async {
+    await _dio.post('/users/fcm-token', data: {'token': token});
   }
 
   // Group endpoints

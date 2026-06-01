@@ -12,6 +12,8 @@ class NotificationProvider extends ChangeNotifier {
   List<AppNotification> get notifications => _notifications;
   int get unreadCount => _unreadCount;
   bool get isLoading => _isLoading;
+  int get unreadGroupInviteCount =>
+      _notifications.where((n) => n.type == 'group_invite' && !n.read).length;
 
   Future<void> loadNotifications({int limit = 50, int skip = 0}) async {
     _isLoading = true;

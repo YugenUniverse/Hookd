@@ -55,6 +55,20 @@ class Conversation {
     return DateTime.now();
   }
 
+  Conversation copyWith({ChatMessage? lastMessage, bool? hasUnread, DateTime? lastActivity}) {
+    return Conversation(
+      id: id,
+      type: type,
+      participants: participants,
+      groupId: groupId,
+      groupName: groupName,
+      lastMessage: lastMessage ?? this.lastMessage,
+      lastActivity: lastActivity ?? this.lastActivity,
+      hasUnread: hasUnread ?? this.hasUnread,
+      hasUpcomingEvent: hasUpcomingEvent,
+    );
+  }
+
   // Returns a display name for the conversation from the perspective of [currentUserId]
   String displayName(String currentUserId) {
     if (type == 'group') return groupName ?? 'Group';

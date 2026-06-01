@@ -6,6 +6,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'app/app.dart';
 import 'app/app_state.dart';
 import 'services/auth_service.dart';
+import 'services/push_notification_service.dart';
 import 'providers/notification_provider.dart';
 import 'providers/group_provider.dart';
 import 'firebase_options.dart';
@@ -23,6 +24,12 @@ void main() async {
   } catch (e) {
     print('Failed to load tokens from storage: $e');
   }
+
+  // Initialise push notifications (permission request, token registration,
+  // foreground/tap handlers). Must run after Firebase.initializeApp.
+  PushNotificationService().init().catchError(
+    (e) => print('PushNotificationService init failed: $e'),
+  );
 
   runApp(
     MultiProvider(
