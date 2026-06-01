@@ -150,6 +150,38 @@ class _FacilityOwnerPageState extends State<FacilityOwnerPage> {
                 return const Center(child: Text('No profile data available.'));
               }
 
+              if (user.approvalStatus == 'pending') {
+                return Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(32.0),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.hourglass_empty_outlined, size: 64, color: colorScheme.primary),
+                        const SizedBox(height: 24),
+                        Text(
+                          'Account Pending Approval',
+                          style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Your account is currently under review by our administration team. You will be able to access your dashboard and manage your facility once approved.',
+                          style: theme.textTheme.bodyLarge?.copyWith(color: colorScheme.onSurfaceVariant),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 32),
+                        FilledButton.icon(
+                          onPressed: _refresh,
+                          icon: const Icon(Icons.refresh),
+                          label: const Text('Check Status'),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }
+
               final username = user.username.isNotEmpty ? user.username : 'User';
               final initial = username[0].toUpperCase();
               final memberSince = user.createdAt != null
