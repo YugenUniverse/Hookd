@@ -129,6 +129,7 @@ class User {
   final int maxStreak;
   final int sessionCount;
   final String allowDmsFrom;
+  final String? approvalStatus;
 
   User({
     required this.id,
@@ -149,6 +150,7 @@ class User {
     this.maxStreak = 0,
     this.sessionCount = 0,
     this.allowDmsFrom = 'everyone',
+    this.approvalStatus,
   });
 
   factory User.fromJson(Map<String, dynamic> json) {
@@ -254,6 +256,7 @@ class User {
       maxStreak: maxStreak,
       sessionCount: sessionCount,
       allowDmsFrom: json['allowDmsFrom']?.toString() ?? 'everyone',
+      approvalStatus: json['approvalStatus']?.toString(),
     );
   }
 
