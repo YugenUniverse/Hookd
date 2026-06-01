@@ -35,6 +35,8 @@ const reviewSchema = new mongoose.Schema(
     },
 );
 
+reviewSchema.index({ climbing_session_id: 1 });
+
 reviewSchema.methods.editReview = async function (newRating, newBody) {
     this.rating = newRating;
     this.body = newBody;

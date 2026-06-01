@@ -902,15 +902,20 @@ exports.getStatisticsByAreaAndTime = async (
         throw error;
     }
 
-    // Find walls within geographic bounds
-    // MongoDB geospatial query: longitude first, then latitude in coordinates
+    // $geoWithin with GeoJSON polygon uses the 2dsphere index on location
     const wallsInArea = await Wall.find({
-        "location.coordinates": {
+        location: {
             $geoWithin: {
-                $box: [
-                    [minLng, minLat],
-                    [maxLng, maxLat],
-                ],
+                $geometry: {
+                    type: "Polygon",
+                    coordinates: [[
+                        [minLng, minLat],
+                        [maxLng, minLat],
+                        [maxLng, maxLat],
+                        [minLng, maxLat],
+                        [minLng, minLat],
+                    ]],
+                },
             },
         },
     }).select("_id name location");
@@ -1096,22 +1101,36 @@ exports.getStatisticsByAreaAndTime = async (
         }));
     });
 
-    // Recent Feedback
-    const sessionIdsPromise = ClimbingSession.find({
-        wall_id: { $in: wallIds },
-        date: { $gte: start, $lte: end },
-    }).distinct("_id");
-
-    const recentFeedbackPromise = sessionIdsPromise.then(async (sessionIds) => {
-        const Review = mongoose.model("Review");
-        return Review.find({
-            climbing_session_id: { $in: sessionIds },
-            body: { $ne: "", $exists: true },
-        })
-            .sort({ createdAt: -1 })
-            .limit(5)
-            .select("rating body createdAt");
-    });
+    // Recent Feedback — single aggregation avoids sequential distinct + find
+    const recentFeedbackPromise = ClimbingSession.aggregate([
+        {
+            $match: {
+                wall_id: { $in: wallIds },
+                date: { $gte: start, $lte: end },
+                review_id: { $ne: null },
+            },
+        },
+        {
+            $lookup: {
+                from: "reviews",
+                localField: "review_id",
+                foreignField: "_id",
+                as: "review",
+            },
+        },
+        { $unwind: "$review" },
+        { $match: { "review.body": { $exists: true, $ne: "" } } },
+        { $sort: { "review.createdAt": -1 } },
+        { $limit: 5 },
+        {
+            $project: {
+                _id: 0,
+                rating: "$review.rating",
+                body: "$review.body",
+                createdAt: "$review.createdAt",
+            },
+        },
+    ]);
 
     // Execute all aggregations in parallel
     const [sessionStats, temporalStats, reviewStats, demographics, feedback] =
