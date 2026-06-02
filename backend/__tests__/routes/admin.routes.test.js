@@ -6,6 +6,7 @@ const adminRoutes = require("../../routes/admin.routes");
 const errorMiddleware = require("../../middleware/error.middleware");
 const { User } = require("../../models/User");
 const Facility = require("../../models/Facility");
+const Review = require("../../models/Review");
 const notificationService = require("../../services/notification.service");
 const emailService = require("../../services/email.service");
 
@@ -159,6 +160,107 @@ describe("admin.routes", () => {
                 message: "Your account request has been rejected.",
             });
             expect(emailService.sendAccountRejectedEmail).toHaveBeenCalledWith(mockUser);
+        });
+    });
+
+    describe("GET /admin/moderation/flagged", () => {
+        it("returns flagged reviews for Admin", async () => {
+            const mockReviews = [
+                {
+                    id: "review-1",
+                    body: "Bad language",
+                    rating: 1,
+                    flagged: true,
+                    status: "active",
+                    flagReason: "Offensive language",
+                },
+            ];
+
+            const sortMock = jest.fn().mockResolvedValue(mockReviews);
+            const populateMock = jest.fn().mockReturnValue({ sort: sortMock });
+            jest.spyOn(Review, "find").mockReturnValue({ populate: populateMock });
+
+            const response = await request(app)
+                .get("/admin/moderation/flagged")
+                .set("Authorization", `Bearer ${adminToken}`);
+
+            expect(response.status).toBe(200);
+            expect(response.body).toEqual(mockReviews);
+            expect(Review.find).toHaveBeenCalledWith({ flagged: true, status: "active" });
+        });
+
+        it("forbids non-Admin users", async () => {
+            const response = await request(app)
+                .get("/admin/moderation/flagged")
+                .set("Authorization", `Bearer ${climberToken}`);
+            expect(response.status).toBe(403);
+        });
+    });
+
+    describe("DELETE /admin/moderation/reviews/:reviewId", () => {
+        it("removes review and notifies author", async () => {
+            const mockAuthor = { _id: "climber-1", username: "climber", email: "climber@example.com" };
+            const mockReview = {
+                _id: "review-1",
+                status: "active",
+                flagged: true,
+                flagReason: "Spam",
+                climbing_session_id: { climber_id: mockAuthor },
+                save: jest.fn().mockResolvedValue(true),
+            };
+
+            const populateMock = jest.fn().mockResolvedValue(mockReview);
+            jest.spyOn(Review, "findById").mockReturnValue({ populate: populateMock });
+
+            const response = await request(app)
+                .delete("/admin/moderation/reviews/review-1")
+                .set("Authorization", `Bearer ${adminToken}`)
+                .send({ reason: "Spam content" });
+
+            expect(response.status).toBe(200);
+            expect(mockReview.status).toBe("removed");
+            expect(mockReview.save).toHaveBeenCalled();
+            expect(notificationService.createBulk).toHaveBeenCalledWith(
+                [mockAuthor._id],
+                "content_removed",
+                { reason: "Spam content", contentType: "review" }
+            );
+            expect(emailService.sendContentRemovedEmail).toHaveBeenCalledWith(mockAuthor, "Spam content");
+        });
+
+        it("returns 404 for already removed review", async () => {
+            const mockReview = { _id: "review-1", status: "removed" };
+            const populateMock = jest.fn().mockResolvedValue(mockReview);
+            jest.spyOn(Review, "findById").mockReturnValue({ populate: populateMock });
+
+            const response = await request(app)
+                .delete("/admin/moderation/reviews/review-1")
+                .set("Authorization", `Bearer ${adminToken}`);
+
+            expect(response.status).toBe(404);
+        });
+    });
+
+    describe("POST /admin/moderation/reviews/:reviewId/dismiss", () => {
+        it("clears flag on review", async () => {
+            const mockReview = {
+                _id: "review-1",
+                status: "active",
+                flagged: true,
+                flagReason: "Spam",
+                save: jest.fn().mockResolvedValue(true),
+            };
+
+            jest.spyOn(Review, "findById").mockResolvedValue(mockReview);
+
+            const response = await request(app)
+                .post("/admin/moderation/reviews/review-1/dismiss")
+                .set("Authorization", `Bearer ${adminToken}`);
+
+            expect(response.status).toBe(200);
+            expect(mockReview.flagged).toBe(false);
+            expect(mockReview.flagReason).toBe("");
+            expect(mockReview.save).toHaveBeenCalled();
         });
     });
 });

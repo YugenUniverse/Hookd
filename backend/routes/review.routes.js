@@ -2,11 +2,11 @@ const express = require("express");
 const router = express.Router();
 
 const reviewController = require("../controllers/review.controller");
-const { authenticateJwtOptional } = require("../middleware/auth.middleware");
+const { authenticateJwtOptional, authenticateJwt, restrictTo } = require("../middleware/auth.middleware");
 
-router.use(authenticateJwtOptional);
+router.get("/wall/:wallId", authenticateJwtOptional, reviewController.getReviewsByWall);
+router.get("/user/:userId", authenticateJwtOptional, reviewController.getReviewsByUser);
 
-router.get("/wall/:wallId", reviewController.getReviewsByWall);
-router.get("/user/:userId", reviewController.getReviewsByUser);
+router.post("/:reviewId/flag", authenticateJwt, restrictTo("Climber"), reviewController.flagReview);
 
 module.exports = router;
