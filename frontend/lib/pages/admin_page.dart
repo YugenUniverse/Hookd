@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../models/user.dart';
 import '../utils/error_helpers.dart';
+import '../widgets/admin_walls_tab.dart';
 
 class AdminPage extends StatefulWidget {
   const AdminPage({super.key});
@@ -20,7 +21,7 @@ class _AdminPageState extends State<AdminPage> with SingleTickerProviderStateMix
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
     _fetchData();
   }
 
@@ -185,6 +186,15 @@ class _AdminPageState extends State<AdminPage> with SingleTickerProviderStateMix
                 ],
               ),
             ),
+
+            Tab(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text('Walls'),
+                ],
+              ),
+            ),
           ],
         ),
       ),
@@ -193,9 +203,12 @@ class _AdminPageState extends State<AdminPage> with SingleTickerProviderStateMix
           : TabBarView(
               controller: _tabController,
               children: [
+
                 _buildApprovalsList(),
                 _buildFlaggedList(),
+                const AdminWallsTab(),
               ],
+
             ),
     );
   }
