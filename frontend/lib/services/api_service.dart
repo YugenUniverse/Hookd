@@ -9,6 +9,8 @@ import '../models/wall.dart';
 import '../models/issue.dart';
 import '../models/event.dart';
 import '../models/app_notification.dart';
+import '../models/admin_metrics.dart';
+
 import '../models/badge.dart';
 import '../models/group.dart';
 import '../models/conversation.dart';
@@ -1241,4 +1243,18 @@ class ApiService {
   Future<void> adminDismissFlag(String reviewId) async {
     await _dio.post('/admin/moderation/reviews/$reviewId/dismiss');
   }
+
+  // --- Admin Metrics ---
+  Future<AdminMetrics> getAdminMetrics({DateTime? startDate, DateTime? endDate}) async {
+    String query = '';
+    if (startDate != null || endDate != null) {
+      final List<String> params = [];
+      if (startDate != null) params.add('startDate=${startDate.toIso8601String()}');
+      if (endDate != null) params.add('endDate=${endDate.toIso8601String()}');
+      query = '?${params.join('&')}';
+    }
+    final response = await _dio.get('/admin/metrics$query');
+    return AdminMetrics.fromJson(response.data);
+  }
+
 }

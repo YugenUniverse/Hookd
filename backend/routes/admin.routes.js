@@ -12,6 +12,8 @@ router.put("/approvals/:userId/reject", adminController.rejectAccount);
 
 router.get("/public-bodies", adminController.getPublicBodies);
 
+router.get("/metrics", adminController.getMetrics);
+
 router.get("/moderation/flagged", adminController.getFlaggedReviews);
 router.delete("/moderation/reviews/:reviewId", adminController.removeReview);
 router.post("/moderation/reviews/:reviewId/dismiss", adminController.dismissFlag);

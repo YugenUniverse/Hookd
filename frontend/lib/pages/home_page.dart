@@ -47,6 +47,7 @@ class _MyHomePageState extends State<MyHomePage>
   StreamSubscription? _pushMsgSub;
   Widget? _panelContent;
   String? _panelTag;
+  bool _isPanelFullscreen = false;
   ImageProvider? _cachedAvatarProvider;
   String? _cachedAvatarUrl;
 
@@ -431,11 +432,19 @@ class _MyHomePageState extends State<MyHomePage>
     _navExpand.forward();
   }
 
+  
+  void _togglePanelFullscreen() {
+    setState(() {
+      _isPanelFullscreen = !_isPanelFullscreen;
+    });
+  }
+
   void _closePanel() {
     final closingTag = _panelTag;
     setState(() {
       _panelContent = null;
       _panelTag = null;
+      _isPanelFullscreen = false;
     });
     if (closingTag == 'issues') _loadIssueCount();
     if (closingTag == 'social') _loadUnreadChatCount();
@@ -531,7 +540,8 @@ class _MyHomePageState extends State<MyHomePage>
       }
 
       final screenWidth = MediaQuery.of(context).size.width;
-      final panelWidth = (screenWidth - 224).clamp(0.0, 560.0);
+      final maxPanelWidth = screenWidth - 224 - 16;
+      final panelWidth = _isPanelFullscreen ? maxPanelWidth : maxPanelWidth.clamp(0.0, 560.0);
 
       return Scaffold(
         body: SafeArea(
@@ -569,6 +579,15 @@ class _MyHomePageState extends State<MyHomePage>
                                   Row(
                                     mainAxisAlignment: MainAxisAlignment.end,
                                     children: [
+                                      IconButton(
+                                        icon: Icon(_isPanelFullscreen ? Icons.fullscreen_exit : Icons.fullscreen, size: 18),
+                                        style: IconButton.styleFrom(
+                                          foregroundColor: cs.onSurfaceVariant,
+                                          minimumSize: const Size(40, 40),
+                                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                        ),
+                                        onPressed: _togglePanelFullscreen,
+                                      ),
                                       IconButton(
                                         icon: const Icon(Icons.close, size: 18),
                                         style: IconButton.styleFrom(

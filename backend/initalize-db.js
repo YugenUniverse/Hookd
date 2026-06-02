@@ -166,7 +166,7 @@ async function runOverpassQuery() {
 async function seedOverpass() {
     console.log("\n--- 🌍 STARTING PHASE 1: OVERPASS IMPORT ---");
 
-    const seedPasswordPlain = "hookd_test_password";
+    const seedPasswordPlain = "password123";
     const seedPasswordHash = await bcrypt.hash(seedPasswordPlain, 10);
 
     const regioneTrentino = await PublicBody.findOneAndUpdate(
@@ -241,7 +241,14 @@ async function seedOverpass() {
             const userResult = await FacilityOwner.findOneAndUpdate(
                 { username: facilityUsername },
                 {
-                    $set: { name, description, location, email: facilityEmail, password: seedPasswordHash, authMethods: ["local"] },
+                    $set: {
+                        name,
+                        description,
+                        location,
+                        email: facilityEmail,
+                        password: seedPasswordHash,
+                        authMethods: ["local"],
+                    },
                     $setOnInsert: { username: facilityUsername },
                 },
                 { upsert: true, returnDocument: "after" },
@@ -315,7 +322,7 @@ async function seedOverpass() {
 
 async function seedAdminAndPending() {
     console.log("\n--- 🛡️ STARTING PHASE 2: ADMIN & PENDING ACCOUNTS ---");
-    const seedPasswordPlain = "hookd_test_password";
+    const seedPasswordPlain = "password123";
     const seedPasswordHash = await bcrypt.hash(seedPasswordPlain, 10);
 
     // 1. Create Admin
@@ -505,7 +512,7 @@ async function seedViaApi() {
         // 1. REGISTER & LOGIN FACILITY
         console.log("🏢 Registering Facility...");
         const facilityEmail = `gym_${runId}@test.com`;
-        const facilityPw = "hookd_test_password";
+        const facilityPw = "password123";
 
         const facilityRegRes = await axios.post(`${BASE_URL}/auth/register`, {
             email: facilityEmail,
@@ -691,7 +698,7 @@ async function seedViaApi() {
             await axios.post(`${BASE_URL}/auth/register`, {
                 email: email,
                 username: faker.internet.username() + runId,
-                password: "hookd_test_password",
+                password: "password123",
                 userType: "Climber",
                 name: faker.person.firstName(),
                 surname: faker.person.lastName(),
@@ -700,7 +707,7 @@ async function seedViaApi() {
 
             const climberLogin = await axios.post(`${BASE_URL}/auth/login`, {
                 email: email,
-                password: "hookd_test_password",
+                password: "password123",
             });
             climberTokens.push(climberLogin.data.accessToken);
         }
@@ -884,7 +891,7 @@ async function seedViaApi() {
                         `${BASE_URL}/auth/login`,
                         {
                             email: regioneTrentino.email,
-                            password: "hookd_test_password",
+                            password: "password123",
                         },
                     );
                     const publicBodyToken = regionLoginRes.data.accessToken;
@@ -1119,13 +1126,33 @@ async function runAll() {
         }
 
         // Flagged content Phase
-        if (!["reviews_and_issues", "climbers_and_sessions", "badges_and_events", "walls_and_facilities"].includes(stopPhase)) {
+        if (
+            ![
+                "reviews_and_issues",
+                "climbers_and_sessions",
+                "badges_and_events",
+                "walls_and_facilities",
+            ].includes(stopPhase)
+        ) {
             console.log("\n--- PHASE 6: flagged_content ---");
             await seedFlaggedContent();
             if (stopPhase === "flagged_content") {
                 console.log("\n🛑 Stopping at phase: flagged_content");
                 return;
             }
+        }
+
+        // Groups Phase
+        if (
+            ![
+                "reviews_and_issues",
+                "climbers_and_sessions",
+                "badges_and_events",
+                "walls_and_facilities",
+                "flagged_content",
+            ].includes(stopPhase)
+        ) {
+            await seedGroupsAndEvents();
         }
 
         console.log("\n🎉 ALL SEEDING COMPLETE! Check your Flutter App! 🎉\n");
@@ -1169,9 +1196,14 @@ async function seedFlaggedContent() {
     const Review = require("./models/Review");
 
     // Drop existing flagged reviews so re-runs stay clean
-    await Review.updateMany({ flagged: true }, { flagged: false, flagReason: "", status: "active" });
+    await Review.updateMany(
+        { flagged: true },
+        { flagged: false, flagReason: "", status: "active" },
+    );
 
-    const reviews = await Review.find({ status: { $ne: "removed" } }).limit(50).lean();
+    const reviews = await Review.find({ status: { $ne: "removed" } })
+        .limit(50)
+        .lean();
 
     if (!reviews.length) {
         console.warn("⚠️ No reviews found — run Phase 4 first.");
@@ -1243,6 +1275,74 @@ async function seedReports() {
     } catch (e) {
         console.error("⚠️ Could not create reports:", e);
     }
+}
+
+async function seedGroupsAndEvents() {
+    console.log("\n--- 🧗 STARTING PHASE 7: GROUPS AND EVENTS SEED ---");
+    const Group = require("./models/Group");
+    const Event = require("./models/Event");
+    const { Climber } = require("./models/User");
+
+    await Group.deleteMany({});
+    await Event.deleteMany({ groupId: { $exists: true } });
+
+    const climbers = await Climber.find().limit(20);
+    if (climbers.length < 5) {
+        console.warn("⚠️ Not enough climbers to create groups.");
+        return;
+    }
+
+    const creator = climbers[0];
+
+    // Create 3 groups
+    const groupsData = [
+        {
+            name: "Weekend Crushers",
+            description: "A group for weekend warriors.",
+            visibility: "public",
+        },
+        {
+            name: "Boulder Bros",
+            description: "V4 and up only.",
+            visibility: "private",
+        },
+        {
+            name: "Morning Senders",
+            description: "Early bird climbers.",
+            visibility: "public",
+        },
+    ];
+
+    const createdGroups = [];
+    for (const gd of groupsData) {
+        const group = new Group({
+            ...gd,
+            creator: creator._id,
+            members: climbers.slice(0, 5).map((c) => ({
+                user: c._id,
+                role: c._id.equals(creator._id) ? "admin" : "member",
+            })),
+        });
+        await group.save();
+        createdGroups.push(group);
+    }
+
+    console.log(`✅ Seeded ${createdGroups.length} groups.`);
+
+    // Create events for the groups
+    for (const group of createdGroups) {
+        const event = new Event({
+            title: `${group.name} Meetup`,
+            description: "Let's climb together!",
+            groupId: group._id,
+            createdBy: creator._id,
+            startDate: new Date(),
+            endDate: new Date(Date.now() + 86400000),
+        });
+        await event.save();
+    }
+
+    console.log(`✅ Seeded ${createdGroups.length} group events.`);
 }
 
 runAll();
