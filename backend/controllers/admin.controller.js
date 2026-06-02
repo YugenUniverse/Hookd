@@ -1,5 +1,6 @@
 const { User } = require("../models/User");
 const Facility = require("../models/Facility");
+const Review = require("../models/Review");
 const notificationService = require("../services/notification.service");
 const emailService = require("../services/email.service");
 
@@ -84,8 +85,89 @@ const rejectAccount = async (req, res, next) => {
     }
 };
 
+const getFlaggedReviews = async (req, res, next) => {
+    try {
+        const reviews = await Review.find({ flagged: true, status: "active" })
+            .populate({
+                path: "climbing_session_id",
+                select: "climber_id wall_id date",
+                populate: [
+                    { path: "climber_id", select: "username email" },
+                    { path: "wall_id", select: "name" },
+                ],
+            })
+            .sort({ createdAt: -1 });
+
+        res.status(200).json(reviews);
+    } catch (err) {
+        next(err);
+    }
+};
+
+const removeReview = async (req, res, next) => {
+    try {
+        const { reviewId } = req.params;
+        const { reason } = req.body;
+
+        const review = await Review.findById(reviewId).populate({
+            path: "climbing_session_id",
+            select: "climber_id",
+            populate: { path: "climber_id", select: "username email" },
+        });
+
+        if (!review || review.status === "removed") {
+            const error = new Error("Review not found");
+            error.statusCode = 404;
+            throw error;
+        }
+
+        review.status = "removed";
+        review.moderatedBy = req.user.id;
+        review.moderatedAt = new Date();
+        await review.save();
+
+        const author = review.climbing_session_id?.climber_id;
+        if (author) {
+            await notificationService.createBulk([author._id || author], "content_removed", {
+                reason: reason || "Violation of community guidelines",
+                contentType: "review",
+            });
+            await emailService.sendContentRemovedEmail(author, reason);
+        }
+
+        res.status(200).json({ message: "Review removed" });
+    } catch (err) {
+        next(err);
+    }
+};
+
+const dismissFlag = async (req, res, next) => {
+    try {
+        const { reviewId } = req.params;
+
+        const review = await Review.findById(reviewId);
+
+        if (!review || review.status === "removed") {
+            const error = new Error("Review not found");
+            error.statusCode = 404;
+            throw error;
+        }
+
+        review.flagged = false;
+        review.flagReason = "";
+        await review.save();
+
+        res.status(200).json({ message: "Flag dismissed" });
+    } catch (err) {
+        next(err);
+    }
+};
+
 module.exports = {
     getPendingApprovals,
     approveAccount,
     rejectAccount,
+    getFlaggedReviews,
+    removeReview,
+    dismissFlag,
 };

@@ -45,3 +45,9 @@ exports.sendAccountRejectedEmail = async (user) => {
     const text = `Hello,\n\nUnfortunately, your account request has been rejected by our admin team. If you believe this is a mistake, please reach out to support.\n\nBest,\nHookd Team`;
     await sendEmail(user.email, subject, text);
 };
+
+exports.sendContentRemovedEmail = async (user, reason) => {
+    const subject = "Your review has been removed";
+    const text = `Hello,\n\nOne of your reviews has been removed by a moderator.\n\nReason: ${reason || "Violation of community guidelines"}\n\nIf you believe this was a mistake, please contact support.\n\nBest,\nHookd Team`;
+    await sendEmail(user.email, subject, text);
+};

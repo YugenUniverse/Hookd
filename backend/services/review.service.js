@@ -55,7 +55,7 @@ exports.getReviewsByWall = async (wallId, requesterUserId = null) => {
         return [];
     }
 
-    const reviews = await Review.find({ climbing_session_id: { $in: sessionIds } })
+    const reviews = await Review.find({ climbing_session_id: { $in: sessionIds }, status: { $ne: "removed" } })
         .sort({ _id: -1 })
         .populate(reviewPopulateOptions);
 
@@ -77,9 +77,46 @@ exports.getReviewsByUser = async (userId, requesterUserId = null) => {
         return [];
     }
 
-    const reviews = await Review.find({ climbing_session_id: { $in: sessionIds } })
+    const reviews = await Review.find({ climbing_session_id: { $in: sessionIds }, status: { $ne: "removed" } })
         .sort({ _id: -1 })
         .populate(reviewPopulateOptions);
 
     return filterVisibleReviews(reviews, requesterUserId);
+};
+
+exports.flagReview = async (reviewId, requesterId, flagReason) => {
+    if (!isValidObjectId(reviewId)) {
+        const error = new Error("Invalid review id");
+        error.statusCode = 400;
+        throw error;
+    }
+
+    const review = await Review.findById(reviewId).populate({
+        path: "climbing_session_id",
+        select: "climber_id",
+    });
+
+    if (!review || review.status === "removed") {
+        const error = new Error("Review not found");
+        error.statusCode = 404;
+        throw error;
+    }
+
+    const authorId = review.climbing_session_id?.climber_id?.toString();
+    if (authorId === requesterId.toString()) {
+        const error = new Error("Cannot flag your own review");
+        error.statusCode = 400;
+        throw error;
+    }
+
+    if (review.flagged) {
+        const error = new Error("Review already flagged");
+        error.statusCode = 409;
+        throw error;
+    }
+
+    review.flagged = true;
+    review.flagReason = flagReason || "";
+    await review.save();
+    return review;
 };

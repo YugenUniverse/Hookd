@@ -1174,4 +1174,29 @@ class ApiService {
     final d = date.day.toString().padLeft(2, '0');
     return '$y-$m-$d';
   }
+
+  // Review moderation
+  Future<void> flagReview(String reviewId, String flagReason) async {
+    await _dio.post('/reviews/$reviewId/flag', data: {'flagReason': flagReason});
+  }
+
+  Future<List<Map<String, dynamic>>> getFlaggedReviews() async {
+    try {
+      final response = await _dio.get('/admin/moderation/flagged');
+      final data = response.data;
+      if (data is! List) return [];
+      return data.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+    } catch (e) {
+      print('Error fetching flagged reviews: $e');
+      return [];
+    }
+  }
+
+  Future<void> adminRemoveReview(String reviewId, {String? reason}) async {
+    await _dio.delete('/admin/moderation/reviews/$reviewId', data: {'reason': reason});
+  }
+
+  Future<void> adminDismissFlag(String reviewId) async {
+    await _dio.post('/admin/moderation/reviews/$reviewId/dismiss');
+  }
 }
