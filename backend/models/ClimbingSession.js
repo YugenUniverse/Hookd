@@ -75,4 +75,7 @@ climbingSessionSchema.methods.removeReview = async function () {
     await this.save();
 };
 
+climbingSessionSchema.index({ wall_id: 1, date: 1 });
+climbingSessionSchema.index({ climber_id: 1, date: 1 });
+
 module.exports = mongoose.model("ClimbingSession", climbingSessionSchema);

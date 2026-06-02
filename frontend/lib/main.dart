@@ -9,6 +9,7 @@ import 'services/auth_service.dart';
 import 'services/push_notification_service.dart';
 import 'providers/notification_provider.dart';
 import 'providers/group_provider.dart';
+import 'providers/statistics_provider.dart';
 import 'firebase_options.dart';
 
 void main() async {
@@ -37,6 +38,7 @@ void main() async {
         ChangeNotifierProvider(create: (_) => MyAppState()),
         ChangeNotifierProvider(create: (_) => NotificationProvider()),
         ChangeNotifierProvider(create: (_) => GroupProvider()),
+        ChangeNotifierProvider(create: (_) => StatisticsProvider()),
       ],
       child: const MyApp(),
     ),
