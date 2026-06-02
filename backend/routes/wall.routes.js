@@ -32,7 +32,7 @@ router.get("/:id", wallController.getWallById);
 router.post(
     "/",
     authenticateJwt,
-    restrictTo("FacilityOwner", "PublicBody"),
+    restrictTo("FacilityOwner", "PublicBody", "Admin"),
     wallController.createWall,
 );
 
@@ -40,7 +40,7 @@ router.post(
 router.put(
     "/:id",
     authenticateJwt,
-    restrictTo("FacilityOwner", "PublicBody"),
+    restrictTo("FacilityOwner", "PublicBody", "Admin"),
     wallController.updateWall,
 );
 
@@ -48,7 +48,7 @@ router.put(
 router.delete(
     "/:id",
     authenticateJwt,
-    restrictTo("FacilityOwner", "PublicBody"),
+    restrictTo("FacilityOwner", "PublicBody", "Admin"),
     wallController.deleteWall,
 );
 

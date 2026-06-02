@@ -642,6 +642,22 @@ class ApiService {
   }
 
   // Admin Endpoints
+
+  Future<List<User>> getPublicBodies() async {
+    try {
+      final response = await _dio.get('/admin/public-bodies');
+      final data = response.data;
+      if (data is List) {
+        return data
+            .map((e) => User.fromJson(Map<String, dynamic>.from(e)))
+            .toList();
+      }
+      return [];
+    } catch (e) {
+      print('Error fetching public bodies: $e');
+      return [];
+    }
+  }
   Future<List<User>> getPendingApprovals() async {
     try {
       final response = await _dio.get('/admin/approvals/pending');
@@ -680,6 +696,28 @@ class ApiService {
     } catch (e) {
       print('Error fetching unread count: $e');
       return 0;
+    }
+  }
+
+
+  Future<List<WallAdminSummary>> searchWalls(String query) async {
+    try {
+      if (query.trim().isEmpty) return [];
+      final resp = await _dio.get(
+        '/walls/search',
+        queryParameters: {'q': query.trim()},
+      );
+      final data = resp.data;
+      if (data is List) {
+        return data
+            .whereType<Map>()
+            .map((e) => WallAdminSummary.fromJson(Map<String, dynamic>.from(e)))
+            .toList();
+      }
+      return [];
+    } catch (e) {
+      print('Error searching walls: $e');
+      return [];
     }
   }
 
@@ -739,6 +777,7 @@ class ApiService {
     double? longitude,
     double? latitude,
     String? address,
+    String? publicBodyId,
   }) async {
     try {
       await _dio.post(
@@ -747,6 +786,7 @@ class ApiService {
           'name': name,
           'description': description,
           'difficulty': difficulty,
+          if (publicBodyId != null) 'publicBody': publicBodyId,
           if (longitude != null && latitude != null)
             'location': {
               'type': 'Point',
@@ -775,6 +815,7 @@ class ApiService {
     required String name,
     required String description,
     required String difficulty,
+    String? status,
   }) async {
     try {
       await _dio.put(
@@ -783,6 +824,7 @@ class ApiService {
           'name': name,
           'description': description,
           'difficulty': difficulty,
+          if (status != null) 'status': status,
         },
       );
       return true;

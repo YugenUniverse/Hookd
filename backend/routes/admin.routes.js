@@ -10,6 +10,8 @@ router.get("/approvals/pending", adminController.getPendingApprovals);
 router.put("/approvals/:userId/approve", adminController.approveAccount);
 router.put("/approvals/:userId/reject", adminController.rejectAccount);
 
+router.get("/public-bodies", adminController.getPublicBodies);
+
 router.get("/moderation/flagged", adminController.getFlaggedReviews);
 router.delete("/moderation/reviews/:reviewId", adminController.removeReview);
 router.post("/moderation/reviews/:reviewId/dismiss", adminController.dismissFlag);

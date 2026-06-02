@@ -17,6 +17,19 @@ const getPendingApprovals = async (req, res, next) => {
     }
 };
 
+const getPublicBodies = async (req, res, next) => {
+    try {
+        const publicBodies = await User.find({
+            userType: "PublicBody",
+            approvalStatus: "approved",
+        });
+
+        res.status(200).json(publicBodies);
+    } catch (err) {
+        next(err);
+    }
+};
+
 const approveAccount = async (req, res, next) => {
     try {
         const { userId } = req.params;
@@ -170,4 +183,5 @@ module.exports = {
     getFlaggedReviews,
     removeReview,
     dismissFlag,
+    getPublicBodies,
 };
