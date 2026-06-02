@@ -29,6 +29,10 @@ const messageBuilders = {
         title: p.senderName || "New message",
         body: p.messagePreview || "You have a new message",
     }),
+    support_ticket_replied: (p) => ({
+        title: "Support Reply",
+        body: p.ticketSubject ? `Reply to: ${p.ticketSubject}` : "Your support ticket has been updated",
+    }),
 };
 
 exports.sendToTokens = async (tokens, type, payload) => {

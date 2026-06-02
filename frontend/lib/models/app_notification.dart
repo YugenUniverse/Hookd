@@ -64,4 +64,8 @@ class AppNotification {
 
   // Issue status fields
   String get newStatus => payload['newStatus']?.toString() ?? '';
+
+  // Support ticket fields
+  String get ticketId => payload['ticketId']?.toString() ?? '';
+  String get ticketSubject => payload['ticketSubject']?.toString() ?? '';
 }

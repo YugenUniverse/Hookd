@@ -51,3 +51,9 @@ exports.sendContentRemovedEmail = async (user, reason) => {
     const text = `Hello,\n\nOne of your reviews has been removed by a moderator.\n\nReason: ${reason || "Violation of community guidelines"}\n\nIf you believe this was a mistake, please contact support.\n\nBest,\nHookd Team`;
     await sendEmail(user.email, subject, text);
 };
+
+exports.sendSupportReplyEmail = async (user, ticket, reply) => {
+    const subject = `Re: ${ticket.subject}`;
+    const text = `Hello,\n\nAn admin has replied to your support ticket.\n\nTicket: ${ticket.subject}\n\nReply:\n${reply}\n\nStatus: ${ticket.status}\n\nBest,\nHookd Team`;
+    await sendEmail(user.email, subject, text);
+};

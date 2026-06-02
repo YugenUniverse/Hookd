@@ -15,6 +15,7 @@ import '../models/badge.dart';
 import '../models/group.dart';
 import '../models/conversation.dart';
 import '../models/message.dart';
+import '../models/support_ticket.dart';
 import '../constants/api_config.dart';
 import 'auth_service.dart';
 
@@ -1257,4 +1258,79 @@ class ApiService {
     return AdminMetrics.fromJson(response.data);
   }
 
+  // Support ticket endpoints
+
+  Future<SupportTicket> createSupportTicket({
+    required String subject,
+    required String body,
+    String category = 'OTHER',
+  }) async {
+    final response = await _dio.post('/support', data: {
+      'subject': subject,
+      'body': body,
+      'category': category,
+    });
+    return SupportTicket.fromJson(Map<String, dynamic>.from(response.data['ticket']));
+  }
+
+  Future<List<SupportTicket>> getMyTickets({int limit = 20, int skip = 0}) async {
+    final response = await _dio.get('/support/mine', queryParameters: {
+      'limit': limit,
+      'skip': skip,
+    });
+    final list = response.data is Map ? response.data['tickets'] : null;
+    if (list is! List) return [];
+    return list
+        .whereType<Map>()
+        .map((e) => SupportTicket.fromJson(Map<String, dynamic>.from(e)))
+        .toList();
+  }
+
+  Future<SupportTicket> getSupportTicket(String ticketId) async {
+    final response = await _dio.get('/support/$ticketId');
+    return SupportTicket.fromJson(Map<String, dynamic>.from(response.data['ticket']));
+  }
+
+  Future<List<SupportTicket>> adminGetSupportTickets({
+    String? status,
+    String? category,
+    int limit = 50,
+    int skip = 0,
+  }) async {
+    final params = <String, dynamic>{'limit': limit, 'skip': skip};
+    if (status != null) params['status'] = status;
+    if (category != null) params['category'] = category;
+    final response = await _dio.get('/admin/support/tickets', queryParameters: params);
+    final list = response.data is Map ? response.data['tickets'] : null;
+    if (list is! List) return [];
+    return list
+        .whereType<Map>()
+        .map((e) => SupportTicket.fromJson(Map<String, dynamic>.from(e)))
+        .toList();
+  }
+
+  Future<SupportTicket> adminGetSupportTicket(String ticketId) async {
+    final response = await _dio.get('/admin/support/tickets/$ticketId');
+    return SupportTicket.fromJson(Map<String, dynamic>.from(response.data['ticket']));
+  }
+
+  Future<SupportTicket> adminReplyToTicket(
+    String ticketId, {
+    required String reply,
+    String? status,
+  }) async {
+    final body = <String, dynamic>{'reply': reply};
+    if (status != null) body['status'] = status;
+    final response = await _dio.patch('/admin/support/tickets/$ticketId/reply', data: body);
+    return SupportTicket.fromJson(Map<String, dynamic>.from(response.data['ticket']));
+  }
+
+  Future<SupportTicket> adminUpdateTicketStatus(String ticketId, String status) async {
+    final response = await _dio.patch(
+      '/admin/support/tickets/$ticketId/status',
+      data: {'status': status},
+    );
+    return SupportTicket.fromJson(Map<String, dynamic>.from(response.data['ticket']));
+  }
+>>>>>>> origin/feat/moderate-content
 }

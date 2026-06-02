@@ -134,6 +134,12 @@ class _NotificationTile extends StatelessWidget {
           ? 'Admin updated your wall: ${notification.wallName}'
           : 'An admin updated your wall',
     ),
+    'support_ticket_replied' => (
+      icon: Icons.support_agent_outlined,
+      title: notification.ticketSubject.isNotEmpty
+          ? 'Reply to: ${notification.ticketSubject}'
+          : 'Your support ticket was updated',
+    ),
     _ => (icon: Icons.notifications_outlined, title: 'Notification'),
   };
 
