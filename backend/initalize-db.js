@@ -166,7 +166,7 @@ async function runOverpassQuery() {
 async function seedOverpass() {
     console.log("\n--- 🌍 STARTING PHASE 1: OVERPASS IMPORT ---");
 
-    const seedPasswordPlain = "password123";
+    const seedPasswordPlain = "hookd_test_password";
     const seedPasswordHash = await bcrypt.hash(seedPasswordPlain, 10);
 
     const regioneTrentino = await PublicBody.findOneAndUpdate(
@@ -177,12 +177,12 @@ async function seedOverpass() {
                 description:
                     "Autonomous Province of Trento — manages outdoor climbing areas in the Trentino region.",
                 location: { type: "Point", coordinates: [11.1217, 46.0667] },
-            },
-            $setOnInsert: {
                 email: "regione.trentino@hookd.internal",
-                username: "regione_trentino",
                 password: seedPasswordHash,
                 authMethods: ["local"],
+            },
+            $setOnInsert: {
+                username: "regione_trentino",
             },
         },
         { upsert: true, returnDocument: "after" },
@@ -241,13 +241,8 @@ async function seedOverpass() {
             const userResult = await FacilityOwner.findOneAndUpdate(
                 { username: facilityUsername },
                 {
-                    $set: { name, description, location },
-                    $setOnInsert: {
-                        email: facilityEmail,
-                        username: facilityUsername,
-                        password: seedPasswordHash,
-                        authMethods: ["local"],
-                    },
+                    $set: { name, description, location, email: facilityEmail, password: seedPasswordHash, authMethods: ["local"] },
+                    $setOnInsert: { username: facilityUsername },
                 },
                 { upsert: true, returnDocument: "after" },
             );
@@ -320,7 +315,7 @@ async function seedOverpass() {
 
 async function seedAdminAndPending() {
     console.log("\n--- 🛡️ STARTING PHASE 2: ADMIN & PENDING ACCOUNTS ---");
-    const seedPasswordPlain = "password123";
+    const seedPasswordPlain = "hookd_test_password";
     const seedPasswordHash = await bcrypt.hash(seedPasswordPlain, 10);
 
     // 1. Create Admin
@@ -330,11 +325,11 @@ async function seedAdminAndPending() {
         {
             $set: {
                 name: "System Admin",
+                password: seedPasswordHash,
+                authMethods: ["local"],
             },
             $setOnInsert: {
                 username: "hookd_admin",
-                password: seedPasswordHash,
-                authMethods: ["local"],
             },
         },
         { upsert: true },
@@ -349,11 +344,11 @@ async function seedAdminAndPending() {
                 $set: {
                     name: `Pending Facility ${i}`,
                     approvalStatus: "pending",
+                    password: seedPasswordHash,
+                    authMethods: ["local"],
                 },
                 $setOnInsert: {
                     username: `pending_owner${i}`,
-                    password: seedPasswordHash,
-                    authMethods: ["local"],
                 },
             },
             { upsert: true },
@@ -369,11 +364,11 @@ async function seedAdminAndPending() {
                 $set: {
                     name: `Pending Public Body ${i}`,
                     approvalStatus: "pending",
+                    password: seedPasswordHash,
+                    authMethods: ["local"],
                 },
                 $setOnInsert: {
                     username: `pending_pb${i}`,
-                    password: seedPasswordHash,
-                    authMethods: ["local"],
                 },
             },
             { upsert: true },
@@ -510,7 +505,7 @@ async function seedViaApi() {
         // 1. REGISTER & LOGIN FACILITY
         console.log("🏢 Registering Facility...");
         const facilityEmail = `gym_${runId}@test.com`;
-        const facilityPw = "password123";
+        const facilityPw = "hookd_test_password";
 
         const facilityRegRes = await axios.post(`${BASE_URL}/auth/register`, {
             email: facilityEmail,
@@ -696,7 +691,7 @@ async function seedViaApi() {
             await axios.post(`${BASE_URL}/auth/register`, {
                 email: email,
                 username: faker.internet.username() + runId,
-                password: "password123",
+                password: "hookd_test_password",
                 userType: "Climber",
                 name: faker.person.firstName(),
                 surname: faker.person.lastName(),
@@ -705,7 +700,7 @@ async function seedViaApi() {
 
             const climberLogin = await axios.post(`${BASE_URL}/auth/login`, {
                 email: email,
-                password: "password123",
+                password: "hookd_test_password",
             });
             climberTokens.push(climberLogin.data.accessToken);
         }
@@ -889,7 +884,7 @@ async function seedViaApi() {
                         `${BASE_URL}/auth/login`,
                         {
                             email: regioneTrentino.email,
-                            password: "password123",
+                            password: "hookd_test_password",
                         },
                     );
                     const publicBodyToken = regionLoginRes.data.accessToken;
@@ -1123,6 +1118,16 @@ async function runAll() {
             }
         }
 
+        // Flagged content Phase
+        if (!["reviews_and_issues", "climbers_and_sessions", "badges_and_events", "walls_and_facilities"].includes(stopPhase)) {
+            console.log("\n--- PHASE 6: flagged_content ---");
+            await seedFlaggedContent();
+            if (stopPhase === "flagged_content") {
+                console.log("\n🛑 Stopping at phase: flagged_content");
+                return;
+            }
+        }
+
         console.log("\n🎉 ALL SEEDING COMPLETE! Check your Flutter App! 🎉\n");
     } catch (err) {
         console.error("\n💥 Master Script Failed:", err);
@@ -1130,6 +1135,62 @@ async function runAll() {
         await mongoose.disconnect();
         process.exit();
     }
+}
+
+// ==========================================
+// PHASE 6: FLAGGED CONTENT SEED
+// ==========================================
+
+const FLAGGED_BODIES = [
+    "This place is a complete scam!!! Staff are absolute ###, never coming back!!!",
+    "BUY CHEAP CLIMBING GEAR AT DISCOUNTCLIMB.COM — best deals online, click now!!!",
+    "The setter clearly has NO idea what they're doing. Absolute garbage route, embarrassing.",
+    "WARNING: this gym has bedbugs. I got sick last time and they refused to refund me.",
+    "Totally fake reviews here. This wall SUCKS and the management are crooks.",
+    "SPAM SPAM SPAM — visit my profile for free climbing tips!!!",
+    "I hope this place burns down. Worst experience of my life.",
+    "The staff are racists. Do NOT go here. Spreading the word everywhere.",
+];
+
+const FLAG_REASONS = [
+    "Offensive language",
+    "Spam",
+    "Offensive language",
+    "Misleading",
+    "Misleading",
+    "Spam",
+    "Offensive language",
+    "Offensive language",
+];
+
+async function seedFlaggedContent() {
+    console.log("\n--- 🚩 STARTING PHASE 6: FLAGGED CONTENT SEED ---");
+
+    const Review = require("./models/Review");
+
+    // Drop existing flagged reviews so re-runs stay clean
+    await Review.updateMany({ flagged: true }, { flagged: false, flagReason: "", status: "active" });
+
+    const reviews = await Review.find({ status: { $ne: "removed" } }).limit(50).lean();
+
+    if (!reviews.length) {
+        console.warn("⚠️ No reviews found — run Phase 4 first.");
+        return;
+    }
+
+    const count = Math.min(FLAGGED_BODIES.length, reviews.length);
+    const toFlag = reviews.slice(0, count);
+
+    for (let i = 0; i < toFlag.length; i++) {
+        await Review.findByIdAndUpdate(toFlag[i]._id, {
+            body: FLAGGED_BODIES[i],
+            flagged: true,
+            flagReason: FLAG_REASONS[i],
+            status: "active",
+        });
+    }
+
+    console.log(`✅ Flagged ${count} reviews with inappropriate content.`);
 }
 
 async function seedReports() {
