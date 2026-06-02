@@ -9,6 +9,12 @@ const Facility = require("../../models/Facility");
 const Review = require("../../models/Review");
 const notificationService = require("../../services/notification.service");
 const emailService = require("../../services/email.service");
+const ClimbingSession = require("../../models/ClimbingSession");
+const { Wall } = require("../../models/Wall");
+const Group = require("../../models/Group");
+const Event = require("../../models/Event");
+const { Report } = require("../../models/Report");
+
 
 jest.mock("../../services/notification.service");
 jest.mock("../../services/email.service");
@@ -38,7 +44,8 @@ const createAuthToken = (user) => {
 describe("admin.routes", () => {
     afterEach(() => {
         jest.restoreAllMocks();
-    });
+    
+});
 
     const adminToken = createAuthToken({
         _id: { toString: () => "admin-1" },
@@ -263,4 +270,59 @@ describe("admin.routes", () => {
             expect(mockReview.save).toHaveBeenCalled();
         });
     });
+    describe("GET /admin/metrics", () => {
+        it("returns 403 for non-Admin users", async () => {
+            const response = await request(app)
+                .get("/admin/metrics")
+                .set("Authorization", `Bearer ${climberToken}`);
+            expect(response.status).toBe(403);
+        });
+
+        it("returns metrics object for Admin", async () => {
+            jest.spyOn(ClimbingSession, "distinct").mockResolvedValue(["user1", "user2"]);
+            jest.spyOn(User, "countDocuments").mockResolvedValue(100);
+            jest.spyOn(Wall, "countDocuments").mockResolvedValue(20);
+            jest.spyOn(Review, "countDocuments").mockResolvedValue(300);
+            jest.spyOn(Group, "countDocuments").mockResolvedValue(10);
+            jest.spyOn(Event, "countDocuments").mockResolvedValue(5);
+            jest.spyOn(Report, "countDocuments").mockResolvedValue(2);
+            
+const now = new Date();
+            const year = now.getFullYear();
+            const month = now.getMonth() + 1;
+            
+            jest.spyOn(User, "aggregate").mockResolvedValue([{ _id: { year, month }, count: 10 }]);
+            jest.spyOn(ClimbingSession, "aggregate").mockResolvedValue([{ _id: { year, month }, count: 50 }]);
+            jest.spyOn(Event, "aggregate").mockResolvedValue([{ _id: { year, month }, count: 2 }]);
+            jest.spyOn(Review, "aggregate").mockResolvedValue([{ _id: { year, month }, count: 15 }]);
+            jest.spyOn(Group, "aggregate").mockResolvedValue([{ _id: { year, month }, count: 3 }]);
+            jest.spyOn(Wall, "aggregate").mockResolvedValue([{ _id: { year, month }, count: 8 }]);
+
+            const response = await request(app)
+                .get("/admin/metrics")
+                .set("Authorization", `Bearer ${adminToken}`);
+
+            expect(response.status).toBe(200);
+            expect(response.body.activeUsers).toBe(2);
+            expect(response.body.totalUsers).toBe(100);
+            expect(response.body.totalWalls).toBe(20);
+            expect(response.body.totalReviews).toBe(300);
+            expect(response.body.totalGroups).toBe(10);
+            expect(response.body.totalEvents).toBe(5);
+            expect(response.body.openReports).toBe(2);
+            expect(response.body.graphs.userRegistrations.length).toBe(12);
+            expect(response.body.graphs.sessionsLogged.length).toBe(12);
+            expect(response.body.graphs.eventsCreated.length).toBe(12);
+            expect(response.body.graphs.reviewsAdded.length).toBe(12);
+            expect(response.body.graphs.groupsCreated.length).toBe(12);
+            expect(response.body.graphs.wallsAdded.length).toBe(12);
+
+            const lastUserReg = response.body.graphs.userRegistrations[11];
+            expect(lastUserReg.count).toBe(10);
+            expect(response.body.graphs.sessionsLogged[11].count).toBe(50);
+            expect(response.body.graphs.eventsCreated[11].count).toBe(2);
+
+        });
+    });
+
 });
