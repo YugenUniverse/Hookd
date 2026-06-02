@@ -38,6 +38,7 @@ var badgeRouter = require("./routes/badge.routes");
 const groupRouter = require("./routes/group.routes");
 const conversationRouter = require("./routes/conversation.routes");
 const adminRouter = require("./routes/admin.routes");
+const supportRouter = require("./routes/support.routes");
 
 const errorMiddleware = require("./middleware/error.middleware");
 
@@ -108,6 +109,7 @@ app.use("/follows", followRouter);
 app.use("/groups", groupRouter);
 app.use("/conversations", conversationRouter);
 app.use("/admin", adminRouter);
+app.use("/support", supportRouter);
 // catch 404 and forward to error handler
 app.use(function (req, res, next) {
     next(createError(404));
