@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../models/user.dart';
+import '../models/support_ticket.dart';
 import '../utils/error_helpers.dart';
+import 'support_page.dart' show SupportStatusChip, SupportCategoryChip;
 
 class AdminPage extends StatefulWidget {
   const AdminPage({super.key});
@@ -15,12 +17,14 @@ class _AdminPageState extends State<AdminPage> with SingleTickerProviderStateMix
   bool _isLoading = true;
   List<User> _pendingApprovals = [];
   List<Map<String, dynamic>> _flaggedReviews = [];
+  List<SupportTicket> _supportTickets = [];
+  String? _ticketStatusFilter;
   final Set<String> _busy = {};
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
     _fetchData();
   }
 
@@ -36,11 +40,13 @@ class _AdminPageState extends State<AdminPage> with SingleTickerProviderStateMix
       final results = await Future.wait([
         ApiService().getPendingApprovals(),
         ApiService().getFlaggedReviews(),
+        ApiService().adminGetSupportTickets(status: _ticketStatusFilter),
       ]);
       if (mounted) {
         setState(() {
           _pendingApprovals = results[0] as List<User>;
           _flaggedReviews = results[1] as List<Map<String, dynamic>>;
+          _supportTickets = results[2] as List<SupportTicket>;
         });
       }
     } catch (e) {
@@ -185,6 +191,18 @@ class _AdminPageState extends State<AdminPage> with SingleTickerProviderStateMix
                 ],
               ),
             ),
+            Tab(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text('Support'),
+                  if (_supportTickets.isNotEmpty) ...[
+                    const SizedBox(width: 6),
+                    _CountBadge(_supportTickets.length),
+                  ],
+                ],
+              ),
+            ),
           ],
         ),
       ),
@@ -195,6 +213,7 @@ class _AdminPageState extends State<AdminPage> with SingleTickerProviderStateMix
               children: [
                 _buildApprovalsList(),
                 _buildFlaggedList(),
+                _buildSupportList(),
               ],
             ),
     );
@@ -505,6 +524,281 @@ class _AdminPageState extends State<AdminPage> with SingleTickerProviderStateMix
           ),
         );
       },
+    );
+  }
+
+  Widget _buildSupportList() {
+    final cs = Theme.of(context).colorScheme;
+
+    const statuses = ['OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED'];
+
+    if (_supportTickets.isEmpty) {
+      return Column(
+        children: [
+          _buildTicketFilterBar(cs, statuses),
+          const Expanded(
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.support_agent_outlined, size: 56),
+                  SizedBox(height: 12),
+                  Text('No tickets', style: TextStyle(fontSize: 16)),
+                ],
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    return Column(
+      children: [
+        _buildTicketFilterBar(cs, statuses),
+        Expanded(
+          child: ListView.builder(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            itemCount: _supportTickets.length,
+            itemBuilder: (context, index) {
+              final ticket = _supportTickets[index];
+              return Card(
+                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(12),
+                  onTap: () => _openTicketDialog(ticket),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(ticket.subject,
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.bold, fontSize: 15)),
+                            ),
+                            const SizedBox(width: 8),
+                            SupportStatusChip(status: ticket.status),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        if (ticket.user != null) ...[
+                          Row(children: [
+                            Icon(Icons.person_outline, size: 14, color: cs.onSurfaceVariant),
+                            const SizedBox(width: 4),
+                            Text(
+                              '@${ticket.user!['username'] ?? ticket.user!['email'] ?? ''}',
+                              style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+                            ),
+                          ]),
+                          const SizedBox(height: 4),
+                        ],
+                        Text(ticket.body,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant)),
+                        const SizedBox(height: 8),
+                        Row(children: [
+                          SupportCategoryChip(category: ticket.category),
+                          const Spacer(),
+                          if (ticket.hasReply)
+                            Row(children: [
+                              Icon(Icons.reply, size: 14, color: cs.primary),
+                              const SizedBox(width: 4),
+                              Text('Replied',
+                                  style: TextStyle(fontSize: 12, color: cs.primary)),
+                            ]),
+                        ]),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTicketFilterBar(ColorScheme cs, List<String> statuses) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
+        children: [
+          FilterChip(
+            label: const Text('All'),
+            selected: _ticketStatusFilter == null,
+            onSelected: (_) {
+              setState(() => _ticketStatusFilter = null);
+              _fetchData();
+            },
+          ),
+          const SizedBox(width: 8),
+          ...statuses.map((s) => Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: FilterChip(
+                  label: Text(s.replaceAll('_', ' ')),
+                  selected: _ticketStatusFilter == s,
+                  onSelected: (_) {
+                    setState(() => _ticketStatusFilter = _ticketStatusFilter == s ? null : s);
+                    _fetchData();
+                  },
+                ),
+              )),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _openTicketDialog(SupportTicket ticket) async {
+    final refreshed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => _AdminTicketDialog(ticket: ticket),
+    );
+    if (refreshed == true) _fetchData();
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Admin ticket detail dialog
+// ──────────────────────────────────────────────────────────────────────────────
+
+class _AdminTicketDialog extends StatefulWidget {
+  final SupportTicket ticket;
+
+  const _AdminTicketDialog({required this.ticket});
+
+  @override
+  State<_AdminTicketDialog> createState() => _AdminTicketDialogState();
+}
+
+class _AdminTicketDialogState extends State<_AdminTicketDialog> {
+  final _replyCtrl = TextEditingController();
+  String _selectedStatus = 'IN_PROGRESS';
+  bool _isSubmitting = false;
+
+  static const _statuses = ['OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED'];
+
+  @override
+  void initState() {
+    super.initState();
+    _replyCtrl.text = widget.ticket.adminReply ?? '';
+    _selectedStatus = widget.ticket.status == 'OPEN' ? 'IN_PROGRESS' : widget.ticket.status;
+  }
+
+  @override
+  void dispose() {
+    _replyCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submitReply() async {
+    final reply = _replyCtrl.text.trim();
+    if (reply.isEmpty) return;
+    setState(() => _isSubmitting = true);
+    try {
+      await ApiService().adminReplyToTicket(
+        widget.ticket.id,
+        reply: reply,
+        status: _selectedStatus,
+      );
+      if (mounted) Navigator.pop(context, true);
+    } catch (e) {
+      if (mounted) showErrorDetailsDialog(context, e);
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
+  }
+
+  Future<void> _updateStatusOnly(String status) async {
+    setState(() => _isSubmitting = true);
+    try {
+      await ApiService().adminUpdateTicketStatus(widget.ticket.id, status);
+      if (mounted) Navigator.pop(context, true);
+    } catch (e) {
+      if (mounted) showErrorDetailsDialog(context, e);
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final ticket = widget.ticket;
+
+    return AlertDialog(
+      title: Row(
+        children: [
+          Expanded(child: Text(ticket.subject, style: const TextStyle(fontSize: 16))),
+          const SizedBox(width: 8),
+          SupportStatusChip(status: ticket.status),
+        ],
+      ),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (ticket.user != null)
+                Text(
+                  '@${ticket.user!['username'] ?? ticket.user!['email'] ?? ''}',
+                  style: TextStyle(color: cs.onSurfaceVariant, fontSize: 13),
+                ),
+              const SizedBox(height: 4),
+              SupportCategoryChip(category: ticket.category),
+              const SizedBox(height: 12),
+              Text(ticket.body, style: const TextStyle(fontSize: 14, height: 1.5)),
+              const SizedBox(height: 16),
+              const Divider(),
+              const SizedBox(height: 8),
+              DropdownButtonFormField<String>(
+                initialValue: _selectedStatus,
+                decoration: const InputDecoration(labelText: 'Set Status', isDense: true),
+                items: _statuses
+                    .map((s) => DropdownMenuItem(
+                          value: s,
+                          child: Text(s.replaceAll('_', ' ')),
+                        ))
+                    .toList(),
+                onChanged: _isSubmitting ? null : (v) => setState(() => _selectedStatus = v ?? _selectedStatus),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _replyCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Reply to user',
+                  alignLabelWithHint: true,
+                ),
+                maxLines: 4,
+                maxLength: 2000,
+                enabled: !_isSubmitting,
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _isSubmitting ? null : () => Navigator.pop(context, false),
+          child: const Text('Cancel'),
+        ),
+        OutlinedButton(
+          onPressed: _isSubmitting ? null : () => _updateStatusOnly(_selectedStatus),
+          child: const Text('Status Only'),
+        ),
+        FilledButton(
+          onPressed: _isSubmitting ? null : _submitReply,
+          child: _isSubmitting
+              ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+              : const Text('Send Reply'),
+        ),
+      ],
     );
   }
 }

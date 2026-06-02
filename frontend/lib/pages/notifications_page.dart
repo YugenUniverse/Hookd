@@ -128,6 +128,12 @@ class _NotificationTile extends StatelessWidget {
           ? 'New issue on ${notification.wallName}'
           : 'New issue reported',
     ),
+    'support_ticket_replied' => (
+      icon: Icons.support_agent_outlined,
+      title: notification.ticketSubject.isNotEmpty
+          ? 'Reply to: ${notification.ticketSubject}'
+          : 'Your support ticket was updated',
+    ),
     _ => (icon: Icons.notifications_outlined, title: 'Notification'),
   };
 

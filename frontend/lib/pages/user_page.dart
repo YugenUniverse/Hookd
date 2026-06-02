@@ -11,6 +11,7 @@ import 'edit_profile_page.dart';
 import '../utils/image_helpers.dart';
 import 'my_issues_page.dart';
 import 'notifications_page.dart';
+import 'support_page.dart';
 import 'wall_issues_page.dart';
 import '../providers/notification_provider.dart';
 import '../widgets/badge_icon.dart';
@@ -427,6 +428,8 @@ class _UserPageState extends State<UserPage> {
                                 ),
                                 const SizedBox(height: 20),
                                 const _NotificationsButton(),
+                                const SizedBox(height: 12),
+                                const _SupportButton(),
                                 const SizedBox(height: 12),
                                 _IssuesButton(userType: AuthService().userType),
                                 const SizedBox(height: 20),
@@ -857,6 +860,43 @@ class _NotificationsButton extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+class _SupportButton extends StatelessWidget {
+  const _SupportButton();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    return InkWell(
+      borderRadius: BorderRadius.circular(20),
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const SupportPage()),
+      ),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: cs.surfaceContainerHighest.withValues(alpha: 0.7),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.3)),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.support_agent_outlined, size: 20, color: cs.primary),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Support',
+                style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
+              ),
+            ),
+            Icon(Icons.chevron_right, size: 20, color: cs.onSurfaceVariant),
+          ],
+        ),
+      ),
     );
   }
 }
