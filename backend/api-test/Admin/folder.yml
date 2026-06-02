@@ -1,1 +1,4 @@
-name: Admin
+info:
+  name: Admin
+  type: folder
+  seq: 1

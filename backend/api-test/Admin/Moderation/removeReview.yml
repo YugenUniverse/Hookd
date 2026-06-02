@@ -1,0 +1,23 @@
+info:
+  name: removeReview
+  type: http
+  seq: 2
+
+http:
+  method: DELETE
+  url: http://localhost:3000/admin/moderation/reviews/{{reviewId}}
+  body:
+    type: json
+    data: |-
+      {
+        "reason": "Offensive language"
+      }
+  auth:
+    type: bearer
+    token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
