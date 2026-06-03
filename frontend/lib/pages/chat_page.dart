@@ -9,6 +9,7 @@ import '../services/auth_service.dart';
 import '../services/chat_service.dart';
 import 'climber_profile_page.dart';
 import 'group_detail_page.dart';
+import 'support_page.dart';
 
 class ChatPage extends StatefulWidget {
   final Conversation conversation;
@@ -214,6 +215,16 @@ class _ChatPageState extends State<ChatPage> {
 
     return Scaffold(
       appBar: AppBar(
+        actions: [
+          if (widget.conversation.type == 'group')
+            IconButton(
+              icon: const Icon(Icons.support_agent_outlined),
+              tooltip: 'Support',
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const SupportPage()),
+              ),
+            ),
+        ],
         title: GestureDetector(
           onTap: _openInfo,
           behavior: HitTestBehavior.opaque,

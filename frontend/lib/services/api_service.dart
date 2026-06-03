@@ -9,10 +9,13 @@ import '../models/wall.dart';
 import '../models/issue.dart';
 import '../models/event.dart';
 import '../models/app_notification.dart';
+import '../models/admin_metrics.dart';
+
 import '../models/badge.dart';
 import '../models/group.dart';
 import '../models/conversation.dart';
 import '../models/message.dart';
+import '../models/support_ticket.dart';
 import '../models/statistics_filter.dart';
 import '../constants/api_config.dart';
 import 'auth_service.dart';
@@ -650,6 +653,53 @@ class ApiService {
     }
   }
 
+  // Admin Endpoints
+
+  Future<List<User>> getPublicBodies() async {
+    try {
+      final response = await _dio.get('/admin/public-bodies');
+      final data = response.data;
+      if (data is List) {
+        return data
+            .map((e) => User.fromJson(Map<String, dynamic>.from(e)))
+            .toList();
+      }
+      return [];
+    } catch (e) {
+      print('Error fetching public bodies: $e');
+      return [];
+    }
+  }
+  Future<List<User>> getPendingApprovals() async {
+    try {
+      final response = await _dio.get('/admin/approvals/pending');
+      final data = response.data;
+      if (data is List) {
+        return data
+            .map((e) => User.fromJson(Map<String, dynamic>.from(e)))
+            .toList();
+      }
+      return [];
+    } catch (e) {
+      print('Error fetching pending approvals: $e');
+      return [];
+    }
+  }
+
+  Future<void> approveAccount(String userId) async {
+    final response = await _dio.put('/admin/approvals/$userId/approve');
+    if (response.statusCode != 200) {
+      throw Exception('Failed to approve account');
+    }
+  }
+
+  Future<void> rejectAccount(String userId) async {
+    final response = await _dio.put('/admin/approvals/$userId/reject');
+    if (response.statusCode != 200) {
+      throw Exception('Failed to reject account');
+    }
+  }
+
   Future<int> getUnreadNotificationCount() async {
     try {
       final response = await _dio.get('/notifications/unread-count');
@@ -658,6 +708,28 @@ class ApiService {
     } catch (e) {
       print('Error fetching unread count: $e');
       return 0;
+    }
+  }
+
+
+  Future<List<WallAdminSummary>> searchWalls(String query) async {
+    try {
+      if (query.trim().isEmpty) return [];
+      final resp = await _dio.get(
+        '/walls/search',
+        queryParameters: {'q': query.trim()},
+      );
+      final data = resp.data;
+      if (data is List) {
+        return data
+            .whereType<Map>()
+            .map((e) => WallAdminSummary.fromJson(Map<String, dynamic>.from(e)))
+            .toList();
+      }
+      return [];
+    } catch (e) {
+      print('Error searching walls: $e');
+      return [];
     }
   }
 
@@ -717,6 +789,7 @@ class ApiService {
     double? longitude,
     double? latitude,
     String? address,
+    String? publicBodyId,
   }) async {
     try {
       await _dio.post(
@@ -725,6 +798,7 @@ class ApiService {
           'name': name,
           'description': description,
           'difficulty': difficulty,
+          if (publicBodyId != null) 'publicBody': publicBodyId,
           if (longitude != null && latitude != null)
             'location': {
               'type': 'Point',
@@ -753,6 +827,7 @@ class ApiService {
     required String name,
     required String description,
     required String difficulty,
+    String? status,
   }) async {
     try {
       await _dio.put(
@@ -761,6 +836,7 @@ class ApiService {
           'name': name,
           'description': description,
           'difficulty': difficulty,
+          if (status != null) 'status': status,
         },
       );
       return true;
@@ -1218,5 +1294,118 @@ class ApiService {
     final m = date.month.toString().padLeft(2, '0');
     final d = date.day.toString().padLeft(2, '0');
     return '$y-$m-$d';
+  }
+
+  // Review moderation
+  Future<void> flagReview(String reviewId, String flagReason) async {
+    await _dio.post('/reviews/$reviewId/flag', data: {'flagReason': flagReason});
+  }
+
+  Future<List<Map<String, dynamic>>> getFlaggedReviews() async {
+    try {
+      final response = await _dio.get('/admin/moderation/flagged');
+      final data = response.data;
+      if (data is! List) return [];
+      return data.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+    } catch (e) {
+      print('Error fetching flagged reviews: $e');
+      return [];
+    }
+  }
+
+  Future<void> adminRemoveReview(String reviewId, {String? reason}) async {
+    await _dio.delete('/admin/moderation/reviews/$reviewId', data: {'reason': reason});
+  }
+
+  Future<void> adminDismissFlag(String reviewId) async {
+    await _dio.post('/admin/moderation/reviews/$reviewId/dismiss');
+  }
+
+  // --- Admin Metrics ---
+  Future<AdminMetrics> getAdminMetrics({DateTime? startDate, DateTime? endDate}) async {
+    String query = '';
+    if (startDate != null || endDate != null) {
+      final List<String> params = [];
+      if (startDate != null) params.add('startDate=${startDate.toIso8601String()}');
+      if (endDate != null) params.add('endDate=${endDate.toIso8601String()}');
+      query = '?${params.join('&')}';
+    }
+    final response = await _dio.get('/admin/metrics$query');
+    return AdminMetrics.fromJson(response.data);
+  }
+
+  // Support ticket endpoints
+
+  Future<SupportTicket> createSupportTicket({
+    required String subject,
+    required String body,
+    String category = 'OTHER',
+  }) async {
+    final response = await _dio.post('/support', data: {
+      'subject': subject,
+      'body': body,
+      'category': category,
+    });
+    return SupportTicket.fromJson(Map<String, dynamic>.from(response.data['ticket']));
+  }
+
+  Future<List<SupportTicket>> getMyTickets({int limit = 20, int skip = 0}) async {
+    final response = await _dio.get('/support/mine', queryParameters: {
+      'limit': limit,
+      'skip': skip,
+    });
+    final list = response.data is Map ? response.data['tickets'] : null;
+    if (list is! List) return [];
+    return list
+        .whereType<Map>()
+        .map((e) => SupportTicket.fromJson(Map<String, dynamic>.from(e)))
+        .toList();
+  }
+
+  Future<SupportTicket> getSupportTicket(String ticketId) async {
+    final response = await _dio.get('/support/$ticketId');
+    return SupportTicket.fromJson(Map<String, dynamic>.from(response.data['ticket']));
+  }
+
+  Future<List<SupportTicket>> adminGetSupportTickets({
+    String? status,
+    String? category,
+    int limit = 50,
+    int skip = 0,
+  }) async {
+    final params = <String, dynamic>{'limit': limit, 'skip': skip};
+    if (status != null) params['status'] = status;
+    if (category != null) params['category'] = category;
+    final response = await _dio.get('/admin/support/tickets', queryParameters: params);
+    final list = response.data is Map ? response.data['tickets'] : null;
+    if (list is! List) return [];
+    return list
+        .whereType<Map>()
+        .map((e) => SupportTicket.fromJson(Map<String, dynamic>.from(e)))
+        .toList();
+  }
+
+  Future<SupportTicket> adminGetSupportTicket(String ticketId) async {
+    final response = await _dio.get('/admin/support/tickets/$ticketId');
+    return SupportTicket.fromJson(Map<String, dynamic>.from(response.data['ticket']));
+  }
+
+  Future<SupportTicket> adminReplyToTicket(
+    String ticketId, {
+    required String reply,
+    String? status,
+  }) async {
+    final body = <String, dynamic>{'reply': reply};
+    if (status != null) body['status'] = status;
+    final response = await _dio.patch('/admin/support/tickets/$ticketId/reply', data: body);
+    return SupportTicket.fromJson(Map<String, dynamic>.from(response.data['ticket']));
+  }
+
+  Future<SupportTicket> adminUpdateTicketStatus(String ticketId, String status) async {
+    final response = await _dio.patch(
+      '/admin/support/tickets/$ticketId/status',
+      data: {'status': status},
+    );
+    return SupportTicket.fromJson(Map<String, dynamic>.from(response.data['ticket']));
   }
 }

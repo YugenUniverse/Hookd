@@ -1,0 +1,24 @@
+info:
+    name: admin-reply-ticket
+    type: http
+    seq: 5
+
+http:
+    method: PATCH
+    url: http://localhost:3000/admin/support/tickets/6a021092a362ceb8f7bd15fd/reply
+    body:
+        type: json
+        data: |-
+            {
+              "reply": "Thank you for reaching out. We have investigated the issue and resolved it.",
+              "status": "RESOLVED"
+            }
+    auth:
+        type: bearer
+        token:
+
+settings:
+    encodeUrl: true
+    timeout: 0
+    followRedirects: true
+    maxRedirects: 5

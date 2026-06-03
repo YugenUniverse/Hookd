@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import '../pages/notifications_page.dart';
+import '../providers/notification_provider.dart';
+import 'package:provider/provider.dart';
+
 
 import '../models/poi.dart' show IndoorWallSummary;
 import '../models/user.dart';
@@ -79,6 +83,7 @@ class _PublicBodyPageState extends State<PublicBodyPage> {
 
   @override
   Widget build(BuildContext context) {
+    final unreadCount = context.watch<NotificationProvider>().unreadCount;
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
@@ -87,6 +92,38 @@ class _PublicBodyPageState extends State<PublicBodyPage> {
         title: const Text('Your profile'),
         centerTitle: true,
         actions: [
+          IconButton(
+            icon: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                const Icon(Icons.notifications_outlined),
+                if (unreadCount > 0)
+                  Positioned(
+                    right: -2,
+                    top: -2,
+                    child: Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.error,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                      child: Text(
+                        '$unreadCount',
+                        style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  )
+              ],
+            ),
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const NotificationsPage()),
+              );
+            },
+          ),
+
           IconButton(
             tooltip: 'Log out',
             onPressed: _logout,
@@ -152,6 +189,38 @@ class _PublicBodyPageState extends State<PublicBodyPage> {
               final user = snapshot.data;
               if (user == null) {
                 return const Center(child: Text('No profile data available.'));
+              }
+
+              if (user.approvalStatus == 'pending') {
+                return Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(32.0),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.hourglass_empty_outlined, size: 64, color: colorScheme.primary),
+                        const SizedBox(height: 24),
+                        Text(
+                          'Account Pending Approval',
+                          style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Your account is currently under review by our administration team. You will be able to access your dashboard and manage your region once approved.',
+                          style: theme.textTheme.bodyLarge?.copyWith(color: colorScheme.onSurfaceVariant),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 32),
+                        FilledButton.icon(
+                          onPressed: _refresh,
+                          icon: const Icon(Icons.refresh),
+                          label: const Text('Check Status'),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
               }
 
               final username = user.username.isNotEmpty

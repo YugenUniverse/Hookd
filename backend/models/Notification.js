@@ -9,7 +9,7 @@ const notificationSchema = new mongoose.Schema(
         },
         type: {
             type: String,
-            enum: ["new_event", "new_issue", "group_invite", "badge_awarded", "new_follower", "issue_status_changed"],
+            enum: ["new_event", "new_issue", "group_invite", "badge_awarded", "new_follower", "issue_status_changed", "account_approved", "account_rejected", "content_removed", "wall_updated_by_admin", "support_ticket_replied"],
             required: true,
         },
         payload: {

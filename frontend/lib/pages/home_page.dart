@@ -16,6 +16,7 @@ import '../pages/public_body_issues_page.dart';
 import '../pages/public_body_page.dart';
 import '../pages/user_page.dart';
 import '../pages/social_page.dart';
+import '../pages/admin_page.dart';
 import '../providers/notification_provider.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
@@ -46,6 +47,7 @@ class _MyHomePageState extends State<MyHomePage>
   StreamSubscription? _pushMsgSub;
   Widget? _panelContent;
   String? _panelTag;
+  bool _isPanelFullscreen = false;
   ImageProvider? _cachedAvatarProvider;
   String? _cachedAvatarUrl;
 
@@ -243,6 +245,16 @@ class _MyHomePageState extends State<MyHomePage>
     _loadIssueCount();
   }
 
+  Future<void> _openAdminPage() async {
+    if (_usePanelNav) {
+      _showPanel(const AdminPage(), 'admin');
+      return;
+    }
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const AdminPage()),
+    );
+  }
+
   Future<bool> _ensureAuthenticated() async {
     if (AuthService().isAuthenticated) {
       return true;
@@ -386,6 +398,7 @@ class _MyHomePageState extends State<MyHomePage>
     final Widget page = switch (userType) {
       'FacilityOwner' => const FacilityOwnerPage(),
       'PublicBody' => const PublicBodyPage(),
+      'Admin' => const AdminPage(),
       _ => const UserPage(),
     };
 
@@ -419,11 +432,19 @@ class _MyHomePageState extends State<MyHomePage>
     _navExpand.forward();
   }
 
+  
+  void _togglePanelFullscreen() {
+    setState(() {
+      _isPanelFullscreen = !_isPanelFullscreen;
+    });
+  }
+
   void _closePanel() {
     final closingTag = _panelTag;
     setState(() {
       _panelContent = null;
       _panelTag = null;
+      _isPanelFullscreen = false;
     });
     if (closingTag == 'issues') _loadIssueCount();
     if (closingTag == 'social') _loadUnreadChatCount();
@@ -448,6 +469,7 @@ class _MyHomePageState extends State<MyHomePage>
     final unreadGroupInviteCount =
         context.watch<NotificationProvider>().unreadGroupInviteCount;
     final isOwnerType = userType == 'FacilityOwner' || userType == 'PublicBody';
+    final isAdmin = userType == 'Admin';
     if (_isDesktopLike) {
       final cs = Theme.of(context).colorScheme;
 
@@ -518,7 +540,8 @@ class _MyHomePageState extends State<MyHomePage>
       }
 
       final screenWidth = MediaQuery.of(context).size.width;
-      final panelWidth = (screenWidth - 224).clamp(0.0, 560.0);
+      final maxPanelWidth = screenWidth - 224 - 16;
+      final panelWidth = _isPanelFullscreen ? maxPanelWidth : maxPanelWidth.clamp(0.0, 560.0);
 
       return Scaffold(
         body: SafeArea(
@@ -556,6 +579,15 @@ class _MyHomePageState extends State<MyHomePage>
                                   Row(
                                     mainAxisAlignment: MainAxisAlignment.end,
                                     children: [
+                                      IconButton(
+                                        icon: Icon(_isPanelFullscreen ? Icons.fullscreen_exit : Icons.fullscreen, size: 18),
+                                        style: IconButton.styleFrom(
+                                          foregroundColor: cs.onSurfaceVariant,
+                                          minimumSize: const Size(40, 40),
+                                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                        ),
+                                        onPressed: _togglePanelFullscreen,
+                                      ),
                                       IconButton(
                                         icon: const Icon(Icons.close, size: 18),
                                         style: IconButton.styleFrom(
@@ -614,21 +646,23 @@ class _MyHomePageState extends State<MyHomePage>
                                 selected: _panelTag == 'search',
                                 t: t,
                               ),
-                              navBtn(
-                                icon: Icons.event,
-                                label: 'Events',
-                                onTap: _openEvents,
-                                selected: _panelTag == 'events',
-                                t: t,
-                              ),
-                              navBtn(
-                                icon: Icons.leaderboard_outlined,
-                                label: 'Rank',
-                                onTap: _openGlobalLeaderboard,
-                                selected: _panelTag == 'leaderboard',
-                                t: t,
-                              ),
-                              if (!isOwnerType)
+                              if (!isAdmin) ...[
+                                navBtn(
+                                  icon: Icons.event,
+                                  label: 'Events',
+                                  onTap: _openEvents,
+                                  selected: _panelTag == 'events',
+                                  t: t,
+                                ),
+                                navBtn(
+                                  icon: Icons.leaderboard_outlined,
+                                  label: 'Rank',
+                                  onTap: _openGlobalLeaderboard,
+                                  selected: _panelTag == 'leaderboard',
+                                  t: t,
+                                ),
+                              ],
+                              if (!isOwnerType && !isAdmin)
                                 navBtn(
                                   icon: Icons.edit_calendar_outlined,
                                   label: 'Log climb',
@@ -647,7 +681,7 @@ class _MyHomePageState extends State<MyHomePage>
                                       : null,
                                   t: t,
                                 ),
-                              if (!isOwnerType)
+                              if (!isOwnerType && !isAdmin)
                                 navBtn(
                                   icon: Icons.people_outlined,
                                   label: 'Social',
@@ -677,18 +711,38 @@ class _MyHomePageState extends State<MyHomePage>
                                   ),
                                   t: t,
                                 ),
-                              navBtn(
-                                icon: isAuthenticated
-                                    ? Icons.person_outline
-                                    : Icons.login,
-                                label: isAuthenticated ? 'Me' : 'Login',
-                                onTap: _openAccountPage,
-                                selected: _panelTag == 'account',
-                                customIcon: isAuthenticated
-                                    ? _buildAvatarWidget(radius: 12)
-                                    : null,
-                                t: t,
-                              ),
+                              if (userType == 'Admin')
+                                navBtn(
+                                  icon: Icons.admin_panel_settings_outlined,
+                                  label: 'Admin',
+                                  onTap: _openAdminPage,
+                                  selected: _panelTag == 'admin',
+                                  t: t,
+                                ),
+                              if (isAdmin)
+                                navBtn(
+                                  icon: Icons.logout,
+                                  label: 'Logout',
+                                  onTap: () async {
+                                    await AuthService().logout();
+                                    _closePanel();
+                                  },
+                                  selected: false,
+                                  t: t,
+                                )
+                              else
+                                navBtn(
+                                  icon: isAuthenticated
+                                      ? Icons.person_outline
+                                      : Icons.login,
+                                  label: isAuthenticated ? 'Me' : 'Login',
+                                  onTap: _openAccountPage,
+                                  selected: _panelTag == 'account',
+                                  customIcon: isAuthenticated
+                                      ? _buildAvatarWidget(radius: 12)
+                                      : null,
+                                  t: t,
+                                ),
                               const SizedBox(height: 8),
                             ],
                           ),
@@ -730,13 +784,14 @@ class _MyHomePageState extends State<MyHomePage>
                   label: 'Search',
                   onTap: _openWallSearch,
                 ),
-                _NavItem(
-                  tooltip: 'Global Rankings',
-                  icon: Icons.leaderboard_outlined,
-                  label: 'Rank',
-                  onTap: _openGlobalLeaderboard,
-                ),
-                if (!isOwnerType)
+                if (!isAdmin)
+                  _NavItem(
+                    tooltip: 'Global Rankings',
+                    icon: Icons.leaderboard_outlined,
+                    label: 'Rank',
+                    onTap: _openGlobalLeaderboard,
+                  ),
+                if (!isOwnerType && !isAdmin)
                   _NavItem(
                     tooltip: 'Log session',
                     icon: Icons.edit_calendar_outlined,
@@ -744,7 +799,7 @@ class _MyHomePageState extends State<MyHomePage>
                     hint: isAuthenticated ? null : 'Login',
                     onTap: _openLogSessionSheet,
                   ),
-                if (!isOwnerType)
+                if (!isOwnerType && !isAdmin)
                   _NavItem(
                     tooltip: 'Social',
                     icon: Icons.people_outlined,
@@ -770,13 +825,30 @@ class _MyHomePageState extends State<MyHomePage>
                       child: const Icon(Icons.warning_outlined),
                     ),
                   ),
-                _NavItem(
-                  tooltip: isAuthenticated ? 'Account' : 'Login',
-                  icon: isAuthenticated ? Icons.person_outline : Icons.login,
-                  label: isAuthenticated ? 'Me' : 'Login',
-                  onPressed: _openAccountPage,
-                  customIcon: isAuthenticated ? _buildAvatarWidget() : null,
-                ),
+                  if (userType == 'Admin')
+                    _NavItem(
+                      tooltip: 'Admin Dashboard',
+                      icon: Icons.admin_panel_settings_outlined,
+                      label: 'Admin',
+                      onTap: _openAdminPage,
+                    ),
+                if (isAdmin)
+                  _NavItem(
+                    tooltip: 'Logout',
+                    icon: Icons.logout,
+                    label: 'Logout',
+                    onTap: () async {
+                      await AuthService().logout();
+                    },
+                  )
+                else
+                  _NavItem(
+                    tooltip: isAuthenticated ? 'Account' : 'Login',
+                    icon: isAuthenticated ? Icons.person_outline : Icons.login,
+                    label: isAuthenticated ? 'Me' : 'Login',
+                    onPressed: _openAccountPage,
+                    customIcon: isAuthenticated ? _buildAvatarWidget() : null,
+                  ),
               ],
             ),
           ),

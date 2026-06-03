@@ -32,9 +32,19 @@ exports.createWall = async (wallData, userId, userType) => {
         await PublicBody.findByIdAndUpdate(userId, {
             $push: { walls: wall._id },
         });
+    } else if (userType === "Admin") {
+        if (!wallData.publicBody) {
+            const error = new Error("Admin must specify a publicBody when creating a wall.");
+            error.statusCode = 400;
+            throw error;
+        }
+        wall = await OutdoorWall.create({ ...wallData, publicBody: wallData.publicBody });
+        await PublicBody.findByIdAndUpdate(wallData.publicBody, {
+            $push: { walls: wall._id },
+        });
     } else {
         const error = new Error(
-            "Only Facilities and Public Bodies can create walls.",
+            "Only Facilities, Public Bodies, and Admins can create walls.",
         );
         error.statusCode = 403;
         throw error;
@@ -50,7 +60,9 @@ exports.updateWall = async (id, updates, userId, userType) => {
         throw error;
     }
 
-    if (userType === "FacilityOwner") {
+    if (userType === "Admin") {
+        // Admins bypass ownership checks
+    } else if (userType === "FacilityOwner") {
         const facility = await Facility.findOne({ ownerAccount: userId });
         if (!facility || wall.facility?.toString() !== facility._id.toString()) {
             const error = new Error("You do not have permission to update this wall");
@@ -64,7 +76,7 @@ exports.updateWall = async (id, updates, userId, userType) => {
             throw error;
         }
     } else {
-        const error = new Error("Only Facilities and Public Bodies can update walls.");
+        const error = new Error("Only Facilities, Public Bodies, and Admins can update walls.");
         error.statusCode = 403;
         throw error;
     }
@@ -74,7 +86,41 @@ exports.updateWall = async (id, updates, userId, userType) => {
         Object.entries(updates).filter(([key]) => allowed.includes(key)),
     );
 
-    return Wall.findByIdAndUpdate(id, { $set: safeUpdates }, { new: true, runValidators: true });
+    let changedFields = {};
+    if (userType === "Admin") {
+        for (const [key, val] of Object.entries(safeUpdates)) {
+            if (JSON.stringify(wall[key]) !== JSON.stringify(val)) {
+                changedFields[key] = { old: wall[key], new: val };
+            }
+        }
+    }
+
+    const updatedWall = await Wall.findByIdAndUpdate(id, { $set: safeUpdates }, { new: true, runValidators: true });
+
+    if (userType === "Admin" && Object.keys(changedFields).length > 0) {
+        const Notification = mongoose.model("Notification");
+        let recipientId;
+        if (wall.wallType === "IndoorWall") {
+            const facility = await Facility.findById(wall.facility);
+            if (facility) recipientId = facility.ownerAccount;
+        } else {
+            recipientId = wall.publicBody;
+        }
+        
+        if (recipientId) {
+            await Notification.create({
+                recipient: recipientId,
+                type: "wall_updated_by_admin",
+                payload: {
+                    wallId: wall._id,
+                    wallName: wall.name,
+                    changes: changedFields
+                }
+            });
+        }
+    }
+
+    return updatedWall;
 };
 
 exports.getAllWalls = async () => {
@@ -184,7 +230,16 @@ exports.deleteWall = async (id, userId, userType) => {
         throw error;
     }
 
-    if (userType === "FacilityOwner") {
+    if (userType === "Admin") {
+        if (wall.wallType !== "OutdoorWall") {
+            const error = new Error("Admins can only delete OutdoorWalls.");
+            error.statusCode = 403;
+            throw error;
+        }
+        if (wall.publicBody) {
+            await PublicBody.findByIdAndUpdate(wall.publicBody, { $pull: { walls: wall._id } });
+        }
+    } else if (userType === "FacilityOwner") {
         const facility = await Facility.findOne({ ownerAccount: userId });
         if (!facility || wall.facility?.toString() !== facility._id.toString()) {
             const error = new Error("You do not have permission to delete this wall");
@@ -199,6 +254,10 @@ exports.deleteWall = async (id, userId, userType) => {
             throw error;
         }
         await PublicBody.findByIdAndUpdate(userId, { $pull: { walls: wall._id } });
+    } else {
+        const error = new Error("Unauthorized to delete wall.");
+        error.statusCode = 403;
+        throw error;
     }
 
     await wall.deleteOne();

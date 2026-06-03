@@ -23,3 +23,13 @@ exports.getReviewsByUser = async (req, res, next) => {
         next(err);
     }
 };
+
+exports.flagReview = async (req, res, next) => {
+    try {
+        const { flagReason } = req.body;
+        await reviewService.flagReview(req.params.reviewId, req.user.id, flagReason);
+        res.status(200).json({ message: "Review flagged successfully" });
+    } catch (err) {
+        next(err);
+    }
+};
