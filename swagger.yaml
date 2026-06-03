@@ -1,120 +1,3997 @@
-swagger: '2.0'
+swagger: "2.0"
 info:
-  version: '1.0'
-  title: "hookd"
-  description: Polls is a simple API allowing consumers to view polls and vote in them.
-  license:
-    name: MIT
-    url: https://github.com/apiaryio/polls-api/blob/master/LICENSE
-host: polls.apiblueprint.org
+    version: "1.0.0"
+    title: Hookd API
+    description: >-
+        The official API documentation for Hookd Climbing App. Includes authentication,
+        wall management, climbing sessions, issues, user profiles, reviews, facilities,
+        points of interest, reports, groups, events, notifications, conversations, and admin.
+    license:
+        name: MIT
+
 basePath: /
+
 schemes:
-- https
-consumes:
-- application/json
-produces:
-- application/json
+    - https
+    - http
+
+securityDefinitions:
+    BearerAuth:
+        type: apiKey
+        name: Authorization
+        in: header
+        description: Enter your JWT token in the format **Bearer <token>**
+
 paths:
-  /questions:
-    x-summary: Questions Collection
-    get:
-      summary: List All Questions
-      responses:
-        200:
-          description: Successful Response
-          schema:
-            type: array
-            items:
-              $ref: '#/definitions/Question'
-          examples:
-            application/json:
-              - question: Favourite programming language?
-                published_at: '2015-08-05T08:40:51.620Z'
-                choices:
-                  - choice: Swift
-                    votes: 2048
-                  - choice: Python
-                    votes: 1024
-                  - choice: Objective-C
-                    votes: 512
-                  - choice: Ruby
-                    votes: 256
-    post:
-      description: >-
-        You may create your own question using this action. It takes a JSON
-        object containing a question and a collection of answers in the
-        form of choices.
-      summary: Create a New Question
-      parameters:
-        - name: body
-          in: body
-          required: true
-          schema:
-            $ref: '#/definitions/QuestionRequest'
-      responses:
-        201:
-          description: ''
-          schema:
-            $ref: '#/definitions/Question'
-          examples:
-            application/json:
-                question: Favourite programming language?
-                published_at: '2015-08-05T08:40:51.620Z'
-                choices:
-                  - choice: Swift
-                    votes: 0
-                  - choice: Python
-                    votes: 0
-                  - choice: Objective-C
-                    votes: 0
-                  - choice: Ruby
-                    votes: 0
+    # ================= AUTHENTICATION =================
+    /auth/register:
+        post:
+            tags:
+                - Authentication
+            summary: Register a new user
+            description: Creates a new user account (Climber, Facility, or PublicBody).
+            parameters:
+                - in: body
+                  name: body
+                  required: true
+                  schema:
+                      type: object
+                      required:
+                          - email
+                          - username
+                          - password
+                      properties:
+                          email:
+                              type: string
+                              example: climber@hookd.com
+                          username:
+                              type: string
+                              example: hookd_user
+                          password:
+                              type: string
+                              example: secretpassword
+                          userType:
+                              type: string
+                              enum: [Climber, Facility, PublicBody]
+                              default: Climber
+                          name:
+                              type: string
+                          surname:
+                              type: string
+                          birthdate:
+                              type: string
+                              format: date
+            responses:
+                201:
+                    description: User successfully created
+                400:
+                    description: Missing or invalid fields
+                409:
+                    description: User already exists with that email
+
+    /auth/login:
+        post:
+            tags:
+                - Authentication
+            summary: User Login
+            description: Authenticates a user using email and password, returning JWT tokens.
+            parameters:
+                - in: body
+                  name: body
+                  required: true
+                  schema:
+                      type: object
+                      required:
+                          - email
+                          - password
+                      properties:
+                          email:
+                              type: string
+                              example: climber@hookd.com
+                          password:
+                              type: string
+                              example: secretpassword
+            responses:
+                200:
+                    description: Successful authentication
+                    schema:
+                        $ref: "#/definitions/AuthResponse"
+                400:
+                    description: Missing fields
+                401:
+                    description: Invalid credentials
+
+    /auth/refresh:
+        post:
+            tags:
+                - Authentication
+            summary: Refresh Access Token
+            description: Exchanges a valid refresh token for a new access token and refresh token pair.
+            parameters:
+                - in: body
+                  name: body
+                  required: true
+                  schema:
+                      type: object
+                      required:
+                          - refreshToken
+                      properties:
+                          refreshToken:
+                              type: string
+            responses:
+                200:
+                    description: Tokens successfully refreshed
+                    schema:
+                        $ref: "#/definitions/AuthResponse"
+                400:
+                    description: Refresh token is required
+                401:
+                    description: Refresh token revoked or expired
+
+    /auth/logout:
+        post:
+            tags:
+                - Authentication
+            summary: Logout
+            description: Revokes the submitted refresh token.
+            parameters:
+                - in: body
+                  name: body
+                  required: true
+                  schema:
+                      type: object
+                      required:
+                          - refreshToken
+                      properties:
+                          refreshToken:
+                              type: string
+            responses:
+                200:
+                    description: Logged out successfully
+                400:
+                    description: Invalid request
+
+    /auth/me:
+        get:
+            tags:
+                - Authentication
+            summary: Get authenticated user from token
+            description: Returns the authenticated user derived from the JWT access token.
+            security:
+                - BearerAuth: []
+            responses:
+                200:
+                    description: Authenticated user profile
+                    schema:
+                        $ref: "#/definitions/UserProfile"
+                401:
+                    description: Unauthorized
+
+    /auth/google:
+        post:
+            tags:
+                - Authentication
+            summary: Google login
+            description: Authenticates a user using a Firebase ID token.
+            parameters:
+                - in: body
+                  name: body
+                  required: true
+                  schema:
+                      type: object
+                      required:
+                          - idToken
+                      properties:
+                          idToken:
+                              type: string
+            responses:
+                200:
+                    description: Google login successful
+                    schema:
+                        $ref: "#/definitions/AuthResponse"
+                400:
+                    description: Firebase ID token is required
+                401:
+                    description: Invalid Firebase ID token
+
+    # ================= USERS =================
+    /users/me:
+        get:
+            tags:
+                - Users
+            summary: Get current logged-in user
+            description: Returns the full profile of the currently authenticated user.
+            security:
+                - BearerAuth: []
+            responses:
+                200:
+                    description: Full user profile returned.
+                    schema:
+                        $ref: "#/definitions/UserProfile"
+                401:
+                    description: Unauthorized.
+                404:
+                    description: User not found.
+        patch:
+            tags:
+                - Users
+            summary: Update current user profile
+            description: Updates the authenticated user's profile fields.
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: body
+                  name: body
+                  required: true
+                  schema:
+                      type: object
+                      properties:
+                          username:
+                              type: string
+                          avatar:
+                              type: string
+                          name:
+                              type: string
+                          surname:
+                              type: string
+                          bio:
+                              type: string
+                          description:
+                              type: string
+                          location:
+                              type: object
+                              properties:
+                                  type:
+                                      type: string
+                                      enum: [Point]
+                                  coordinates:
+                                      type: array
+                                      items:
+                                          type: number
+                                  address:
+                                      type: string
+            responses:
+                200:
+                    description: Profile updated successfully
+                    schema:
+                        $ref: "#/definitions/UserProfile"
+                400:
+                    description: Validation error
+                401:
+                    description: Unauthorized
+
+    /users/fcm-token:
+        post:
+            tags:
+                - Users
+            summary: Register FCM push token
+            description: Registers a Firebase Cloud Messaging token for push notifications.
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: body
+                  name: body
+                  required: true
+                  schema:
+                      type: object
+                      required:
+                          - token
+                      properties:
+                          token:
+                              type: string
+            responses:
+                200:
+                    description: FCM token registered
+                400:
+                    description: Token is required
+                401:
+                    description: Unauthorized
+
+    /users/{id}:
+        get:
+            tags:
+                - Users
+            summary: Get public user profile
+            description: Returns limited public information for a specific user.
+            parameters:
+                - in: path
+                  name: id
+                  required: true
+                  type: string
+                  description: The 24-character MongoDB ObjectId of the user.
+            responses:
+                200:
+                    description: Public profile data.
+                    schema:
+                        $ref: "#/definitions/PublicUser"
+                400:
+                    description: Invalid user ID.
+                404:
+                    description: User not found.
+
+    # ================= CLIMBERS =================
+    /climbers/leaderboard:
+        get:
+            tags:
+                - Climbers
+            summary: Get the global gym leaderboard
+            description: Returns a gamified ranking of all climbers based on their total ascents across all walls.
+            parameters:
+                - in: query
+                  name: limit
+                  type: integer
+                  default: 50
+                  description: Maximum number of climbers to return
+            responses:
+                200:
+                    description: A successfully generated global leaderboard.
+                    schema:
+                        type: array
+                        items:
+                            $ref: "#/definitions/LeaderboardEntry"
+
+    /climbers/search:
+        get:
+            tags:
+                - Climbers
+            summary: Search climbers by username
+            description: Returns climbers whose username matches the query (minimum 2 characters).
+            parameters:
+                - in: query
+                  name: q
+                  required: true
+                  type: string
+                  description: Username search query (min 2 chars)
+            responses:
+                200:
+                    description: List of matching climbers
+                    schema:
+                        type: object
+                        properties:
+                            users:
+                                type: array
+                                items:
+                                    $ref: "#/definitions/PublicUser"
+                400:
+                    description: Query must be at least 2 characters
+
+    /climbers/{id}/badges:
+        post:
+            tags:
+                - Climbers
+            summary: Award a badge to a climber
+            description: Awards a badge to the specified climber. Only FacilityOwner or PublicBody can call this.
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: id
+                  required: true
+                  type: string
+                  description: MongoDB ObjectId of the climber
+                - in: body
+                  name: body
+                  required: true
+                  schema:
+                      type: object
+                      required:
+                          - badgeId
+                      properties:
+                          badgeId:
+                              type: string
+                              description: MongoDB ObjectId of the badge to award
+            responses:
+                200:
+                    description: Badge awarded successfully
+                400:
+                    description: Invalid badgeId
+                401:
+                    description: Unauthorized
+                403:
+                    description: Only FacilityOwner or PublicBody can award badges
+                404:
+                    description: Climber or badge not found
+
+    # ================= BADGES =================
+    /badges:
+        post:
+            tags:
+                - Badges
+            summary: Create a new badge
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: body
+                  name: body
+                  required: true
+                  schema:
+                      $ref: "#/definitions/BadgeInput"
+            responses:
+                201:
+                    description: Badge created
+                    schema:
+                        $ref: "#/definitions/BadgeOutput"
+                400:
+                    description: Validation error
+                401:
+                    description: Unauthorized
+        get:
+            tags:
+                - Badges
+            summary: List badges
+            description: Returns all badges. Supports optional query filters (e.g. ?type=system or ?score=50).
+            parameters:
+                - in: query
+                  name: type
+                  type: string
+                  description: Filter by badge type (e.g. system, custom)
+                - in: query
+                  name: score
+                  type: integer
+                  description: Filter by badge score
+            responses:
+                200:
+                    description: List of badges
+                    schema:
+                        type: array
+                        items:
+                            $ref: "#/definitions/BadgeOutput"
+
+    /badges/{id}:
+        get:
+            tags:
+                - Badges
+            summary: Get badge by ID
+            parameters:
+                - in: path
+                  name: id
+                  required: true
+                  type: string
+            responses:
+                200:
+                    description: Badge details
+                    schema:
+                        $ref: "#/definitions/BadgeOutput"
+                404:
+                    description: Badge not found
+        put:
+            tags:
+                - Badges
+            summary: Update a badge
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: id
+                  required: true
+                  type: string
+                - in: body
+                  name: body
+                  required: true
+                  schema:
+                      $ref: "#/definitions/BadgeInput"
+            responses:
+                200:
+                    description: Badge updated
+                    schema:
+                        $ref: "#/definitions/BadgeOutput"
+                401:
+                    description: Unauthorized
+                404:
+                    description: Badge not found
+        delete:
+            tags:
+                - Badges
+            summary: Delete a badge
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: id
+                  required: true
+                  type: string
+            responses:
+                204:
+                    description: Badge deleted
+                401:
+                    description: Unauthorized
+                404:
+                    description: Badge not found
+
+    # ================= FACILITIES =================
+    /facilities/search:
+        get:
+            tags:
+                - Facilities
+            summary: Search unclaimed facilities
+            description: Returns unclaimed facilities matching the search query (minimum 2 characters).
+            parameters:
+                - in: query
+                  name: q
+                  required: true
+                  type: string
+                  description: Search query for facility name
+            responses:
+                200:
+                    description: List of matching unclaimed facilities
+                    schema:
+                        type: array
+                        items:
+                            $ref: "#/definitions/FacilityOutput"
+                400:
+                    description: Query must be at least 2 characters
+
+    /facilities/{id}/claim:
+        post:
+            tags:
+                - Facilities
+            summary: Claim a facility
+            description: Links an unclaimed facility to the authenticated FacilityOwner account.
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: id
+                  required: true
+                  type: string
+                  description: The 24-character MongoDB ObjectId of the facility to claim.
+            responses:
+                200:
+                    description: Facility claimed successfully
+                    schema:
+                        type: object
+                        properties:
+                            message:
+                                type: string
+                            facility:
+                                $ref: "#/definitions/FacilityOutput"
+                401:
+                    description: Unauthorized
+                403:
+                    description: Only FacilityOwner accounts can claim facilities
+                404:
+                    description: Facility not found
+                409:
+                    description: Facility already has an owner
+
+    /facilities/{id}:
+        put:
+            tags:
+                - Facilities
+            summary: Update a facility
+            description: Updates facility details. Only the owner can update their facility.
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: id
+                  required: true
+                  type: string
+                  description: The 24-character MongoDB ObjectId of the facility.
+                - in: body
+                  name: body
+                  required: true
+                  schema:
+                      $ref: "#/definitions/FacilityInput"
+            responses:
+                200:
+                    description: Facility updated successfully
+                    schema:
+                        type: object
+                        properties:
+                            message:
+                                type: string
+                            facility:
+                                $ref: "#/definitions/FacilityOutput"
+                401:
+                    description: Unauthorized
+                403:
+                    description: You are not the owner of this facility
+                404:
+                    description: Facility not found
+                400:
+                    description: Validation error
+
+    /facilities/{id}/unpair:
+        post:
+            tags:
+                - Facilities
+            summary: Unpair facility from owner
+            description: Removes the link between a FacilityOwner and their facility.
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: id
+                  required: true
+                  type: string
+                  description: The 24-character MongoDB ObjectId of the facility to unpair.
+            responses:
+                200:
+                    description: Facility unpaired successfully
+                    schema:
+                        type: object
+                        properties:
+                            message:
+                                type: string
+                            facility:
+                                $ref: "#/definitions/FacilityOutput"
+                401:
+                    description: Unauthorized
+                403:
+                    description: You are not the owner of this facility
+                404:
+                    description: Facility not found
+
+    # ================= WALLS =================
+    /walls:
+        get:
+            tags:
+                - Walls
+            summary: Get all walls
+            description: Returns all walls, including indoor and outdoor entries.
+            responses:
+                200:
+                    description: A list of walls.
+                    schema:
+                        type: array
+                        items:
+                            $ref: "#/definitions/WallOutput"
+        post:
+            tags:
+                - Walls
+            summary: Create a new wall
+            security:
+                - BearerAuth: []
+            description: Creates a new wall for the authenticated Facility or PublicBody.
+            parameters:
+                - in: body
+                  name: body
+                  required: true
+                  schema:
+                      $ref: "#/definitions/WallInput"
+            responses:
+                201:
+                    description: Wall created successfully
+                    schema:
+                        type: object
+                        properties:
+                            message:
+                                type: string
+                            wall:
+                                $ref: "#/definitions/WallOutput"
+                400:
+                    description: Validation error or missing fields.
+                401:
+                    description: Unauthorized.
+                403:
+                    description: User is not allowed to create walls.
+
+    /walls/owned:
+        get:
+            tags:
+                - Walls
+            summary: Get owned walls
+            description: Returns walls owned by the authenticated Facility or PublicBody.
+            security:
+                - BearerAuth: []
+            responses:
+                200:
+                    description: List of owned walls
+                    schema:
+                        type: array
+                        items:
+                            $ref: "#/definitions/WallOutput"
+                401:
+                    description: Unauthorized
+                403:
+                    description: Only Facility or PublicBody can access owned walls
+
+    /walls/search:
+        get:
+            tags:
+                - Walls
+            summary: Search walls
+            description: Returns walls whose name contains the provided query text.
+            parameters:
+                - in: query
+                  name: q
+                  required: true
+                  type: string
+                  description: Search keyword
+            responses:
+                200:
+                    description: Matching walls.
+                    schema:
+                        type: array
+                        items:
+                            $ref: "#/definitions/WallOutput"
+                400:
+                    description: Missing or invalid search query.
+
+    /walls/nearby:
+        get:
+            tags:
+                - Walls
+            summary: Find nearby walls
+            description: Returns walls within the requested radius from the provided longitude and latitude.
+            parameters:
+                - in: query
+                  name: lng
+                  required: true
+                  type: number
+                  description: Longitude of the search point
+                - in: query
+                  name: lat
+                  required: true
+                  type: number
+                  description: Latitude of the search point
+                - in: query
+                  name: radius
+                  type: integer
+                  default: 10000
+                  description: Radius in meters
+            responses:
+                200:
+                    description: Nearby walls.
+                    schema:
+                        type: array
+                        items:
+                            $ref: "#/definitions/WallOutput"
+                400:
+                    description: Missing or invalid lng/lat parameters.
+
+    /walls/{id}:
+        get:
+            tags:
+                - Walls
+            summary: Get wall by ID
+            description: Returns the wall details for a specific wall.
+            parameters:
+                - in: path
+                  name: id
+                  required: true
+                  type: string
+                  description: The 24-character MongoDB ObjectId of the wall.
+            responses:
+                200:
+                    description: Wall details returned.
+                    schema:
+                        $ref: "#/definitions/WallOutput"
+                404:
+                    description: Wall not found.
+        put:
+            tags:
+                - Walls
+            summary: Update a wall
+            description: Updates a wall owned by the authenticated Facility or PublicBody.
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: id
+                  required: true
+                  type: string
+                  description: The 24-character MongoDB ObjectId of the wall.
+                - in: body
+                  name: body
+                  required: true
+                  schema:
+                      $ref: "#/definitions/WallInput"
+            responses:
+                200:
+                    description: Wall updated successfully
+                    schema:
+                        type: object
+                        properties:
+                            message:
+                                type: string
+                            wall:
+                                $ref: "#/definitions/WallOutput"
+                401:
+                    description: Unauthorized
+                403:
+                    description: Forbidden. User is not the owner of this wall.
+                404:
+                    description: Wall not found
+        delete:
+            tags:
+                - Walls
+            summary: Delete a wall
+            description: Deletes a wall owned by the authenticated Facility or PublicBody.
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: id
+                  required: true
+                  type: string
+                  description: The 24-character MongoDB ObjectId of the wall.
+            responses:
+                200:
+                    description: Wall deleted successfully.
+                401:
+                    description: Unauthorized.
+                403:
+                    description: Forbidden. User is not the owner of this wall.
+                404:
+                    description: Wall not found.
+
+    /walls/{id}/leaderboard:
+        get:
+            tags:
+                - Walls
+            summary: Get a wall-specific leaderboard
+            parameters:
+                - in: path
+                  name: id
+                  required: true
+                  type: string
+                - in: query
+                  name: limit
+                  type: integer
+                  default: 50
+                  description: Maximum number of leaderboard entries to return
+                - in: query
+                  name: offset
+                  type: integer
+                  default: 0
+                  description: 0 for current season, negative values for historical seasons
+            responses:
+                200:
+                    description: Seasonal leaderboard.
+                    schema:
+                        $ref: "#/definitions/WallLeaderboardResponse"
+                400:
+                    description: Invalid pagination values.
+                404:
+                    description: Wall not found.
+
+    # ================= POIS =================
+    /pois:
+        get:
+            tags:
+                - Points of Interest
+            summary: Get all POIs
+            description: Returns all points of interest.
+            responses:
+                200:
+                    description: A list of all POIs
+                    schema:
+                        type: array
+                        items:
+                            $ref: "#/definitions/POIOutput"
+
+    /pois/search:
+        get:
+            tags:
+                - Points of Interest
+            summary: Search POIs
+            description: Returns POIs matching the search query.
+            parameters:
+                - in: query
+                  name: q
+                  required: true
+                  type: string
+                  description: Search keyword
+            responses:
+                200:
+                    description: Matching POIs
+                    schema:
+                        type: array
+                        items:
+                            $ref: "#/definitions/POIOutput"
+                400:
+                    description: Missing search query
+
+    /pois/nearby:
+        get:
+            tags:
+                - Points of Interest
+            summary: Find nearby POIs
+            description: Returns POIs within the requested radius from the provided coordinates.
+            parameters:
+                - in: query
+                  name: lng
+                  required: true
+                  type: number
+                  description: Longitude of the search point
+                - in: query
+                  name: lat
+                  required: true
+                  type: number
+                  description: Latitude of the search point
+                - in: query
+                  name: radius
+                  type: integer
+                  default: 10000
+                  description: Radius in meters
+            responses:
+                200:
+                    description: Nearby POIs
+                    schema:
+                        type: array
+                        items:
+                            $ref: "#/definitions/POIOutput"
+                400:
+                    description: Missing or invalid lng/lat parameters
+
+    # ================= REPORTS =================
+    /reports/wall/{wallId}:
+        get:
+            tags:
+                - Reports
+            summary: Get wall report
+            description: Retrieves live dynamic data for a specific wall.
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: wallId
+                  required: true
+                  type: string
+                  description: The 24-character MongoDB ObjectId of the wall.
+            responses:
+                200:
+                    description: Wall report data
+                    schema:
+                        $ref: "#/definitions/ReportOutput"
+                401:
+                    description: Unauthorized
+                403:
+                    description: Only FacilityOwner or PublicBody can access reports
+                404:
+                    description: Wall not found
+
+    /reports/wall/{wallId}/save:
+        post:
+            tags:
+                - Reports
+            summary: Save report snapshot
+            description: Generates and saves a snapshot of wall data.
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: wallId
+                  required: true
+                  type: string
+                  description: The 24-character MongoDB ObjectId of the wall.
+            responses:
+                201:
+                    description: Report saved successfully
+                    schema:
+                        $ref: "#/definitions/ReportOutput"
+                401:
+                    description: Unauthorized
+                403:
+                    description: Only FacilityOwner or PublicBody can save reports
+                404:
+                    description: Wall not found
+
+    /reports/walls/save:
+        post:
+            tags:
+                - Reports
+            summary: Save group report snapshot
+            description: Generates and saves a combined snapshot across multiple walls.
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: body
+                  name: body
+                  required: true
+                  schema:
+                      type: object
+                      required:
+                          - wallIds
+                      properties:
+                          wallIds:
+                              type: array
+                              items:
+                                  type: string
+                              description: Array of MongoDB ObjectIds of the walls
+            responses:
+                201:
+                    description: Group report saved successfully
+                    schema:
+                        $ref: "#/definitions/ReportOutput"
+                400:
+                    description: wallIds is required
+                401:
+                    description: Unauthorized
+                403:
+                    description: Only FacilityOwner or PublicBody can save reports
+
+    /reports/stats/area-time:
+        get:
+            tags:
+                - Reports
+            summary: Get statistics by area and time
+            description: Returns aggregated session statistics grouped by area and time period.
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: query
+                  name: wallId
+                  type: string
+                  description: Filter by specific wall ObjectId
+                - in: query
+                  name: period
+                  type: string
+                  description: Time period for aggregation (e.g. week, month)
+            responses:
+                200:
+                    description: Aggregated statistics
+                    schema:
+                        type: object
+                401:
+                    description: Unauthorized
+                403:
+                    description: Only FacilityOwner or PublicBody can access statistics
+
+    /reports/saved:
+        get:
+            tags:
+                - Reports
+            summary: List saved reports
+            description: Returns a lightweight list of all saved reports.
+            security:
+                - BearerAuth: []
+            responses:
+                200:
+                    description: List of saved reports
+                    schema:
+                        type: array
+                        items:
+                            $ref: "#/definitions/ReportOutput"
+                401:
+                    description: Unauthorized
+                403:
+                    description: Only FacilityOwner or PublicBody can access saved reports
+
+    /reports/saved/{id}:
+        get:
+            tags:
+                - Reports
+            summary: Get a specific saved report
+            description: Returns a specific saved report with full data.
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: id
+                  required: true
+                  type: string
+                  description: The 24-character MongoDB ObjectId of the saved report.
+            responses:
+                200:
+                    description: Saved report details
+                    schema:
+                        $ref: "#/definitions/ReportOutput"
+                401:
+                    description: Unauthorized
+                403:
+                    description: Only FacilityOwner or PublicBody can access saved reports
+                404:
+                    description: Report not found
+        delete:
+            tags:
+                - Reports
+            summary: Delete a saved report
+            description: Permanently deletes a saved report.
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: id
+                  required: true
+                  type: string
+                  description: The 24-character MongoDB ObjectId of the saved report.
+            responses:
+                200:
+                    description: Report deleted successfully
+                401:
+                    description: Unauthorized
+                403:
+                    description: Only FacilityOwner or PublicBody can delete saved reports
+                404:
+                    description: Report not found
+
+    /reports/saved/{id}/export:
+        get:
+            tags:
+                - Reports
+            summary: Export saved report as CSV
+            description: Downloads the saved report as a CSV file.
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: id
+                  required: true
+                  type: string
+                  description: The 24-character MongoDB ObjectId of the saved report.
+            produces:
+                - text/csv
+            responses:
+                200:
+                    description: CSV file download
+                401:
+                    description: Unauthorized
+                403:
+                    description: Only FacilityOwner or PublicBody can export reports
+                404:
+                    description: Report not found
+
+    # ================= REVIEWS =================
+    /reviews/wall/{wallId}:
+        get:
+            tags:
+                - Reviews
+            summary: Get reviews for a wall
+            description: >-
+                Returns all public reviews for a wall. If authenticated, private
+                reviews belonging to the requester are included.
+            parameters:
+                - in: path
+                  name: wallId
+                  required: true
+                  type: string
+            responses:
+                200:
+                    description: List of filtered reviews.
+                    schema:
+                        type: object
+                        properties:
+                            reviews:
+                                type: array
+                                items:
+                                    $ref: "#/definitions/ReviewOutput"
+
+    /reviews/user/{userId}:
+        get:
+            tags:
+                - Reviews
+            summary: Get reviews by a specific user
+            description: >-
+                Returns public reviews written by a user. If authenticated, the
+                user's own private reviews are included.
+            parameters:
+                - in: path
+                  name: userId
+                  required: true
+                  type: string
+            responses:
+                200:
+                    description: List of filtered reviews.
+                    schema:
+                        type: object
+                        properties:
+                            reviews:
+                                type: array
+                                items:
+                                    $ref: "#/definitions/ReviewOutput"
+
+    /reviews/{reviewId}/flag:
+        post:
+            tags:
+                - Reviews
+            summary: Flag a review
+            description: Flags a review for moderation. Climber only.
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: reviewId
+                  required: true
+                  type: string
+                  description: MongoDB ObjectId of the review to flag
+                - in: body
+                  name: body
+                  schema:
+                      type: object
+                      properties:
+                          reason:
+                              type: string
+                              description: Optional reason for flagging
+            responses:
+                200:
+                    description: Review flagged successfully
+                401:
+                    description: Unauthorized
+                403:
+                    description: Only Climbers can flag reviews
+                404:
+                    description: Review not found
+                409:
+                    description: Review already flagged by this user
+
+    # ================= SESSIONS =================
+    /sessions:
+        get:
+            tags:
+                - Sessions
+            summary: Get logged user's sessions
+            description: >-
+                **Climber only.**
+                Returns all climbing sessions belonging to the currently
+                authenticated climber.
+            security:
+                - BearerAuth: []
+            responses:
+                200:
+                    description: A list of sessions.
+                    schema:
+                        type: object
+                        properties:
+                            sessions:
+                                type: array
+                                items:
+                                    $ref: "#/definitions/SessionOutput"
+                401:
+                    description: Unauthorized.
+                403:
+                    description: Only climbers can view climbing sessions.
+        post:
+            tags:
+                - Sessions
+            summary: Create a new climbing session
+            description: >-
+                **Climber only.**
+                Creates a climbing session and optionally attaches an inline
+                review. If `review` is provided, `review.rating` is mandatory.
+                The response always contains `session`; `review` is present only
+                when an inline review was supplied.
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: body
+                  name: body
+                  required: true
+                  schema:
+                      $ref: "#/definitions/SessionInput"
+            responses:
+                201:
+                    description: Session (and optional review) created successfully.
+                    schema:
+                        type: object
+                        properties:
+                            session:
+                                $ref: "#/definitions/SessionOutput"
+                            review:
+                                $ref: "#/definitions/ReviewOutput"
+                400:
+                    description: Validation error — missing or invalid fields.
+                401:
+                    description: Unauthorized.
+                403:
+                    description: Only climbers can create climbing sessions.
+
+    /sessions/user/{userId}:
+        get:
+            tags:
+                - Sessions
+            summary: Get public sessions for a user
+            description: Returns public (non-private) climbing sessions for a specific user.
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: userId
+                  required: true
+                  type: string
+                  description: MongoDB ObjectId of the climber
+            responses:
+                200:
+                    description: List of public sessions
+                    schema:
+                        type: object
+                        properties:
+                            sessions:
+                                type: array
+                                items:
+                                    $ref: "#/definitions/SessionOutput"
+                400:
+                    description: Invalid userId
+                401:
+                    description: Unauthorized
+                404:
+                    description: User not found
+
+    /sessions/{sessionId}:
+        get:
+            tags:
+                - Sessions
+            summary: Get a specific session by ID
+            description: >-
+                **Climber only.**
+                Returns the session if it exists and belongs to the authenticated
+                user. Returns 403 if the session belongs to a different climber.
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: sessionId
+                  required: true
+                  type: string
+                  description: MongoDB ObjectId of the climbing session.
+            responses:
+                200:
+                    description: Session returned.
+                    schema:
+                        type: object
+                        properties:
+                            session:
+                                $ref: "#/definitions/SessionOutput"
+                400:
+                    description: Invalid sessionId format.
+                401:
+                    description: Unauthorized.
+                403:
+                    description: Only climbers can view climbing sessions.
+                404:
+                    description: Session not found.
+        put:
+            tags:
+                - Sessions
+            summary: Update a climbing session
+            description: >-
+                **Climber only.**
+                Partially updates a session. At least one of `wall_id`, `date`,
+                `time`, or `isSend` must be supplied. Ownership is enforced — only the
+                session's original climber may update it.
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: sessionId
+                  required: true
+                  type: string
+                  description: MongoDB ObjectId of the climbing session.
+                - in: body
+                  name: body
+                  required: true
+                  schema:
+                      $ref: "#/definitions/SessionUpdateInput"
+            responses:
+                200:
+                    description: Session updated successfully.
+                    schema:
+                        type: object
+                        properties:
+                            session:
+                                $ref: "#/definitions/SessionOutput"
+                400:
+                    description: >-
+                        Validation error — no fields provided, or invalid
+                        wall_id / date / time / isSend value.
+                401:
+                    description: Unauthorized.
+                403:
+                    description: Only climbers can update climbing sessions.
+                404:
+                    description: Session not found.
+        delete:
+            tags:
+                - Sessions
+            summary: Delete a climbing session
+            description: >-
+                **Climber only.**
+                Permanently deletes the session and removes its reference from
+                both the Wall and Climber documents. Ownership is enforced.
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: sessionId
+                  required: true
+                  type: string
+                  description: MongoDB ObjectId of the climbing session.
+            responses:
+                204:
+                    description: Session deleted successfully — no content returned.
+                401:
+                    description: Unauthorized.
+                403:
+                    description: Only climbers can delete climbing sessions.
+                404:
+                    description: Session not found.
+
+    /sessions/{sessionId}/reviews:
+        post:
+            tags:
+                - Sessions
+            summary: Add a review to an existing session
+            description: >-
+                **Climber only.**
+                Attaches a review to a session that does not already have one.
+                Returns 409 if a review is already linked (`review_id` is set on
+                the session document).
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: sessionId
+                  required: true
+                  type: string
+                  description: MongoDB ObjectId of the climbing session.
+                - in: body
+                  name: body
+                  required: true
+                  schema:
+                      $ref: "#/definitions/ReviewInput"
+            responses:
+                201:
+                    description: Review added and linked to the session.
+                    schema:
+                        type: object
+                        properties:
+                            session:
+                                $ref: "#/definitions/SessionOutput"
+                            review:
+                                $ref: "#/definitions/ReviewOutput"
+                400:
+                    description: Validation error — rating is missing or not a number.
+                401:
+                    description: Unauthorized.
+                403:
+                    description: Only climbers can add reviews to climbing sessions.
+                404:
+                    description: Session not found.
+                409:
+                    description: Climbing session already has a review.
+
+    # ================= ISSUES =================
+    /issues:
+        post:
+            tags:
+                - Issues
+            summary: Create a new issue on a wall
+            description: >-
+                **Climber only.**
+                Reports an issue (e.g. a damaged hold) on a specific wall.
+                `body` must be a non-empty string of at most 500 characters.
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: body
+                  name: body
+                  required: true
+                  schema:
+                      $ref: "#/definitions/IssueInput"
+            responses:
+                201:
+                    description: Issue created successfully.
+                    schema:
+                        type: object
+                        properties:
+                            issue:
+                                $ref: "#/definitions/IssueOutput"
+                400:
+                    description: >-
+                        Validation error — wall_id or body missing, wall_id is
+                        not a valid ObjectId, body is empty or exceeds 500 chars.
+                401:
+                    description: Unauthorized.
+                403:
+                    description: Only climbers can create issues.
+
+    /issues/my-issues:
+        get:
+            tags:
+                - Issues
+            summary: Get issues relevant to the authenticated user
+            description: >-
+                Returns issues scoped to the caller's `userType`:
+
+                - **Climber** — all issues the climber has personally filed.
+                - **Facility** — all issues across every wall owned by the facility.
+                - **PublicBody** — all issues across every wall owned by the public body.
+            security:
+                - BearerAuth: []
+            responses:
+                200:
+                    description: List of issues for the authenticated user.
+                    schema:
+                        type: object
+                        properties:
+                            issues:
+                                type: array
+                                items:
+                                    $ref: "#/definitions/IssueOutput"
+                400:
+                    description: Invalid user type.
+                401:
+                    description: Unauthorized.
+
+    /issues/walls/{wallId}:
+        get:
+            tags:
+                - Issues
+            summary: Get all issues for a specific wall
+            description: >-
+                **PublicBody / Facility only.**
+                Returns all issues reported on the given wall. The authenticated user must own the wall.
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: wallId
+                  required: true
+                  type: string
+                  description: MongoDB ObjectId of the wall.
+            responses:
+                200:
+                    description: List of issues for the wall.
+                    schema:
+                        type: object
+                        properties:
+                            issues:
+                                type: array
+                                items:
+                                    $ref: "#/definitions/IssueOutput"
+                400:
+                    description: wallId is not a valid ObjectId.
+                401:
+                    description: Unauthorized.
+                403:
+                    description: Only public bodies or facilities can access wall issues.
+                404:
+                    description: Wall or user not found.
+
+    /issues/public-body/dashboard:
+        get:
+            tags:
+                - Issues
+            summary: Get PublicBody issue dashboard
+            description: Returns a paginated list of issues for all walls owned by the authenticated PublicBody.
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: query
+                  name: status
+                  type: string
+                  enum: [OPEN, IN_PROGRESS, RESOLVED, CLOSED]
+                  description: Filter by status
+                - in: query
+                  name: limit
+                  type: integer
+                  default: 20
+                - in: query
+                  name: skip
+                  type: integer
+                  default: 0
+            responses:
+                200:
+                    description: Paginated issue list
+                    schema:
+                        type: object
+                        properties:
+                            issues:
+                                type: array
+                                items:
+                                    $ref: "#/definitions/IssueOutput"
+                            total:
+                                type: integer
+                401:
+                    description: Unauthorized
+                403:
+                    description: Only PublicBody accounts can access this dashboard
+
+    /issues/public-body/dashboard/summary:
+        get:
+            tags:
+                - Issues
+            summary: Get PublicBody issue summary
+            description: Returns aggregated issue counts grouped by status for all walls owned by the authenticated PublicBody.
+            security:
+                - BearerAuth: []
+            responses:
+                200:
+                    description: Issue summary by status
+                    schema:
+                        type: object
+                        properties:
+                            OPEN:
+                                type: integer
+                            IN_PROGRESS:
+                                type: integer
+                            RESOLVED:
+                                type: integer
+                            CLOSED:
+                                type: integer
+                401:
+                    description: Unauthorized
+                403:
+                    description: Only PublicBody accounts can access this summary
+
+    /issues/{issueId}/status:
+        put:
+            tags:
+                - Issues
+            summary: Update the status of an issue
+            description: >-
+                **PublicBody / Facility only.**
+                Transitions an issue to a new status. The caller must own the wall the issue belongs to.
+                Valid values: OPEN, IN_PROGRESS, RESOLVED, CLOSED.
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: issueId
+                  required: true
+                  type: string
+                  description: MongoDB ObjectId of the issue.
+                - in: body
+                  name: body
+                  required: true
+                  schema:
+                      $ref: "#/definitions/IssueStatusUpdateInput"
+            responses:
+                200:
+                    description: Issue status updated successfully.
+                    schema:
+                        type: object
+                        properties:
+                            issue:
+                                $ref: "#/definitions/IssueOutput"
+                400:
+                    description: issueId not valid, or status missing/invalid.
+                401:
+                    description: Unauthorized.
+                403:
+                    description: Only public bodies or facilities can update issue status.
+                404:
+                    description: Issue not found.
+
+    /issues/{issueId}:
+        delete:
+            tags:
+                - Issues
+            summary: Delete an issue
+            description: >-
+                **Climber only.**
+                Permanently deletes the issue. The authenticated user must be
+                the original reporter.
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: issueId
+                  required: true
+                  type: string
+                  description: MongoDB ObjectId of the issue to delete.
+            responses:
+                204:
+                    description: Issue deleted — no content returned.
+                400:
+                    description: issueId is not a valid ObjectId.
+                401:
+                    description: Unauthorized.
+                403:
+                    description: You can only delete your own issues.
+                404:
+                    description: Issue not found.
+
+    # ================= NOTIFICATIONS =================
+    /notifications:
+        get:
+            tags:
+                - Notifications
+            summary: Get notifications for current user
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: query
+                  name: limit
+                  type: integer
+                  description: Max notifications to return
+                - in: query
+                  name: skip
+                  type: integer
+                  description: Number of notifications to skip
+            responses:
+                200:
+                    description: List of notifications
+                    schema:
+                        type: object
+                        properties:
+                            notifications:
+                                type: array
+                                items:
+                                    $ref: "#/definitions/NotificationOutput"
+                401:
+                    description: Unauthorized
+
+    /notifications/unread-count:
+        get:
+            tags:
+                - Notifications
+            summary: Get unread notification count
+            security:
+                - BearerAuth: []
+            responses:
+                200:
+                    description: Unread count
+                    schema:
+                        type: object
+                        properties:
+                            count:
+                                type: integer
+                401:
+                    description: Unauthorized
+
+    /notifications/read-all:
+        patch:
+            tags:
+                - Notifications
+            summary: Mark all notifications as read
+            security:
+                - BearerAuth: []
+            responses:
+                204:
+                    description: All notifications marked as read
+                401:
+                    description: Unauthorized
+
+    /notifications/{id}/read:
+        patch:
+            tags:
+                - Notifications
+            summary: Mark a notification as read
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: id
+                  required: true
+                  type: string
+                  description: MongoDB ObjectId of the notification
+            responses:
+                200:
+                    description: Notification marked as read
+                    schema:
+                        type: object
+                        properties:
+                            notification:
+                                $ref: "#/definitions/NotificationOutput"
+                401:
+                    description: Unauthorized
+                404:
+                    description: Notification not found
+
+    # ================= FOLLOWS =================
+    /follows/{targetId}:
+        post:
+            tags:
+                - Follows
+            summary: Follow a user
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: targetId
+                  required: true
+                  type: string
+                  description: MongoDB ObjectId of the user to follow
+            responses:
+                200:
+                    description: Followed
+                    schema:
+                        type: object
+                        properties:
+                            message:
+                                type: string
+                401:
+                    description: Unauthorized
+                404:
+                    description: Target user not found
+        delete:
+            tags:
+                - Follows
+            summary: Unfollow a user
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: targetId
+                  required: true
+                  type: string
+                  description: MongoDB ObjectId of the user to unfollow
+            responses:
+                200:
+                    description: Unfollowed
+                401:
+                    description: Unauthorized
+
+    /follows/check/{targetId}:
+        get:
+            tags:
+                - Follows
+            summary: Check if current user follows a user
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: targetId
+                  required: true
+                  type: string
+            responses:
+                200:
+                    description: Follow status
+                    schema:
+                        type: object
+                        properties:
+                            following:
+                                type: boolean
+                401:
+                    description: Unauthorized
+
+    /follows/me:
+        get:
+            tags:
+                - Follows
+            summary: Get users the current user follows
+            security:
+                - BearerAuth: []
+            responses:
+                200:
+                    description: List of followed users
+                    schema:
+                        type: object
+                        properties:
+                            following:
+                                type: array
+                                items:
+                                    $ref: "#/definitions/PublicUser"
+                401:
+                    description: Unauthorized
+
+    /follows/me/followers:
+        get:
+            tags:
+                - Follows
+            summary: Get followers of the current user
+            security:
+                - BearerAuth: []
+            responses:
+                200:
+                    description: List of followers
+                    schema:
+                        type: object
+                        properties:
+                            followers:
+                                type: array
+                                items:
+                                    $ref: "#/definitions/PublicUser"
+                401:
+                    description: Unauthorized
+
+    /follows/{userId}/followers:
+        get:
+            tags:
+                - Follows
+            summary: Get followers of a user
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: userId
+                  required: true
+                  type: string
+            responses:
+                200:
+                    description: List of followers
+                    schema:
+                        type: object
+                        properties:
+                            followers:
+                                type: array
+                                items:
+                                    $ref: "#/definitions/PublicUser"
+                401:
+                    description: Unauthorized
+
+    /follows/{userId}/following:
+        get:
+            tags:
+                - Follows
+            summary: Get users that a user follows
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: userId
+                  required: true
+                  type: string
+            responses:
+                200:
+                    description: List of followed users
+                    schema:
+                        type: object
+                        properties:
+                            following:
+                                type: array
+                                items:
+                                    $ref: "#/definitions/PublicUser"
+                401:
+                    description: Unauthorized
+
+    # ================= GROUPS =================
+    /groups:
+        post:
+            tags:
+                - Groups
+            summary: Create a group
+            description: Climber only.
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: body
+                  name: body
+                  required: true
+                  schema:
+                      $ref: "#/definitions/GroupInput"
+            responses:
+                201:
+                    description: Group created
+                    schema:
+                        type: object
+                        properties:
+                            group:
+                                $ref: "#/definitions/GroupOutput"
+                400:
+                    description: Validation error
+                401:
+                    description: Unauthorized
+                403:
+                    description: Only Climbers can create groups
+
+    /groups/discover:
+        get:
+            tags:
+                - Groups
+            summary: Discover public groups
+            description: Returns public groups the requester does not already belong to.
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: query
+                  name: search
+                  type: string
+                  description: Optional search query
+            responses:
+                200:
+                    description: List of discoverable groups
+                    schema:
+                        type: object
+                        properties:
+                            groups:
+                                type: array
+                                items:
+                                    $ref: "#/definitions/GroupOutput"
+                401:
+                    description: Unauthorized
+
+    /groups/mine:
+        get:
+            tags:
+                - Groups
+            summary: Get groups the current user belongs to
+            security:
+                - BearerAuth: []
+            responses:
+                200:
+                    description: List of user's groups
+                    schema:
+                        type: object
+                        properties:
+                            groups:
+                                type: array
+                                items:
+                                    $ref: "#/definitions/GroupOutput"
+                401:
+                    description: Unauthorized
+
+    /groups/invites/pending:
+        get:
+            tags:
+                - Groups
+            summary: Get pending invitations for current user
+            security:
+                - BearerAuth: []
+            responses:
+                200:
+                    description: List of pending invitations
+                    schema:
+                        type: object
+                        properties:
+                            invitations:
+                                type: array
+                                items:
+                                    $ref: "#/definitions/GroupInviteOutput"
+                401:
+                    description: Unauthorized
+
+    /groups/invites/{inviteId}/accept:
+        patch:
+            tags:
+                - Groups
+            summary: Accept a group invitation
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: inviteId
+                  required: true
+                  type: string
+            responses:
+                200:
+                    description: Invitation accepted
+                    schema:
+                        type: object
+                        properties:
+                            group:
+                                $ref: "#/definitions/GroupOutput"
+                401:
+                    description: Unauthorized
+                404:
+                    description: Invitation not found
+
+    /groups/invites/{inviteId}/decline:
+        patch:
+            tags:
+                - Groups
+            summary: Decline a group invitation
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: inviteId
+                  required: true
+                  type: string
+            responses:
+                200:
+                    description: Invitation declined
+                401:
+                    description: Unauthorized
+                404:
+                    description: Invitation not found
+
+    /groups/{id}:
+        get:
+            tags:
+                - Groups
+            summary: Get group details
+            description: Members only.
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: id
+                  required: true
+                  type: string
+            responses:
+                200:
+                    description: Group details
+                    schema:
+                        type: object
+                        properties:
+                            group:
+                                $ref: "#/definitions/GroupOutput"
+                401:
+                    description: Unauthorized
+                403:
+                    description: Not a member of this group
+                404:
+                    description: Group not found
+        patch:
+            tags:
+                - Groups
+            summary: Update group name/description
+            description: Group admin only.
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: id
+                  required: true
+                  type: string
+                - in: body
+                  name: body
+                  required: true
+                  schema:
+                      $ref: "#/definitions/GroupInput"
+            responses:
+                200:
+                    description: Group updated
+                    schema:
+                        type: object
+                        properties:
+                            group:
+                                $ref: "#/definitions/GroupOutput"
+                400:
+                    description: Validation error
+                401:
+                    description: Unauthorized
+                403:
+                    description: Admin only
+                404:
+                    description: Group not found
+        delete:
+            tags:
+                - Groups
+            summary: Delete a group
+            description: Group admin only.
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: id
+                  required: true
+                  type: string
+            responses:
+                204:
+                    description: Group deleted
+                401:
+                    description: Unauthorized
+                403:
+                    description: Admin only
+                404:
+                    description: Group not found
+
+    /groups/{id}/join:
+        post:
+            tags:
+                - Groups
+            summary: Join a public group
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: id
+                  required: true
+                  type: string
+            responses:
+                200:
+                    description: Joined group
+                    schema:
+                        type: object
+                        properties:
+                            group:
+                                $ref: "#/definitions/GroupOutput"
+                401:
+                    description: Unauthorized
+                403:
+                    description: Group is private
+                404:
+                    description: Group not found
+                409:
+                    description: Already a member
+
+    /groups/{id}/invites:
+        post:
+            tags:
+                - Groups
+            summary: Invite a user to the group
+            description: Group admin only.
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: id
+                  required: true
+                  type: string
+                - in: body
+                  name: body
+                  required: true
+                  schema:
+                      type: object
+                      required:
+                          - username
+                      properties:
+                          username:
+                              type: string
+            responses:
+                201:
+                    description: Invitation created
+                    schema:
+                        type: object
+                        properties:
+                            invitation:
+                                $ref: "#/definitions/GroupInviteOutput"
+                400:
+                    description: username is required
+                401:
+                    description: Unauthorized
+                403:
+                    description: Admin only
+                404:
+                    description: User or group not found
+
+    /groups/{id}/members/{userId}:
+        delete:
+            tags:
+                - Groups
+            summary: Remove a member or leave the group
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: id
+                  required: true
+                  type: string
+                - in: path
+                  name: userId
+                  required: true
+                  type: string
+            responses:
+                204:
+                    description: Member removed
+                401:
+                    description: Unauthorized
+                403:
+                    description: Cannot remove another admin
+                404:
+                    description: Group or member not found
+
+    /groups/{id}/members/{userId}/role:
+        patch:
+            tags:
+                - Groups
+            summary: Update member role
+            description: Group admin only.
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: id
+                  required: true
+                  type: string
+                - in: path
+                  name: userId
+                  required: true
+                  type: string
+                - in: body
+                  name: body
+                  required: true
+                  schema:
+                      type: object
+                      required:
+                          - role
+                      properties:
+                          role:
+                              type: string
+                              enum: [admin, manager, member]
+            responses:
+                200:
+                    description: Role updated
+                    schema:
+                        type: object
+                        properties:
+                            group:
+                                $ref: "#/definitions/GroupOutput"
+                400:
+                    description: Invalid role
+                401:
+                    description: Unauthorized
+                403:
+                    description: Admin only
+                404:
+                    description: Group or member not found
+
+    /groups/{id}/events:
+        get:
+            tags:
+                - Groups
+            summary: List events for the group
+            description: Members only.
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: id
+                  required: true
+                  type: string
+            responses:
+                200:
+                    description: List of group events
+                    schema:
+                        type: object
+                        properties:
+                            events:
+                                type: array
+                                items:
+                                    $ref: "#/definitions/EventOutput"
+                401:
+                    description: Unauthorized
+                403:
+                    description: Members only
+                404:
+                    description: Group not found
+        post:
+            tags:
+                - Groups
+            summary: Create an event for the group
+            description: Group admin or manager only.
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: id
+                  required: true
+                  type: string
+                - in: body
+                  name: body
+                  required: true
+                  schema:
+                      $ref: "#/definitions/EventInput"
+            responses:
+                201:
+                    description: Event created
+                    schema:
+                        type: object
+                        properties:
+                            event:
+                                $ref: "#/definitions/EventOutput"
+                400:
+                    description: Validation error
+                401:
+                    description: Unauthorized
+                403:
+                    description: Admin/manager only
+
+    /groups/{id}/climbs:
+        get:
+            tags:
+                - Groups
+            summary: List planned climbs for the group
+            description: Members only.
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: id
+                  required: true
+                  type: string
+            responses:
+                200:
+                    description: List of planned climbs
+                    schema:
+                        type: object
+                        properties:
+                            climbs:
+                                type: array
+                                items:
+                                    $ref: "#/definitions/PlannedClimbOutput"
+                401:
+                    description: Unauthorized
+                403:
+                    description: Members only
+                404:
+                    description: Group not found
+        post:
+            tags:
+                - Groups
+            summary: Create a planned climb
+            description: Group admin only.
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: id
+                  required: true
+                  type: string
+                - in: body
+                  name: body
+                  required: true
+                  schema:
+                      $ref: "#/definitions/PlannedClimbInput"
+            responses:
+                201:
+                    description: Planned climb created
+                    schema:
+                        type: object
+                        properties:
+                            climb:
+                                $ref: "#/definitions/PlannedClimbOutput"
+                400:
+                    description: Validation error
+                401:
+                    description: Unauthorized
+                403:
+                    description: Admin only
+
+    /groups/{id}/climbs/{climbId}:
+        delete:
+            tags:
+                - Groups
+            summary: Delete a planned climb
+            description: Group admin only.
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: id
+                  required: true
+                  type: string
+                - in: path
+                  name: climbId
+                  required: true
+                  type: string
+            responses:
+                204:
+                    description: Planned climb deleted
+                401:
+                    description: Unauthorized
+                403:
+                    description: Admin only
+                404:
+                    description: Climb not found
+
+    /groups/{id}/climbs/{climbId}/rsvp:
+        patch:
+            tags:
+                - Groups
+            summary: RSVP to a planned climb
+            description: Any group member.
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: id
+                  required: true
+                  type: string
+                - in: path
+                  name: climbId
+                  required: true
+                  type: string
+                - in: body
+                  name: body
+                  required: true
+                  schema:
+                      type: object
+                      required:
+                          - status
+                      properties:
+                          status:
+                              type: string
+                              enum: [going, not_going]
+            responses:
+                200:
+                    description: RSVP recorded
+                    schema:
+                        type: object
+                        properties:
+                            climb:
+                                $ref: "#/definitions/PlannedClimbOutput"
+                400:
+                    description: status must be 'going' or 'not_going'
+                401:
+                    description: Unauthorized
+                403:
+                    description: Members only
+                404:
+                    description: Climb not found
+
+    # ================= EVENTS =================
+    /events/active:
+        get:
+            tags:
+                - Events
+            summary: Get all active events
+            description: Returns active events across all facilities. Public.
+            responses:
+                200:
+                    description: List of active events
+                    schema:
+                        type: object
+                        properties:
+                            events:
+                                type: array
+                                items:
+                                    $ref: "#/definitions/EventOutput"
+
+    /events:
+        get:
+            tags:
+                - Events
+            summary: List events for a facility
+            description: Returns events for a specific facility. Public.
+            parameters:
+                - in: query
+                  name: facilityId
+                  required: true
+                  type: string
+                  description: MongoDB ObjectId of the facility
+                - in: query
+                  name: limit
+                  type: integer
+                - in: query
+                  name: skip
+                  type: integer
+            responses:
+                200:
+                    description: List of events
+                    schema:
+                        type: object
+                        properties:
+                            events:
+                                type: array
+                                items:
+                                    $ref: "#/definitions/EventOutput"
+                400:
+                    description: facilityId query param is required
+        post:
+            tags:
+                - Events
+            summary: Create an event
+            description: FacilityOwner or PublicBody only.
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: body
+                  name: body
+                  required: true
+                  schema:
+                      $ref: "#/definitions/EventInput"
+            responses:
+                201:
+                    description: Event created
+                    schema:
+                        type: object
+                        properties:
+                            event:
+                                $ref: "#/definitions/EventOutput"
+                400:
+                    description: Validation error
+                401:
+                    description: Unauthorized
+                403:
+                    description: Only FacilityOwner or PublicBody can create events
+
+    /events/{id}:
+        get:
+            tags:
+                - Events
+            summary: Get event by ID
+            parameters:
+                - in: path
+                  name: id
+                  required: true
+                  type: string
+            responses:
+                200:
+                    description: Event details
+                    schema:
+                        type: object
+                        properties:
+                            event:
+                                $ref: "#/definitions/EventOutput"
+                404:
+                    description: Event not found
+        patch:
+            tags:
+                - Events
+            summary: Update an event
+            description: Event owner only.
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: id
+                  required: true
+                  type: string
+                - in: body
+                  name: body
+                  required: true
+                  schema:
+                      $ref: "#/definitions/EventInput"
+            responses:
+                200:
+                    description: Event updated
+                    schema:
+                        type: object
+                        properties:
+                            event:
+                                $ref: "#/definitions/EventOutput"
+                400:
+                    description: Validation error
+                401:
+                    description: Unauthorized
+                403:
+                    description: Not event owner
+                404:
+                    description: Event not found
+        delete:
+            tags:
+                - Events
+            summary: Delete an event
+            description: Event owner only.
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: id
+                  required: true
+                  type: string
+            responses:
+                204:
+                    description: Event deleted
+                401:
+                    description: Unauthorized
+                403:
+                    description: Not event owner
+                404:
+                    description: Event not found
+
+    /events/{id}/leaderboard:
+        get:
+            tags:
+                - Events
+            summary: Get event leaderboard
+            parameters:
+                - in: path
+                  name: id
+                  required: true
+                  type: string
+            responses:
+                200:
+                    description: Event leaderboard
+                    schema:
+                        type: object
+                        properties:
+                            leaderboard:
+                                type: array
+                                items:
+                                    $ref: "#/definitions/LeaderboardEntry"
+                404:
+                    description: Event not found
+
+    /events/{id}/close:
+        post:
+            tags:
+                - Events
+            summary: Close an event and distribute badges
+            description: Event owner only. Closes the event and distributes badges to winners.
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: id
+                  required: true
+                  type: string
+            responses:
+                200:
+                    description: Event closed and badges distributed
+                    schema:
+                        type: object
+                        properties:
+                            event:
+                                $ref: "#/definitions/EventOutput"
+                            message:
+                                type: string
+                401:
+                    description: Unauthorized
+                403:
+                    description: Not event owner
+                404:
+                    description: Event not found
+
+    # ================= CONVERSATIONS =================
+    /conversations:
+        get:
+            tags:
+                - Conversations
+            summary: List conversations for current user
+            security:
+                - BearerAuth: []
+            responses:
+                200:
+                    description: List of conversations
+                    schema:
+                        type: object
+                        properties:
+                            conversations:
+                                type: array
+                                items:
+                                    $ref: "#/definitions/ConversationOutput"
+                401:
+                    description: Unauthorized
+
+    /conversations/dm/{userId}:
+        post:
+            tags:
+                - Conversations
+            summary: Get or create a DM conversation
+            description: Climber only. Gets or creates a direct message conversation with another user.
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: userId
+                  required: true
+                  type: string
+                  description: MongoDB ObjectId of the other user
+            responses:
+                200:
+                    description: DM conversation
+                    schema:
+                        type: object
+                        properties:
+                            conversation:
+                                $ref: "#/definitions/ConversationOutput"
+                401:
+                    description: Unauthorized
+                403:
+                    description: Only Climbers can create DMs, or DM permission denied
+
+    /conversations/group/{groupId}:
+        get:
+            tags:
+                - Conversations
+            summary: Get group conversation
+            description: Gets (or lazily creates) the conversation for a group. Members only.
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: groupId
+                  required: true
+                  type: string
+            responses:
+                200:
+                    description: Group conversation
+                    schema:
+                        type: object
+                        properties:
+                            conversation:
+                                $ref: "#/definitions/ConversationOutput"
+                401:
+                    description: Unauthorized
+                403:
+                    description: Not a group member
+                404:
+                    description: Group not found
+
+    /conversations/{id}/messages:
+        get:
+            tags:
+                - Conversations
+            summary: Get messages for a conversation
+            description: Paginated via ?before=<ISO date>
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: id
+                  required: true
+                  type: string
+                - in: query
+                  name: before
+                  type: string
+                  format: date-time
+                  description: Cursor — return messages before this timestamp
+                - in: query
+                  name: limit
+                  type: integer
+                  default: 30
+            responses:
+                200:
+                    description: List of messages
+                    schema:
+                        type: object
+                        properties:
+                            messages:
+                                type: array
+                                items:
+                                    $ref: "#/definitions/MessageOutput"
+                401:
+                    description: Unauthorized
+                403:
+                    description: Not a participant
+                404:
+                    description: Conversation not found
+        post:
+            tags:
+                - Conversations
+            summary: Send a message
+            description: REST alternative to Socket.IO for sending a message.
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: id
+                  required: true
+                  type: string
+                - in: body
+                  name: body
+                  required: true
+                  schema:
+                      type: object
+                      required:
+                          - content
+                      properties:
+                          content:
+                              type: string
+                              description: Message text content
+            responses:
+                201:
+                    description: Message sent
+                    schema:
+                        type: object
+                        properties:
+                            message:
+                                $ref: "#/definitions/MessageOutput"
+                400:
+                    description: content is required
+                401:
+                    description: Unauthorized
+                403:
+                    description: Not a participant
+
+    /conversations/{id}/read:
+        patch:
+            tags:
+                - Conversations
+            summary: Mark all messages in a conversation as read
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: id
+                  required: true
+                  type: string
+            responses:
+                200:
+                    description: Marked as read
+                    schema:
+                        type: object
+                        properties:
+                            ok:
+                                type: boolean
+                401:
+                    description: Unauthorized
+                403:
+                    description: Not a participant
+
+    # ================= SUPPORT =================
+    /support:
+        post:
+            tags:
+                - Support
+            summary: Create a support ticket
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: body
+                  name: body
+                  required: true
+                  schema:
+                      $ref: "#/definitions/SupportTicketInput"
+            responses:
+                201:
+                    description: Support ticket created
+                    schema:
+                        $ref: "#/definitions/SupportTicketOutput"
+                400:
+                    description: Validation error — subject or body missing/invalid
+
+    /support/mine:
+        get:
+            tags:
+                - Support
+            summary: Get current user's support tickets
+            security:
+                - BearerAuth: []
+            responses:
+                200:
+                    description: List of user's support tickets
+                    schema:
+                        type: array
+                        items:
+                            $ref: "#/definitions/SupportTicketOutput"
+                401:
+                    description: Unauthorized
+
+    /support/{ticketId}:
+        get:
+            tags:
+                - Support
+            summary: Get a specific support ticket
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: ticketId
+                  required: true
+                  type: string
+            responses:
+                200:
+                    description: Support ticket details
+                    schema:
+                        $ref: "#/definitions/SupportTicketOutput"
+                400:
+                    description: Invalid ticketId
+                401:
+                    description: Unauthorized
+                404:
+                    description: Ticket not found
+
+    # ================= ADMIN =================
+    /admin/approvals/pending:
+        get:
+            tags:
+                - Admin
+            summary: Get pending account approvals
+            description: Admin only. Returns Facility and PublicBody accounts awaiting approval.
+            security:
+                - BearerAuth: []
+            responses:
+                200:
+                    description: List of pending approvals
+                    schema:
+                        type: array
+                        items:
+                            $ref: "#/definitions/UserProfile"
+                401:
+                    description: Unauthorized
+                403:
+                    description: Admin only
+
+    /admin/approvals/{userId}/approve:
+        put:
+            tags:
+                - Admin
+            summary: Approve an account
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: userId
+                  required: true
+                  type: string
+            responses:
+                200:
+                    description: Account approved
+                401:
+                    description: Unauthorized
+                403:
+                    description: Admin only
+                404:
+                    description: User not found
+
+    /admin/approvals/{userId}/reject:
+        put:
+            tags:
+                - Admin
+            summary: Reject an account
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: userId
+                  required: true
+                  type: string
+            responses:
+                200:
+                    description: Account rejected
+                401:
+                    description: Unauthorized
+                403:
+                    description: Admin only
+                404:
+                    description: User not found
+
+    /admin/public-bodies:
+        get:
+            tags:
+                - Admin
+            summary: Get all PublicBody accounts
+            security:
+                - BearerAuth: []
+            responses:
+                200:
+                    description: List of PublicBody accounts
+                    schema:
+                        type: array
+                        items:
+                            $ref: "#/definitions/UserProfile"
+                401:
+                    description: Unauthorized
+                403:
+                    description: Admin only
+
+    /admin/metrics:
+        get:
+            tags:
+                - Admin
+            summary: Get platform metrics
+            security:
+                - BearerAuth: []
+            responses:
+                200:
+                    description: Platform metrics
+                    schema:
+                        type: object
+                        description: Various platform usage statistics
+                401:
+                    description: Unauthorized
+                403:
+                    description: Admin only
+
+    /admin/moderation/flagged:
+        get:
+            tags:
+                - Admin
+            summary: Get flagged reviews
+            security:
+                - BearerAuth: []
+            responses:
+                200:
+                    description: List of flagged reviews
+                    schema:
+                        type: array
+                        items:
+                            $ref: "#/definitions/ReviewOutput"
+                401:
+                    description: Unauthorized
+                403:
+                    description: Admin only
+
+    /admin/moderation/reviews/{reviewId}:
+        delete:
+            tags:
+                - Admin
+            summary: Remove a flagged review
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: reviewId
+                  required: true
+                  type: string
+            responses:
+                200:
+                    description: Review removed
+                401:
+                    description: Unauthorized
+                403:
+                    description: Admin only
+                404:
+                    description: Review not found
+
+    /admin/moderation/reviews/{reviewId}/dismiss:
+        post:
+            tags:
+                - Admin
+            summary: Dismiss a review flag
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: reviewId
+                  required: true
+                  type: string
+            responses:
+                200:
+                    description: Flag dismissed
+                401:
+                    description: Unauthorized
+                403:
+                    description: Admin only
+                404:
+                    description: Review not found
+
+    /admin/support/tickets:
+        get:
+            tags:
+                - Admin
+            summary: Get all support tickets
+            security:
+                - BearerAuth: []
+            responses:
+                200:
+                    description: List of all support tickets
+                    schema:
+                        type: array
+                        items:
+                            $ref: "#/definitions/SupportTicketOutput"
+                401:
+                    description: Unauthorized
+                403:
+                    description: Admin only
+
+    /admin/support/tickets/{ticketId}:
+        get:
+            tags:
+                - Admin
+            summary: Get a support ticket (admin view)
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: ticketId
+                  required: true
+                  type: string
+            responses:
+                200:
+                    description: Support ticket details
+                    schema:
+                        $ref: "#/definitions/SupportTicketOutput"
+                400:
+                    description: Invalid ticketId
+                401:
+                    description: Unauthorized
+                403:
+                    description: Admin only
+                404:
+                    description: Ticket not found
+
+    /admin/support/tickets/{ticketId}/reply:
+        patch:
+            tags:
+                - Admin
+            summary: Reply to a support ticket
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: ticketId
+                  required: true
+                  type: string
+                - in: body
+                  name: body
+                  required: true
+                  schema:
+                      type: object
+                      required:
+                          - reply
+                      properties:
+                          reply:
+                              type: string
+                              maxLength: 2000
+                          status:
+                              type: string
+                              enum: [OPEN, IN_PROGRESS, RESOLVED, CLOSED]
+            responses:
+                200:
+                    description: Reply sent
+                    schema:
+                        $ref: "#/definitions/SupportTicketOutput"
+                400:
+                    description: Validation error
+                401:
+                    description: Unauthorized
+                403:
+                    description: Admin only
+                404:
+                    description: Ticket not found
+
+    /admin/support/tickets/{ticketId}/status:
+        patch:
+            tags:
+                - Admin
+            summary: Update support ticket status
+            security:
+                - BearerAuth: []
+            parameters:
+                - in: path
+                  name: ticketId
+                  required: true
+                  type: string
+                - in: body
+                  name: body
+                  required: true
+                  schema:
+                      type: object
+                      required:
+                          - status
+                      properties:
+                          status:
+                              type: string
+                              enum: [OPEN, IN_PROGRESS, RESOLVED, CLOSED]
+            responses:
+                200:
+                    description: Status updated
+                    schema:
+                        $ref: "#/definitions/SupportTicketOutput"
+                400:
+                    description: Invalid status
+                401:
+                    description: Unauthorized
+                403:
+                    description: Admin only
+                404:
+                    description: Ticket not found
+
 definitions:
-  Question:
-    title: Question
-    type: object
-    properties:
-      question:
-        type: string
-      published_at:
-        type: string
-      choices:
-        type: array
-        items:
-          $ref: '#/definitions/Choice'
-    required:
-      - question
-      - published_at
-      - choices
-  Choice:
-    title: Choice
-    type: object
-    properties:
-      votes:
-        type: integer
-        format: int32
-      choice:
-        type: string
-    required:
-      - votes
-      - choice
-  QuestionRequest:
-    title: Question Request
-    type: object
-    properties:
-      question:
-        type: string
-      choices:
-        type: array
-        items:
-          type: string
-    required:
-      - question
-      - choices
-    example:
-      question: Favourite programming language?
-      choices:
-        - Swift
-        - Python
-        - Objective-C
-        - Ruby
+    # ─── Auth ────────────────────────────────────────────────────────────────
+    AuthResponse:
+        type: object
+        properties:
+            message:
+                type: string
+            accessToken:
+                type: string
+            refreshToken:
+                type: string
+
+    # ─── Users ───────────────────────────────────────────────────────────────
+    PublicUser:
+        type: object
+        properties:
+            id:
+                type: string
+            username:
+                type: string
+            avatar:
+                type: string
+            userType:
+                type: string
+            profile:
+                type: object
+                properties:
+                    bio:
+                        type: string
+                    description:
+                        type: string
+                    location:
+                        type: object
+                        properties:
+                            type:
+                                type: string
+                            coordinates:
+                                type: array
+                                items:
+                                    type: number
+                            address:
+                                type: string
+
+    UserProfile:
+        type: object
+        properties:
+            id:
+                type: string
+            email:
+                type: string
+            username:
+                type: string
+            avatar:
+                type: string
+            userType:
+                type: string
+            authMethods:
+                type: array
+                items:
+                    type: string
+            createdAt:
+                type: string
+                format: date-time
+            updatedAt:
+                type: string
+                format: date-time
+
+    # ─── Badges ──────────────────────────────────────────────────────────────
+    BadgeInput:
+        type: object
+        required:
+            - name
+        properties:
+            name:
+                type: string
+            description:
+                type: string
+            type:
+                type: string
+                enum: [system, custom]
+            score:
+                type: integer
+
+    BadgeOutput:
+        type: object
+        properties:
+            id:
+                type: string
+            name:
+                type: string
+            description:
+                type: string
+            type:
+                type: string
+            score:
+                type: integer
+            createdAt:
+                type: string
+                format: date-time
+
+    # ─── Facilities ───────────────────────────────────────────────────────────
+    FacilityInput:
+        type: object
+        properties:
+            name:
+                type: string
+            description:
+                type: string
+            location:
+                type: object
+                properties:
+                    type:
+                        type: string
+                        enum: [Point]
+                        default: Point
+                    coordinates:
+                        type: array
+                        items:
+                            type: number
+                    address:
+                        type: string
+
+    FacilityOutput:
+        type: object
+        properties:
+            id:
+                type: string
+            name:
+                type: string
+            description:
+                type: string
+            location:
+                type: object
+                properties:
+                    type:
+                        type: string
+                    coordinates:
+                        type: array
+                        items:
+                            type: number
+                    address:
+                        type: string
+            ownerAccount:
+                type: string
+                description: ObjectId of the FacilityOwner who owns this facility
+            createdAt:
+                type: string
+                format: date-time
+            updatedAt:
+                type: string
+                format: date-time
+
+    # ─── POIs ────────────────────────────────────────────────────────────────
+    POIOutput:
+        type: object
+        properties:
+            id:
+                type: string
+            name:
+                type: string
+            description:
+                type: string
+            location:
+                type: object
+                properties:
+                    type:
+                        type: string
+                    coordinates:
+                        type: array
+                        items:
+                            type: number
+                    address:
+                        type: string
+            createdAt:
+                type: string
+                format: date-time
+            updatedAt:
+                type: string
+                format: date-time
+
+    # ─── Reports ─────────────────────────────────────────────────────────────
+    ReportOutput:
+        type: object
+        properties:
+            id:
+                type: string
+            wall_id:
+                type: string
+                description: ObjectId of the wall this report belongs to
+            data:
+                type: object
+                description: Report data structure
+            createdAt:
+                type: string
+                format: date-time
+            updatedAt:
+                type: string
+                format: date-time
+
+    # ─── Reviews ─────────────────────────────────────────────────────────────
+    ReviewInput:
+        type: object
+        required:
+            - rating
+        properties:
+            rating:
+                type: number
+                example: 4.5
+            body:
+                type: string
+                example: "Great session, very clean holds."
+
+    ReviewOutput:
+        type: object
+        properties:
+            id:
+                type: string
+                example: "664f1a2b3c4d5e6f7a8b9c20"
+            rating:
+                type: number
+                example: 4.5
+            body:
+                type: string
+                example: "Great session, very clean holds."
+            climbing_session_id:
+                type: object
+                properties:
+                    wall_id:
+                        type: object
+                        properties:
+                            name:
+                                type: string
+                            difficulty:
+                                type: string
+                    date:
+                        type: string
+                        format: date-time
+                    time:
+                        type: number
+                    is_private:
+                        type: boolean
+
+    # ─── Walls ───────────────────────────────────────────────────────────────
+    WallInput:
+        type: object
+        required:
+            - name
+            - location
+        properties:
+            name:
+                type: string
+            description:
+                type: string
+            difficulty:
+                type: string
+                example: BEGINNER
+            location:
+                type: object
+                required:
+                    - coordinates
+                properties:
+                    type:
+                        type: string
+                        enum: [Point]
+                        default: Point
+                    coordinates:
+                        type: array
+                        items:
+                            type: number
+                    address:
+                        type: string
+
+    WallOutput:
+        type: object
+        properties:
+            id:
+                type: string
+            name:
+                type: string
+            description:
+                type: string
+            difficulty:
+                type: string
+            status:
+                type: string
+            rating:
+                type: number
+            location:
+                type: object
+                properties:
+                    type:
+                        type: string
+                    coordinates:
+                        type: array
+                        items:
+                            type: number
+                    address:
+                        type: string
+            facility:
+                type: object
+                properties:
+                    id:
+                        type: string
+                    username:
+                        type: string
+                    email:
+                        type: string
+                    avatar:
+                        type: string
+            publicBody:
+                type: object
+                properties:
+                    id:
+                        type: string
+                    username:
+                        type: string
+                    email:
+                        type: string
+                    avatar:
+                        type: string
+            totalSessions:
+                type: integer
+            createdAt:
+                type: string
+                format: date-time
+            updatedAt:
+                type: string
+                format: date-time
+
+    WallLeaderboardResponse:
+        type: object
+        properties:
+            seasonName:
+                type: string
+            isHistorical:
+                type: boolean
+            daysRemaining:
+                type: integer
+            averageTime:
+                type: number
+            leaderboard:
+                type: array
+                items:
+                    type: object
+                    properties:
+                        id:
+                            type: string
+                        username:
+                            type: string
+                        avatar:
+                            type: string
+                        totalAscents:
+                            type: integer
+                        bestTime:
+                            type: number
+                        score:
+                            type: integer
+                        badges:
+                            type: array
+                            items:
+                                type: string
+
+    # ─── Sessions ────────────────────────────────────────────────────────────
+    SessionInput:
+        type: object
+        required:
+            - wall_id
+            - date
+            - time
+        properties:
+            wall_id:
+                type: string
+                description: Valid MongoDB ObjectId of the target wall.
+                example: "664f1a2b3c4d5e6f7a8b9c02"
+            date:
+                type: string
+                format: date-time
+                example: "2024-05-20T09:00:00.000Z"
+            time:
+                type: number
+                description: Session duration (domain-defined unit).
+                example: 90
+            is_private:
+                type: boolean
+                default: false
+            isSend:
+                type: boolean
+                default: false
+                description: Whether the session was a successful send
+            review:
+                description: Optional inline review to attach at creation time.
+                $ref: "#/definitions/ReviewInput"
+
+    SessionUpdateInput:
+        type: object
+        description: At least one of wall_id, date, time, or isSend must be provided.
+        properties:
+            wall_id:
+                type: string
+                example: "664f1a2b3c4d5e6f7a8b9c02"
+            date:
+                type: string
+                format: date-time
+                example: "2024-06-01T10:00:00.000Z"
+            time:
+                type: number
+                example: 120
+            is_private:
+                type: boolean
+            isSend:
+                type: boolean
+                description: Whether the session was a successful send
+
+    SessionOutput:
+        type: object
+        properties:
+            id:
+                type: string
+                example: "664f1a2b3c4d5e6f7a8b9c10"
+            climber_id:
+                type: string
+                example: "664f1a2b3c4d5e6f7a8b9c01"
+            wall_id:
+                type: string
+                example: "664f1a2b3c4d5e6f7a8b9c02"
+            date:
+                type: string
+                format: date-time
+            time:
+                type: number
+            is_private:
+                type: boolean
+            isSend:
+                type: boolean
+                description: Whether the session was a successful send
+            review_id:
+                type: string
+                description: ObjectId of the linked review, if any.
+                example: "664f1a2b3c4d5e6f7a8b9c20"
+            createdAt:
+                type: string
+                format: date-time
+            updatedAt:
+                type: string
+                format: date-time
+
+    # ─── Issues ──────────────────────────────────────────────────────────────
+    IssueInput:
+        type: object
+        required:
+            - wall_id
+            - body
+        properties:
+            wall_id:
+                type: string
+                description: Valid MongoDB ObjectId of the target wall.
+                example: "664f1a2b3c4d5e6f7a8b9c02"
+            body:
+                type: string
+                description: Issue description. Must be non-empty and <= 500 characters.
+                minLength: 1
+                maxLength: 500
+                example: "The left overhang hold is loose and needs inspection."
+            severity:
+                type: string
+                description: Optional severity level
+            description:
+                type: string
+                maxLength: 1000
+            location:
+                type: string
+                maxLength: 200
+
+    IssueOutput:
+        type: object
+        properties:
+            id:
+                type: string
+                example: "664f1a2b3c4d5e6f7a8b9c0d"
+            climber_id:
+                type: string
+                description: ObjectId of the climber who reported the issue.
+                example: "664f1a2b3c4d5e6f7a8b9c01"
+            wall_id:
+                type: string
+                description: ObjectId of the affected wall.
+                example: "664f1a2b3c4d5e6f7a8b9c02"
+            body:
+                type: string
+                example: "The left overhang hold is loose and needs inspection."
+            status:
+                type: string
+                enum: [OPEN, IN_PROGRESS, RESOLVED, CLOSED]
+                default: OPEN
+                example: OPEN
+            submitted_at:
+                type: string
+                format: date-time
+
+    IssueStatusUpdateInput:
+        type: object
+        required:
+            - status
+        properties:
+            status:
+                type: string
+                enum: [OPEN, IN_PROGRESS, RESOLVED, CLOSED]
+                example: IN_PROGRESS
+
+    # ─── Leaderboard ─────────────────────────────────────────────────────────
+    LeaderboardEntry:
+        type: object
+        properties:
+            id:
+                type: string
+            username:
+                type: string
+            avatar:
+                type: string
+            totalAscents:
+                type: integer
+            score:
+                type: integer
+            badges:
+                type: array
+                items:
+                    type: string
+
+    # ─── Notifications ───────────────────────────────────────────────────────
+    NotificationOutput:
+        type: object
+        properties:
+            id:
+                type: string
+            type:
+                type: string
+            message:
+                type: string
+            read:
+                type: boolean
+            createdAt:
+                type: string
+                format: date-time
+
+    # ─── Groups ──────────────────────────────────────────────────────────────
+    GroupInput:
+        type: object
+        required:
+            - name
+        properties:
+            name:
+                type: string
+            description:
+                type: string
+            isPrivate:
+                type: boolean
+                default: false
+
+    GroupOutput:
+        type: object
+        properties:
+            id:
+                type: string
+            name:
+                type: string
+            description:
+                type: string
+            isPrivate:
+                type: boolean
+            members:
+                type: array
+                items:
+                    type: object
+                    properties:
+                        user:
+                            $ref: "#/definitions/PublicUser"
+                        role:
+                            type: string
+                            enum: [admin, manager, member]
+            createdAt:
+                type: string
+                format: date-time
+
+    GroupInviteOutput:
+        type: object
+        properties:
+            id:
+                type: string
+            group:
+                $ref: "#/definitions/GroupOutput"
+            invitedBy:
+                $ref: "#/definitions/PublicUser"
+            status:
+                type: string
+                enum: [pending, accepted, declined]
+            createdAt:
+                type: string
+                format: date-time
+
+    # ─── Events ──────────────────────────────────────────────────────────────
+    EventInput:
+        type: object
+        required:
+            - name
+            - startDate
+            - endDate
+        properties:
+            name:
+                type: string
+            description:
+                type: string
+            startDate:
+                type: string
+                format: date-time
+            endDate:
+                type: string
+                format: date-time
+            wallId:
+                type: string
+            groupId:
+                type: string
+
+    EventOutput:
+        type: object
+        properties:
+            id:
+                type: string
+            name:
+                type: string
+            description:
+                type: string
+            startDate:
+                type: string
+                format: date-time
+            endDate:
+                type: string
+                format: date-time
+            status:
+                type: string
+                enum: [active, closed]
+            createdBy:
+                $ref: "#/definitions/PublicUser"
+            createdAt:
+                type: string
+                format: date-time
+
+    # ─── Planned Climbs ──────────────────────────────────────────────────────
+    PlannedClimbInput:
+        type: object
+        required:
+            - wallId
+            - date
+        properties:
+            wallId:
+                type: string
+            date:
+                type: string
+                format: date-time
+            notes:
+                type: string
+
+    PlannedClimbOutput:
+        type: object
+        properties:
+            id:
+                type: string
+            group:
+                type: string
+            wall:
+                $ref: "#/definitions/WallOutput"
+            date:
+                type: string
+                format: date-time
+            notes:
+                type: string
+            rsvps:
+                type: array
+                items:
+                    type: object
+                    properties:
+                        user:
+                            $ref: "#/definitions/PublicUser"
+                        status:
+                            type: string
+                            enum: [going, not_going]
+            createdAt:
+                type: string
+                format: date-time
+
+    # ─── Conversations ───────────────────────────────────────────────────────
+    ConversationOutput:
+        type: object
+        properties:
+            id:
+                type: string
+            type:
+                type: string
+                enum: [dm, group]
+            participants:
+                type: array
+                items:
+                    $ref: "#/definitions/PublicUser"
+            group:
+                type: object
+                properties:
+                    id:
+                        type: string
+                    name:
+                        type: string
+            lastMessage:
+                $ref: "#/definitions/MessageOutput"
+            hasUpcomingEvent:
+                type: boolean
+                description: Present only on group conversations
+            updatedAt:
+                type: string
+                format: date-time
+
+    MessageOutput:
+        type: object
+        properties:
+            id:
+                type: string
+            conversation:
+                type: string
+            sender:
+                $ref: "#/definitions/PublicUser"
+            content:
+                type: string
+            readBy:
+                type: array
+                items:
+                    type: string
+            createdAt:
+                type: string
+                format: date-time
+
+    # ─── Support ─────────────────────────────────────────────────────────────
+    SupportTicketInput:
+        type: object
+        required:
+            - subject
+            - body
+        properties:
+            subject:
+                type: string
+                maxLength: 200
+            body:
+                type: string
+                maxLength: 2000
+            category:
+                type: string
+                enum: [ACCOUNT, BUG, CONTENT, OTHER]
+
+    SupportTicketOutput:
+        type: object
+        properties:
+            id:
+                type: string
+            subject:
+                type: string
+            body:
+                type: string
+            category:
+                type: string
+                enum: [ACCOUNT, BUG, CONTENT, OTHER]
+            status:
+                type: string
+                enum: [OPEN, IN_PROGRESS, RESOLVED, CLOSED]
+            createdBy:
+                $ref: "#/definitions/PublicUser"
+            replies:
+                type: array
+                items:
+                    type: object
+                    properties:
+                        author:
+                            $ref: "#/definitions/PublicUser"
+                        body:
+                            type: string
+                        createdAt:
+                            type: string
+                            format: date-time
+            createdAt:
+                type: string
+                format: date-time
+            updatedAt:
+                type: string
+                format: date-time
