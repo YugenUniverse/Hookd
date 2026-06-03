@@ -13,6 +13,9 @@ router.use(restrictTo("FacilityOwner", "PublicBody"));
 // GET live dynamic data
 router.get("/wall/:wallId", reportController.getWallReport);
 
+// GET statistics filtered by geographic area and time range
+router.get("/stats/area-time", reportController.getStatisticsByAreaAndTime);
+
 // POST request to generate and save a snapshot
 router.post("/wall/:wallId/save", reportController.saveReport);
 

@@ -12,6 +12,7 @@ import '../services/api_service.dart';
 import '../services/auth_service.dart';
 import '../dialogs/login_dialog.dart';
 import '../pages/report_list_page.dart';
+import '../pages/statistics_page.dart';
 import '../services/report_service.dart';
 import '../pages/events_list_page.dart';
 
@@ -281,6 +282,18 @@ class _PublicBodyPageState extends State<PublicBodyPage> {
                                             token: token,
                                           ),
                                         ),
+                                      ),
+                                    );
+                                  },
+                                ),
+                                const SizedBox(height: 12),
+                                _NavButton(
+                                  icon: Icons.map_outlined,
+                                  label: 'Geographic analytics',
+                                  onTap: () {
+                                    Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder: (_) => const StatisticsPage(),
                                       ),
                                     );
                                   },

@@ -16,6 +16,7 @@ import '../models/group.dart';
 import '../models/conversation.dart';
 import '../models/message.dart';
 import '../models/support_ticket.dart';
+import '../models/statistics_filter.dart';
 import '../constants/api_config.dart';
 import 'auth_service.dart';
 
@@ -133,7 +134,9 @@ class ApiService {
     final map = Map<String, dynamic>.from(data as Map);
     // The public endpoint nests bio/description under 'profile' — flatten it
     if (map['profile'] is Map) {
-      (map['profile'] as Map<dynamic, dynamic>).forEach((k, v) => map.putIfAbsent(k.toString(), () => v));
+      (map['profile'] as Map<dynamic, dynamic>).forEach(
+        (k, v) => map.putIfAbsent(k.toString(), () => v),
+      );
     }
     return User.fromJson(map);
   }
@@ -144,7 +147,9 @@ class ApiService {
     if (data is Map<String, dynamic>) {
       return User.fromJson(data);
     }
-    throw StateError('Unexpected /users/me PATCH response: ${data.runtimeType}');
+    throw StateError(
+      'Unexpected /users/me PATCH response: ${data.runtimeType}',
+    );
   }
 
   Future<List<ClimbingSession>> fetchCurrentUserSessions({
@@ -174,7 +179,10 @@ class ApiService {
         .toList();
   }
 
-  Future<List<ClimbingSession>> getPublicSessions(String userId, {int limit = 20}) async {
+  Future<List<ClimbingSession>> getPublicSessions(
+    String userId, {
+    int limit = 20,
+  }) async {
     try {
       final response = await _dio.get(
         '/sessions/user/$userId',
@@ -251,7 +259,10 @@ class ApiService {
 
   Future<List<Badge>> getSystemBadges() async {
     try {
-      final response = await _dio.get('/badges', queryParameters: {'type': 'system'});
+      final response = await _dio.get(
+        '/badges',
+        queryParameters: {'type': 'system'},
+      );
       final data = response.data;
       if (data is! List) return [];
       return data
@@ -266,10 +277,10 @@ class ApiService {
 
   Future<List<Badge>> getBadgesForEvent(String eventId) async {
     try {
-      final response = await _dio.get('/badges', queryParameters: {
-        'type': 'event',
-        'eventId': eventId,
-      });
+      final response = await _dio.get(
+        '/badges',
+        queryParameters: {'type': 'event', 'eventId': eventId},
+      );
       final data = response.data;
       if (data is! List) return [];
       return data
@@ -539,11 +550,7 @@ class ApiService {
     String description = '',
     String location = '',
   }) async {
-    final payload = {
-      'wall_id': wallId,
-      'body': body,
-      'severity': severity,
-    };
+    final payload = {'wall_id': wallId, 'body': body, 'severity': severity};
     if (description.isNotEmpty) {
       payload['description'] = description;
     }
@@ -637,7 +644,9 @@ class ApiService {
   Future<Map<String, dynamic>> fetchPublicBodyIssueSummary() async {
     try {
       final response = await _dio.get('/issues/public-body/dashboard/summary');
-      return response.data is Map ? Map<String, dynamic>.from(response.data) : {};
+      return response.data is Map
+          ? Map<String, dynamic>.from(response.data)
+          : {};
     } catch (e) {
       print('Error fetching issue summary: $e');
       return {};
@@ -866,7 +875,10 @@ class ApiService {
   }
 
   Future<List<Event>> getEventsForFacility(String facilityId) async {
-    final response = await _dio.get('/events', queryParameters: {'facilityId': facilityId});
+    final response = await _dio.get(
+      '/events',
+      queryParameters: {'facilityId': facilityId},
+    );
     final data = response.data;
     final list = data is Map ? data['events'] : null;
     if (list is! List) return [];
@@ -939,7 +951,10 @@ class ApiService {
       final data = response.data;
       final list = data is Map ? data['followers'] : null;
       if (list is! List) return [];
-      return list.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+      return list
+          .whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
     } catch (_) {
       return [];
     }
@@ -951,7 +966,10 @@ class ApiService {
       final data = response.data;
       final list = data is Map ? data['followers'] : null;
       if (list is! List) return [];
-      return list.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+      return list
+          .whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
     } catch (_) {
       return [];
     }
@@ -963,7 +981,10 @@ class ApiService {
       final data = response.data;
       final list = data is Map ? data['following'] : null;
       if (list is! List) return [];
-      return list.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+      return list
+          .whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
     } catch (_) {
       return [];
     }
@@ -992,7 +1013,10 @@ class ApiService {
       final data = response.data;
       final list = data is Map ? data['following'] : null;
       if (list is! List) return [];
-      return list.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+      return list
+          .whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
     } catch (_) {
       return [];
     }
@@ -1030,11 +1054,15 @@ class ApiService {
     String? description,
     String visibility = 'private',
   }) async {
-    final response = await _dio.post('/groups', data: {
-      'name': name,
-      if (description != null && description.trim().isNotEmpty) 'description': description.trim(),
-      'visibility': visibility,
-    });
+    final response = await _dio.post(
+      '/groups',
+      data: {
+        'name': name,
+        if (description != null && description.trim().isNotEmpty)
+          'description': description.trim(),
+        'visibility': visibility,
+      },
+    );
     return Group.fromJson(Map<String, dynamic>.from(response.data['group']));
   }
 
@@ -1053,7 +1081,11 @@ class ApiService {
     return Group.fromJson(Map<String, dynamic>.from(response.data['group']));
   }
 
-  Future<Group> updateGroup(String groupId, {String? name, String? description}) async {
+  Future<Group> updateGroup(
+    String groupId, {
+    String? name,
+    String? description,
+  }) async {
     final body = <String, dynamic>{};
     if (name != null) body['name'] = name;
     if (description != null) body['description'] = description;
@@ -1095,7 +1127,9 @@ class ApiService {
   Future<List<Group>> discoverGroups({String? search}) async {
     final response = await _dio.get(
       '/groups/discover',
-      queryParameters: search != null && search.isNotEmpty ? {'search': search} : null,
+      queryParameters: search != null && search.isNotEmpty
+          ? {'search': search}
+          : null,
     );
     final list = response.data is Map ? response.data['groups'] : null;
     if (list is! List) return [];
@@ -1113,7 +1147,9 @@ class ApiService {
   Future<List<PlannedClimb>> getPlannedClimbs(String groupId) async {
     final response = await _dio.get('/groups/$groupId/climbs');
     final list = response.data['climbs'] as List;
-    return list.map((e) => PlannedClimb.fromJson(Map<String, dynamic>.from(e))).toList();
+    return list
+        .map((e) => PlannedClimb.fromJson(Map<String, dynamic>.from(e)))
+        .toList();
   }
 
   Future<PlannedClimb> createPlannedClimb(
@@ -1123,40 +1159,79 @@ class ApiService {
     String? venueType,
     String? notes,
   }) async {
-    final response = await _dio.post('/groups/$groupId/climbs', data: {
-      'date': date.toUtc().toIso8601String(),
-      if (venueId != null) 'venueId': venueId,
-      if (venueType != null) 'venueType': venueType,
-      if (notes != null && notes.isNotEmpty) 'notes': notes,
-    });
-    return PlannedClimb.fromJson(Map<String, dynamic>.from(response.data['climb']));
+    final response = await _dio.post(
+      '/groups/$groupId/climbs',
+      data: {
+        'date': date.toUtc().toIso8601String(),
+        if (venueId != null) 'venueId': venueId,
+        if (venueType != null) 'venueType': venueType,
+        if (notes != null && notes.isNotEmpty) 'notes': notes,
+      },
+    );
+    return PlannedClimb.fromJson(
+      Map<String, dynamic>.from(response.data['climb']),
+    );
   }
 
   Future<void> deletePlannedClimb(String groupId, String climbId) async {
     await _dio.delete('/groups/$groupId/climbs/$climbId');
   }
 
-  Future<PlannedClimb> rsvpPlannedClimb(String groupId, String climbId, String status) async {
+  Future<PlannedClimb> rsvpPlannedClimb(
+    String groupId,
+    String climbId,
+    String status,
+  ) async {
     final response = await _dio.patch(
       '/groups/$groupId/climbs/$climbId/rsvp',
       data: {'status': status},
     );
-    return PlannedClimb.fromJson(Map<String, dynamic>.from(response.data['climb']));
+    return PlannedClimb.fromJson(
+      Map<String, dynamic>.from(response.data['climb']),
+    );
+  }
+
+  Future<Map<String, dynamic>> getStatisticsByAreaAndTime(
+    StatisticsFilter filter,
+  ) async {
+    final params = filter.toQueryParams();
+    print('📤 API Call: GET /reports/stats/area-time');
+    print('   Params: $params');
+    try {
+      final response = await _dio.get(
+        '/reports/stats/area-time',
+        queryParameters: params,
+      );
+      print('   Status: ${response.statusCode}');
+      final data = response.data;
+      if (data is Map<String, dynamic>) return data;
+      return Map<String, dynamic>.from(data as Map);
+    } catch (e) {
+      print('   Error: $e');
+      rethrow;
+    }
   }
 
   // Conversation / chat endpoints
 
   Future<List<Map<String, dynamic>>> searchClimbers(String query) async {
-    final response = await _dio.get('/climbers/search', queryParameters: {'q': query});
+    final response = await _dio.get(
+      '/climbers/search',
+      queryParameters: {'q': query},
+    );
     final list = response.data is Map ? response.data['users'] : null;
     if (list is! List) return [];
-    return list.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+    return list
+        .whereType<Map>()
+        .map((e) => Map<String, dynamic>.from(e))
+        .toList();
   }
 
   Future<Conversation> getGroupConversation(String groupId) async {
     final response = await _dio.get('/conversations/group/$groupId');
     return Conversation.fromJson(
-        Map<String, dynamic>.from(response.data['conversation']));
+      Map<String, dynamic>.from(response.data['conversation']),
+    );
   }
 
   Future<List<Conversation>> getConversations() async {
@@ -1172,7 +1247,8 @@ class ApiService {
   Future<Conversation> getOrCreateDm(String targetUserId) async {
     final response = await _dio.post('/conversations/dm/$targetUserId');
     return Conversation.fromJson(
-        Map<String, dynamic>.from(response.data['conversation']));
+      Map<String, dynamic>.from(response.data['conversation']),
+    );
   }
 
   Future<List<ChatMessage>> getMessages(
@@ -1182,10 +1258,7 @@ class ApiService {
   }) async {
     final response = await _dio.get(
       '/conversations/$conversationId/messages',
-      queryParameters: {
-        'limit': limit,
-        if (before != null) 'before': before,
-      },
+      queryParameters: {'limit': limit, if (before != null) 'before': before},
     );
     final list = response.data is Map ? response.data['messages'] : null;
     if (list is! List) return [];
@@ -1196,13 +1269,16 @@ class ApiService {
   }
 
   Future<ChatMessage> sendMessageRest(
-      String conversationId, String content) async {
+    String conversationId,
+    String content,
+  ) async {
     final response = await _dio.post(
       '/conversations/$conversationId/messages',
       data: {'content': content},
     );
     return ChatMessage.fromJson(
-        Map<String, dynamic>.from(response.data['message']));
+      Map<String, dynamic>.from(response.data['message']),
+    );
   }
 
   Future<void> markConversationRead(String conversationId) async {
@@ -1332,5 +1408,4 @@ class ApiService {
     );
     return SupportTicket.fromJson(Map<String, dynamic>.from(response.data['ticket']));
   }
->>>>>>> origin/feat/moderate-content
 }

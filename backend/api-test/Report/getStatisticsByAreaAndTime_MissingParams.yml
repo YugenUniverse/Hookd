@@ -1,0 +1,27 @@
+info:
+  name: getStatisticsByAreaAndTime_MissingParams
+  type: http
+  seq: 10
+
+http:
+  method: GET
+  url: http://localhost:3000/reports/stats/area-time?minLat=40.7128&maxLat=40.8128
+  headers:
+    - name: Content-Type
+      value: application/json
+  params:
+    - name: minLat
+      value: "40.7128"
+      type: query
+    - name: maxLat
+      value: "40.8128"
+      type: query
+  auth:
+    type: bearer
+    token: ""
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
