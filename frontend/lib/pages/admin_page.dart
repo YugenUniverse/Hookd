@@ -14,7 +14,8 @@ class AdminPage extends StatefulWidget {
   State<AdminPage> createState() => _AdminPageState();
 }
 
-class _AdminPageState extends State<AdminPage> with SingleTickerProviderStateMixin {
+class _AdminPageState extends State<AdminPage>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
   bool _isLoading = true;
   List<User> _pendingApprovals = [];
@@ -63,8 +64,9 @@ class _AdminPageState extends State<AdminPage> with SingleTickerProviderStateMix
     try {
       await ApiService().approveAccount(user.id);
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('${user.username} approved')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('${user.username} approved')));
       _fetchData();
     } catch (e) {
       if (mounted) showErrorDetailsDialog(context, e);
@@ -78,11 +80,18 @@ class _AdminPageState extends State<AdminPage> with SingleTickerProviderStateMix
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Reject account'),
-        content: Text('Reject @${user.username}? They will be notified by email.'),
+        content: Text(
+          'Reject @${user.username}? They will be notified by email.',
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
           FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Theme.of(ctx).colorScheme.error),
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(ctx).colorScheme.error,
+            ),
             onPressed: () => Navigator.pop(ctx, true),
             child: const Text('Reject'),
           ),
@@ -95,8 +104,9 @@ class _AdminPageState extends State<AdminPage> with SingleTickerProviderStateMix
     try {
       await ApiService().rejectAccount(user.id);
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('${user.username} rejected')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('${user.username} rejected')));
       _fetchData();
     } catch (e) {
       if (mounted) showErrorDetailsDialog(context, e);
@@ -113,9 +123,14 @@ class _AdminPageState extends State<AdminPage> with SingleTickerProviderStateMix
         title: const Text('Remove review'),
         content: const Text('Remove this review? The author will be notified.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
           FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Theme.of(ctx).colorScheme.error),
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(ctx).colorScheme.error,
+            ),
             onPressed: () => Navigator.pop(ctx, true),
             child: const Text('Remove'),
           ),
@@ -126,10 +141,14 @@ class _AdminPageState extends State<AdminPage> with SingleTickerProviderStateMix
 
     setState(() => _busy.add(id));
     try {
-      await ApiService().adminRemoveReview(id, reason: review['flagReason']?.toString());
+      await ApiService().adminRemoveReview(
+        id,
+        reason: review['flagReason']?.toString(),
+      );
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Review removed')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Review removed')));
       _fetchData();
     } catch (e) {
       if (mounted) showErrorDetailsDialog(context, e);
@@ -144,8 +163,9 @@ class _AdminPageState extends State<AdminPage> with SingleTickerProviderStateMix
     try {
       await ApiService().adminDismissFlag(id);
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Flag dismissed')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Flag dismissed')));
       _fetchData();
     } catch (e) {
       if (mounted) showErrorDetailsDialog(context, e);
@@ -159,6 +179,7 @@ class _AdminPageState extends State<AdminPage> with SingleTickerProviderStateMix
     return Scaffold(
       appBar: AppBar(
         title: const Text('Admin Dashboard'),
+        centerTitle: true,
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -168,6 +189,8 @@ class _AdminPageState extends State<AdminPage> with SingleTickerProviderStateMix
         ],
         bottom: TabBar(
           controller: _tabController,
+          isScrollable: true,
+          tabAlignment: TabAlignment.center,
           tabs: [
             const Tab(text: 'Overview'),
             Tab(
@@ -197,9 +220,7 @@ class _AdminPageState extends State<AdminPage> with SingleTickerProviderStateMix
             Tab(
               child: Row(
                 mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text('Walls'),
-                ],
+                children: [const Text('Walls')],
               ),
             ),
             Tab(
@@ -228,7 +249,6 @@ class _AdminPageState extends State<AdminPage> with SingleTickerProviderStateMix
                 const AdminWallsTab(),
                 _buildSupportList(),
               ],
-
             ),
     );
   }
@@ -256,7 +276,9 @@ class _AdminPageState extends State<AdminPage> with SingleTickerProviderStateMix
         final user = _pendingApprovals[index];
         final isBusy = _busy.contains(user.id);
 
-        final typeLabel = user.userType == 'FacilityOwner' ? 'Gym Operator' : 'Public Body';
+        final typeLabel = user.userType == 'FacilityOwner'
+            ? 'Gym Operator'
+            : 'Public Body';
         final typeIcon = user.userType == 'FacilityOwner'
             ? Icons.fitness_center
             : Icons.account_balance;
@@ -277,22 +299,39 @@ class _AdminPageState extends State<AdminPage> with SingleTickerProviderStateMix
                     CircleAvatar(
                       radius: 20,
                       backgroundColor: cs.primaryContainer,
-                      child: Icon(typeIcon, size: 20, color: cs.onPrimaryContainer),
+                      child: Icon(
+                        typeIcon,
+                        size: 20,
+                        color: cs.onPrimaryContainer,
+                      ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('@${user.username}',
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                          Text(user.email,
-                              style: TextStyle(color: cs.onSurfaceVariant, fontSize: 13)),
+                          Text(
+                            '@${user.username}',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 15,
+                            ),
+                          ),
+                          Text(
+                            user.email,
+                            style: TextStyle(
+                              color: cs.onSurfaceVariant,
+                              fontSize: 13,
+                            ),
+                          ),
                         ],
                       ),
                     ),
                     Chip(
-                      label: Text(typeLabel, style: const TextStyle(fontSize: 11)),
+                      label: Text(
+                        typeLabel,
+                        style: const TextStyle(fontSize: 11),
+                      ),
                       padding: EdgeInsets.zero,
                       visualDensity: VisualDensity.compact,
                       backgroundColor: cs.secondaryContainer,
@@ -306,31 +345,55 @@ class _AdminPageState extends State<AdminPage> with SingleTickerProviderStateMix
                 ],
                 if (user.facilityData?.name != null) ...[
                   const SizedBox(height: 4),
-                  Row(children: [
-                    Icon(Icons.business, size: 14, color: cs.onSurfaceVariant),
-                    const SizedBox(width: 4),
-                    Text(user.facilityData!.name,
-                        style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant)),
-                  ]),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.business,
+                        size: 14,
+                        color: cs.onSurfaceVariant,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        user.facilityData!.name,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: cs.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
                 if (user.publicBodyData?.address != null) ...[
                   const SizedBox(height: 4),
-                  Row(children: [
-                    Icon(Icons.location_on_outlined, size: 14, color: cs.onSurfaceVariant),
-                    const SizedBox(width: 4),
-                    Expanded(
-                      child: Text(user.publicBodyData!.address!,
-                          style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant),
-                          overflow: TextOverflow.ellipsis),
-                    ),
-                  ]),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.location_on_outlined,
+                        size: 14,
+                        color: cs.onSurfaceVariant,
+                      ),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          user.publicBodyData!.address!,
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: cs.onSurfaceVariant,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
                 if (user.bio != null && user.bio!.isNotEmpty) ...[
                   const SizedBox(height: 8),
-                  Text(user.bio!,
-                      style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis),
+                  Text(
+                    user.bio!,
+                    style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ],
                 const SizedBox(height: 12),
                 if (isBusy)
@@ -339,20 +402,24 @@ class _AdminPageState extends State<AdminPage> with SingleTickerProviderStateMix
                   Row(
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
-                      OutlinedButton.icon(
-                        onPressed: () => _handleReject(user),
-                        icon: const Icon(Icons.close, size: 16),
-                        label: const Text('Reject'),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: cs.error,
-                          side: BorderSide(color: cs.error),
+                      Flexible(
+                        child: OutlinedButton.icon(
+                          onPressed: () => _handleReject(user),
+                          icon: const Icon(Icons.close, size: 16),
+                          label: const Text('Reject'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: cs.error,
+                            side: BorderSide(color: cs.error),
+                          ),
                         ),
                       ),
                       const SizedBox(width: 8),
-                      FilledButton.icon(
-                        onPressed: () => _handleApprove(user),
-                        icon: const Icon(Icons.check, size: 16),
-                        label: const Text('Approve'),
+                      Flexible(
+                        child: FilledButton.icon(
+                          onPressed: () => _handleApprove(user),
+                          icon: const Icon(Icons.check, size: 16),
+                          label: const Text('Approve'),
+                        ),
                       ),
                     ],
                   ),
@@ -401,7 +468,9 @@ class _AdminPageState extends State<AdminPage> with SingleTickerProviderStateMix
         }
 
         final reviewerName = extractField(climber, ['username', 'email']);
-        final reviewerEmail = climber is Map ? (climber['email']?.toString() ?? '') : '';
+        final reviewerEmail = climber is Map
+            ? (climber['email']?.toString() ?? '')
+            : '';
         final wallName = extractField(wall, ['name']);
         final body = (review['body'] ?? '').toString();
         final rating = (review['rating'] ?? 0) as num;
@@ -417,7 +486,10 @@ class _AdminPageState extends State<AdminPage> with SingleTickerProviderStateMix
                 Container(
                   width: double.infinity,
                   color: cs.errorContainer,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 10,
+                  ),
                   child: Row(
                     children: [
                       Icon(Icons.flag, size: 15, color: cs.onErrorContainer),
@@ -441,7 +513,9 @@ class _AdminPageState extends State<AdminPage> with SingleTickerProviderStateMix
                       radius: 22,
                       backgroundColor: cs.surfaceContainerHighest,
                       child: Text(
-                        reviewerName.isNotEmpty ? reviewerName[0].toUpperCase() : '?',
+                        reviewerName.isNotEmpty
+                            ? reviewerName[0].toUpperCase()
+                            : '?',
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
                           color: cs.onSurfaceVariant,
@@ -453,11 +527,21 @@ class _AdminPageState extends State<AdminPage> with SingleTickerProviderStateMix
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('@$reviewerName',
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                          Text(
+                            '@$reviewerName',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 15,
+                            ),
+                          ),
                           if (reviewerEmail.isNotEmpty)
-                            Text(reviewerEmail,
-                                style: TextStyle(color: cs.onSurfaceVariant, fontSize: 13)),
+                            Text(
+                              reviewerEmail,
+                              style: TextStyle(
+                                color: cs.onSurfaceVariant,
+                                fontSize: 13,
+                              ),
+                            ),
                         ],
                       ),
                     ),
@@ -474,22 +558,32 @@ class _AdminPageState extends State<AdminPage> with SingleTickerProviderStateMix
                         Icon(Icons.terrain, size: 15, color: cs.primary),
                         const SizedBox(width: 6),
                         Expanded(
-                          child: Text(wallName,
-                              style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w500,
-                                  color: cs.onSurface),
-                              overflow: TextOverflow.ellipsis),
+                          child: Text(
+                            wallName,
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                              color: cs.onSurface,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 6),
                     Row(
-                      children: List.generate(5, (i) => Icon(
-                        i < rating ? Icons.star_rounded : Icons.star_outline_rounded,
-                        size: 18,
-                        color: i < rating ? Colors.amber.shade600 : cs.outlineVariant,
-                      )),
+                      children: List.generate(
+                        5,
+                        (i) => Icon(
+                          i < rating
+                              ? Icons.star_rounded
+                              : Icons.star_outline_rounded,
+                          size: 18,
+                          color: i < rating
+                              ? Colors.amber.shade600
+                              : cs.outlineVariant,
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -504,9 +598,9 @@ class _AdminPageState extends State<AdminPage> with SingleTickerProviderStateMix
                   child: Text(
                     body,
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: cs.onSurface,
-                          height: 1.5,
-                        ),
+                      color: cs.onSurface,
+                      height: 1.5,
+                    ),
                     maxLines: 4,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -519,17 +613,23 @@ class _AdminPageState extends State<AdminPage> with SingleTickerProviderStateMix
                     : Row(
                         mainAxisAlignment: MainAxisAlignment.end,
                         children: [
-                          OutlinedButton.icon(
-                            onPressed: () => _handleDismiss(review),
-                            icon: const Icon(Icons.check, size: 16),
-                            label: const Text('Dismiss'),
+                          Flexible(
+                            child: OutlinedButton.icon(
+                              onPressed: () => _handleDismiss(review),
+                              icon: const Icon(Icons.check, size: 16),
+                              label: const Text('Dismiss'),
+                            ),
                           ),
                           const SizedBox(width: 8),
-                          FilledButton.icon(
-                            onPressed: () => _handleRemove(review),
-                            icon: const Icon(Icons.delete_outline, size: 16),
-                            label: const Text('Remove'),
-                            style: FilledButton.styleFrom(backgroundColor: cs.error),
+                          Flexible(
+                            child: FilledButton.icon(
+                              onPressed: () => _handleRemove(review),
+                              icon: const Icon(Icons.delete_outline, size: 16),
+                              label: const Text('Remove'),
+                              style: FilledButton.styleFrom(
+                                backgroundColor: cs.error,
+                              ),
+                            ),
                           ),
                         ],
                       ),
@@ -588,9 +688,13 @@ class _AdminPageState extends State<AdminPage> with SingleTickerProviderStateMix
                         Row(
                           children: [
                             Expanded(
-                              child: Text(ticket.subject,
-                                  style: const TextStyle(
-                                      fontWeight: FontWeight.bold, fontSize: 15)),
+                              child: Text(
+                                ticket.subject,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 15,
+                                ),
+                              ),
                             ),
                             const SizedBox(width: 8),
                             SupportStatusChip(status: ticket.status),
@@ -598,32 +702,59 @@ class _AdminPageState extends State<AdminPage> with SingleTickerProviderStateMix
                         ),
                         const SizedBox(height: 6),
                         if (ticket.user != null) ...[
-                          Row(children: [
-                            Icon(Icons.person_outline, size: 14, color: cs.onSurfaceVariant),
-                            const SizedBox(width: 4),
-                            Text(
-                              '@${ticket.user!['username'] ?? ticket.user!['email'] ?? ''}',
-                              style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
-                            ),
-                          ]),
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.person_outline,
+                                size: 14,
+                                color: cs.onSurfaceVariant,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                '@${ticket.user!['username'] ?? ticket.user!['email'] ?? ''}',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: cs.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ),
                           const SizedBox(height: 4),
                         ],
-                        Text(ticket.body,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant)),
+                        Text(
+                          ticket.body,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: cs.onSurfaceVariant,
+                          ),
+                        ),
                         const SizedBox(height: 8),
-                        Row(children: [
-                          SupportCategoryChip(category: ticket.category),
-                          const Spacer(),
-                          if (ticket.hasReply)
-                            Row(children: [
-                              Icon(Icons.reply, size: 14, color: cs.primary),
-                              const SizedBox(width: 4),
-                              Text('Replied',
-                                  style: TextStyle(fontSize: 12, color: cs.primary)),
-                            ]),
-                        ]),
+                        Row(
+                          children: [
+                            SupportCategoryChip(category: ticket.category),
+                            const Spacer(),
+                            if (ticket.hasReply)
+                              Row(
+                                children: [
+                                  Icon(
+                                    Icons.reply,
+                                    size: 14,
+                                    color: cs.primary,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'Replied',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: cs.primary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                          ],
+                        ),
                       ],
                     ),
                   ),
@@ -639,6 +770,7 @@ class _AdminPageState extends State<AdminPage> with SingleTickerProviderStateMix
   Widget _buildTicketFilterBar(ColorScheme cs, List<String> statuses) {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
+      clipBehavior: Clip.hardEdge,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Row(
         children: [
@@ -651,17 +783,24 @@ class _AdminPageState extends State<AdminPage> with SingleTickerProviderStateMix
             },
           ),
           const SizedBox(width: 8),
-          ...statuses.map((s) => Padding(
-                padding: const EdgeInsets.only(right: 8),
-                child: FilterChip(
-                  label: Text(s.replaceAll('_', ' ')),
-                  selected: _ticketStatusFilter == s,
-                  onSelected: (_) {
-                    setState(() => _ticketStatusFilter = _ticketStatusFilter == s ? null : s);
-                    _fetchData();
-                  },
-                ),
-              )),
+          ...statuses.asMap().entries.map(
+            (entry) => Padding(
+              padding: entry.key < statuses.length - 1
+                  ? const EdgeInsets.only(right: 8)
+                  : EdgeInsets.zero,
+              child: FilterChip(
+                label: Text(entry.value.replaceAll('_', ' ')),
+                selected: _ticketStatusFilter == entry.value,
+                onSelected: (_) {
+                  setState(
+                    () => _ticketStatusFilter =
+                        _ticketStatusFilter == entry.value ? null : entry.value,
+                  );
+                  _fetchData();
+                },
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -700,7 +839,9 @@ class _AdminTicketDialogState extends State<_AdminTicketDialog> {
   void initState() {
     super.initState();
     _replyCtrl.text = widget.ticket.adminReply ?? '';
-    _selectedStatus = widget.ticket.status == 'OPEN' ? 'IN_PROGRESS' : widget.ticket.status;
+    _selectedStatus = widget.ticket.status == 'OPEN'
+        ? 'IN_PROGRESS'
+        : widget.ticket.status;
   }
 
   @override
@@ -747,7 +888,9 @@ class _AdminTicketDialogState extends State<_AdminTicketDialog> {
     return AlertDialog(
       title: Row(
         children: [
-          Expanded(child: Text(ticket.subject, style: const TextStyle(fontSize: 16))),
+          Expanded(
+            child: Text(ticket.subject, style: const TextStyle(fontSize: 16)),
+          ),
           const SizedBox(width: 8),
           SupportStatusChip(status: ticket.status),
         ],
@@ -767,20 +910,32 @@ class _AdminTicketDialogState extends State<_AdminTicketDialog> {
               const SizedBox(height: 4),
               SupportCategoryChip(category: ticket.category),
               const SizedBox(height: 12),
-              Text(ticket.body, style: const TextStyle(fontSize: 14, height: 1.5)),
+              Text(
+                ticket.body,
+                style: const TextStyle(fontSize: 14, height: 1.5),
+              ),
               const SizedBox(height: 16),
               const Divider(),
               const SizedBox(height: 8),
               DropdownButtonFormField<String>(
                 initialValue: _selectedStatus,
-                decoration: const InputDecoration(labelText: 'Set Status', isDense: true),
+                decoration: const InputDecoration(
+                  labelText: 'Set Status',
+                  isDense: true,
+                ),
                 items: _statuses
-                    .map((s) => DropdownMenuItem(
-                          value: s,
-                          child: Text(s.replaceAll('_', ' ')),
-                        ))
+                    .map(
+                      (s) => DropdownMenuItem(
+                        value: s,
+                        child: Text(s.replaceAll('_', ' ')),
+                      ),
+                    )
                     .toList(),
-                onChanged: _isSubmitting ? null : (v) => setState(() => _selectedStatus = v ?? _selectedStatus),
+                onChanged: _isSubmitting
+                    ? null
+                    : (v) => setState(
+                        () => _selectedStatus = v ?? _selectedStatus,
+                      ),
               ),
               const SizedBox(height: 12),
               TextField(
@@ -803,13 +958,19 @@ class _AdminTicketDialogState extends State<_AdminTicketDialog> {
           child: const Text('Cancel'),
         ),
         OutlinedButton(
-          onPressed: _isSubmitting ? null : () => _updateStatusOnly(_selectedStatus),
+          onPressed: _isSubmitting
+              ? null
+              : () => _updateStatusOnly(_selectedStatus),
           child: const Text('Status Only'),
         ),
         FilledButton(
           onPressed: _isSubmitting ? null : _submitReply,
           child: _isSubmitting
-              ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
               : const Text('Send Reply'),
         ),
       ],

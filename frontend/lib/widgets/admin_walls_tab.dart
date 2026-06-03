@@ -235,10 +235,12 @@ class _AdminWallsTabState extends State<AdminWallsTab> {
                 ),
               ),
               const SizedBox(width: 16),
-              FilledButton.icon(
-                onPressed: _showWallDialog,
-                icon: const Icon(Icons.add),
-                label: const Text('Add Wall'),
+              Flexible(
+                child: FilledButton.icon(
+                  onPressed: _showWallDialog,
+                  icon: const Icon(Icons.add),
+                  label: const Text('Add Wall'),
+                ),
               ),
             ],
           ),

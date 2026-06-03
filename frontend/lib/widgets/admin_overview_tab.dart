@@ -171,6 +171,7 @@ class _AdminOverviewTabState extends State<AdminOverviewTab> {
           } else if (snapshot.hasData) {
             final metrics = snapshot.data!;
             return SingleChildScrollView(
+              clipBehavior: Clip.hardEdge,
               padding: const EdgeInsets.all(16.0),
               physics: const AlwaysScrollableScrollPhysics(),
               child: Column(
