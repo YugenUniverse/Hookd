@@ -25,12 +25,16 @@ class _AdminOverviewTabState extends State<AdminOverviewTab> {
 
   void _refreshMetrics() {
     setState(() {
-      _metricsFuture = _apiService.getAdminMetrics(startDate: _startDate, endDate: _endDate);
+      _metricsFuture = _apiService.getAdminMetrics(
+        startDate: _startDate,
+        endDate: _endDate,
+      );
     });
   }
 
   Future<void> _selectDateRange(BuildContext context) async {
-    DateTime tempStart = _startDate ?? DateTime.now().subtract(const Duration(days: 30));
+    DateTime tempStart =
+        _startDate ?? DateTime.now().subtract(const Duration(days: 30));
     DateTime tempEnd = _endDate ?? DateTime.now();
     bool pickingStart = true;
 
@@ -50,17 +54,29 @@ class _AdminOverviewTabState extends State<AdminOverviewTab> {
                       children: [
                         Expanded(
                           child: InkWell(
-                            onTap: () => setDialogState(() => pickingStart = true),
+                            onTap: () =>
+                                setDialogState(() => pickingStart = true),
                             child: Container(
                               padding: const EdgeInsets.all(8),
                               decoration: BoxDecoration(
-                                color: pickingStart ? Theme.of(context).primaryColor.withValues(alpha: 0.2) : Colors.transparent,
+                                color: pickingStart
+                                    ? Theme.of(
+                                        context,
+                                      ).primaryColor.withValues(alpha: 0.2)
+                                    : Colors.transparent,
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Column(
                                 children: [
-                                  const Text('Start Date', style: TextStyle(fontWeight: FontWeight.bold)),
-                                  Text(DateFormat('MMM d, yyyy').format(tempStart)),
+                                  const Text(
+                                    'Start Date',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  Text(
+                                    DateFormat('MMM d, yyyy').format(tempStart),
+                                  ),
                                 ],
                               ),
                             ),
@@ -68,17 +84,29 @@ class _AdminOverviewTabState extends State<AdminOverviewTab> {
                         ),
                         Expanded(
                           child: InkWell(
-                            onTap: () => setDialogState(() => pickingStart = false),
+                            onTap: () =>
+                                setDialogState(() => pickingStart = false),
                             child: Container(
                               padding: const EdgeInsets.all(8),
                               decoration: BoxDecoration(
-                                color: !pickingStart ? Theme.of(context).primaryColor.withValues(alpha: 0.2) : Colors.transparent,
+                                color: !pickingStart
+                                    ? Theme.of(
+                                        context,
+                                      ).primaryColor.withValues(alpha: 0.2)
+                                    : Colors.transparent,
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Column(
                                 children: [
-                                  const Text('End Date', style: TextStyle(fontWeight: FontWeight.bold)),
-                                  Text(DateFormat('MMM d, yyyy').format(tempEnd)),
+                                  const Text(
+                                    'End Date',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  Text(
+                                    DateFormat('MMM d, yyyy').format(tempEnd),
+                                  ),
                                 ],
                               ),
                             ),
@@ -180,8 +208,8 @@ class _AdminOverviewTabState extends State<AdminOverviewTab> {
                   Text(
                     'System Health',
                     style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                   const SizedBox(height: 16),
                   _buildSummaryGrid(metrics),
@@ -194,8 +222,8 @@ class _AdminOverviewTabState extends State<AdminOverviewTab> {
                             ? 'Growth (${DateFormat('MMM d, y').format(_startDate!)} - ${DateFormat('MMM d, y').format(_endDate!)})'
                             : 'Growth (Last 12 Months)',
                         style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                              fontWeight: FontWeight.bold,
-                            ),
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                       Row(
                         children: [
@@ -239,13 +267,48 @@ class _AdminOverviewTabState extends State<AdminOverviewTab> {
           crossAxisSpacing: 16,
           childAspectRatio: 1.5,
           children: [
-            _buildStatCard('Active Users (30d)', metrics.activeUsers, Icons.local_fire_department, Colors.orange),
-            _buildStatCard('Total Users', metrics.totalUsers, Icons.people, Colors.blue),
-            _buildStatCard('Total Walls', metrics.totalWalls, Icons.terrain, Colors.green),
-            _buildStatCard('Total Reviews', metrics.totalReviews, Icons.star, Colors.amber),
-            _buildStatCard('Total Groups', metrics.totalGroups, Icons.group_work, Colors.purple),
-            _buildStatCard('Total Events', metrics.totalEvents, Icons.event, Colors.teal),
-            _buildStatCard('Open Reports', metrics.openReports, Icons.flag, Colors.red),
+            _buildStatCard(
+              'Active Users (30d)',
+              metrics.activeUsers,
+              Icons.local_fire_department,
+              Colors.orange,
+            ),
+            _buildStatCard(
+              'Total Users',
+              metrics.totalUsers,
+              Icons.people,
+              Colors.blue,
+            ),
+            _buildStatCard(
+              'Total Walls',
+              metrics.totalWalls,
+              Icons.terrain,
+              Colors.green,
+            ),
+            _buildStatCard(
+              'Total Reviews',
+              metrics.totalReviews,
+              Icons.star,
+              Colors.amber,
+            ),
+            _buildStatCard(
+              'Total Groups',
+              metrics.totalGroups,
+              Icons.group_work,
+              Colors.purple,
+            ),
+            _buildStatCard(
+              'Total Events',
+              metrics.totalEvents,
+              Icons.event,
+              Colors.teal,
+            ),
+            _buildStatCard(
+              'Open Reports',
+              metrics.openReports,
+              Icons.flag,
+              Colors.red,
+            ),
           ],
         );
       },
@@ -283,10 +346,7 @@ class _AdminOverviewTabState extends State<AdminOverviewTab> {
             const Spacer(),
             Text(
               value.toString(),
-              style: const TextStyle(
-                fontSize: 28,
-                fontWeight: FontWeight.bold,
-              ),
+              style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
             ),
           ],
         ),
@@ -302,15 +362,35 @@ class _AdminOverviewTabState extends State<AdminOverviewTab> {
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
-            _buildChartSection('User Registrations', graphs.userRegistrations, Colors.blue),
+            _buildChartSection(
+              'User Registrations',
+              graphs.userRegistrations,
+              Colors.blue,
+            ),
             const Divider(height: 32),
-            _buildChartSection('Sessions Logged', graphs.sessionsLogged, Colors.orange),
+            _buildChartSection(
+              'Sessions Logged',
+              graphs.sessionsLogged,
+              Colors.orange,
+            ),
             const Divider(height: 32),
-            _buildChartSection('Events Created', graphs.eventsCreated, Colors.teal),
+            _buildChartSection(
+              'Events Created',
+              graphs.eventsCreated,
+              Colors.teal,
+            ),
             const Divider(height: 32),
-            _buildChartSection('Reviews Added', graphs.reviewsAdded, Colors.amber),
+            _buildChartSection(
+              'Reviews Added',
+              graphs.reviewsAdded,
+              Colors.amber,
+            ),
             const Divider(height: 32),
-            _buildChartSection('Groups Created', graphs.groupsCreated, Colors.purple),
+            _buildChartSection(
+              'Groups Created',
+              graphs.groupsCreated,
+              Colors.purple,
+            ),
             const Divider(height: 32),
             _buildChartSection('Walls Added', graphs.wallsAdded, Colors.green),
           ],
@@ -319,7 +399,11 @@ class _AdminOverviewTabState extends State<AdminOverviewTab> {
     );
   }
 
-  Widget _buildChartSection(String title, List<GraphDataPoint> data, Color color) {
+  Widget _buildChartSection(
+    String title,
+    List<GraphDataPoint> data,
+    Color color,
+  ) {
     if (data.isEmpty) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -363,8 +447,12 @@ class _AdminOverviewTabState extends State<AdminOverviewTab> {
               gridData: FlGridData(show: false),
               titlesData: FlTitlesData(
                 show: true,
-                rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                rightTitles: AxisTitles(
+                  sideTitles: SideTitles(showTitles: false),
+                ),
+                topTitles: AxisTitles(
+                  sideTitles: SideTitles(showTitles: false),
+                ),
                 bottomTitles: AxisTitles(
                   sideTitles: SideTitles(
                     showTitles: true,
@@ -377,7 +465,10 @@ class _AdminOverviewTabState extends State<AdminOverviewTab> {
                           padding: const EdgeInsets.only(top: 8.0),
                           child: Text(
                             '${point.month}/${point.year.toString().substring(2)}',
-                            style: const TextStyle(fontSize: 10, color: Colors.grey),
+                            style: const TextStyle(
+                              fontSize: 10,
+                              color: Colors.grey,
+                            ),
                           ),
                         );
                       }
@@ -393,7 +484,10 @@ class _AdminOverviewTabState extends State<AdminOverviewTab> {
                       if (value % 1 == 0) {
                         return Text(
                           value.toInt().toString(),
-                          style: const TextStyle(fontSize: 10, color: Colors.grey),
+                          style: const TextStyle(
+                            fontSize: 10,
+                            color: Colors.grey,
+                          ),
                         );
                       }
                       return const Text('');

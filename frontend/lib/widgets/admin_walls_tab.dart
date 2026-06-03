@@ -48,9 +48,9 @@ class _AdminWallsTabState extends State<AdminWallsTab> {
       if (mounted) setState(() => _walls = walls);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error searching walls: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error searching walls: $e')));
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -64,9 +64,14 @@ class _AdminWallsTabState extends State<AdminWallsTab> {
         title: const Text('Delete Wall'),
         content: Text('Are you sure you want to delete ${wall.name}?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
           FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Theme.of(ctx).colorScheme.error),
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(ctx).colorScheme.error,
+            ),
             onPressed: () => Navigator.pop(ctx, true),
             child: const Text('Delete'),
           ),
@@ -80,7 +85,9 @@ class _AdminWallsTabState extends State<AdminWallsTab> {
       final success = await ApiService().deleteWall(wall.id);
       if (success) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Wall deleted')));
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('Wall deleted')));
           _searchWalls(_searchController.text);
         }
       } else {
@@ -88,7 +95,9 @@ class _AdminWallsTabState extends State<AdminWallsTab> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error deleting wall: $e')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error deleting wall: $e')));
       }
     }
   }
@@ -118,39 +127,64 @@ class _AdminWallsTabState extends State<AdminWallsTab> {
                       if (wall == null) ...[
                         DropdownButtonFormField<String>(
                           value: selectedPublicBodyId,
-                          decoration: const InputDecoration(labelText: 'Assign to Public Body'),
+                          decoration: const InputDecoration(
+                            labelText: 'Assign to Public Body',
+                          ),
                           items: _publicBodies.map((pb) {
                             return DropdownMenuItem(
                               value: pb.id,
                               child: Text(pb.name ?? pb.username),
                             );
                           }).toList(),
-                          onChanged: (v) => setStateDialog(() => selectedPublicBodyId = v),
-                          validator: (v) => v == null ? 'Please select a Public Body' : null,
+                          onChanged: (v) =>
+                              setStateDialog(() => selectedPublicBodyId = v),
+                          validator: (v) =>
+                              v == null ? 'Please select a Public Body' : null,
                         ),
                         const SizedBox(height: 16),
                       ],
                       TextFormField(
                         controller: nameCtrl,
-                        decoration: const InputDecoration(labelText: 'Wall Name'),
+                        decoration: const InputDecoration(
+                          labelText: 'Wall Name',
+                        ),
                         validator: (v) => v!.isEmpty ? 'Required' : null,
                       ),
                       const SizedBox(height: 16),
                       TextFormField(
                         controller: descCtrl,
-                        decoration: const InputDecoration(labelText: 'Description'),
+                        decoration: const InputDecoration(
+                          labelText: 'Description',
+                        ),
                         maxLines: 3,
                       ),
                       const SizedBox(height: 16),
                       DropdownButtonFormField<String>(
                         value: difficulty,
-                        decoration: const InputDecoration(labelText: 'Difficulty'),
+                        decoration: const InputDecoration(
+                          labelText: 'Difficulty',
+                        ),
                         items: const [
-                          DropdownMenuItem(value: 'UNKNOWN', child: Text('Unknown')),
-                          DropdownMenuItem(value: 'BEGINNER', child: Text('Beginner')),
-                          DropdownMenuItem(value: 'INTERMEDIATE', child: Text('Intermediate')),
-                          DropdownMenuItem(value: 'ADVANCED', child: Text('Advanced')),
-                          DropdownMenuItem(value: 'EXPERT', child: Text('Expert')),
+                          DropdownMenuItem(
+                            value: 'UNKNOWN',
+                            child: Text('Unknown'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'BEGINNER',
+                            child: Text('Beginner'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'INTERMEDIATE',
+                            child: Text('Intermediate'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'ADVANCED',
+                            child: Text('Advanced'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'EXPERT',
+                            child: Text('Expert'),
+                          ),
                         ],
                         onChanged: (v) => setStateDialog(() => difficulty = v!),
                       ),
@@ -158,12 +192,26 @@ class _AdminWallsTabState extends State<AdminWallsTab> {
                         const SizedBox(height: 16),
                         DropdownButtonFormField<String>(
                           value: status,
-                          decoration: const InputDecoration(labelText: 'Status'),
+                          decoration: const InputDecoration(
+                            labelText: 'Status',
+                          ),
                           items: const [
-                            DropdownMenuItem(value: 'OPEN', child: Text('Open')),
-                            DropdownMenuItem(value: 'CLOSED', child: Text('Closed')),
-                            DropdownMenuItem(value: 'UNDER_MAINTAINANCE', child: Text('Under Maintenance')),
-                            DropdownMenuItem(value: 'PERMANENTLY_CLOSED', child: Text('Permanently Closed')),
+                            DropdownMenuItem(
+                              value: 'OPEN',
+                              child: Text('Open'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'CLOSED',
+                              child: Text('Closed'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'UNDER_MAINTAINANCE',
+                              child: Text('Under Maintenance'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'PERMANENTLY_CLOSED',
+                              child: Text('Permanently Closed'),
+                            ),
                           ],
                           onChanged: (v) => setStateDialog(() => status = v!),
                         ),
@@ -173,7 +221,10 @@ class _AdminWallsTabState extends State<AdminWallsTab> {
                 ),
               ),
               actions: [
-                TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: const Text('Cancel'),
+                ),
                 FilledButton(
                   onPressed: () async {
                     if (!formKey.currentState!.validate()) return;
@@ -209,7 +260,9 @@ class _AdminWallsTabState extends State<AdminWallsTab> {
 
     if (success == true) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Saved successfully')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Saved successfully')));
         _searchWalls(_searchController.text);
       }
     }
@@ -249,34 +302,40 @@ class _AdminWallsTabState extends State<AdminWallsTab> {
           child: _isLoading
               ? const Center(child: CircularProgressIndicator())
               : _walls.isEmpty
-                  ? const Center(child: Text('No walls found'))
-                  : ListView.builder(
-                      itemCount: _walls.length,
-                      itemBuilder: (context, index) {
-                        final wall = _walls[index];
-                        return Card(
-                          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                          child: ListTile(
-                            title: Text(wall.name),
-                            subtitle: Text('${wall.wallType} - ${wall.status}'),
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                IconButton(
-                                  icon: const Icon(Icons.edit),
-                                  onPressed: () => _showWallDialog(wall: wall),
-                                ),
-                                if (wall.wallType == 'OutdoorWall')
-                                  IconButton(
-                                    icon: const Icon(Icons.delete, color: Colors.red),
-                                    onPressed: () => _deleteWall(wall),
-                                  ),
-                              ],
+              ? const Center(child: Text('No walls found'))
+              : ListView.builder(
+                  itemCount: _walls.length,
+                  itemBuilder: (context, index) {
+                    final wall = _walls[index];
+                    return Card(
+                      margin: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
+                      child: ListTile(
+                        title: Text(wall.name),
+                        subtitle: Text('${wall.wallType} - ${wall.status}'),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.edit),
+                              onPressed: () => _showWallDialog(wall: wall),
                             ),
-                          ),
-                        );
-                      },
-                    ),
+                            if (wall.wallType == 'OutdoorWall')
+                              IconButton(
+                                icon: const Icon(
+                                  Icons.delete,
+                                  color: Colors.red,
+                                ),
+                                onPressed: () => _deleteWall(wall),
+                              ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
         ),
       ],
     );
