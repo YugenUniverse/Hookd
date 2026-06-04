@@ -117,7 +117,7 @@ class _UserPageState extends State<UserPage> {
 
     await AuthService().logout();
     if (!mounted) return;
-    navigator.pop();
+    if (navigator.canPop()) navigator.pop();
     messenger.showSnackBar(const SnackBar(content: Text('Logged out')));
   }
 

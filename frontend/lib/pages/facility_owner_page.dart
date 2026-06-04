@@ -80,7 +80,7 @@ class _FacilityOwnerPageState extends State<FacilityOwnerPage> {
     if (confirmed != true) return;
     await AuthService().logout();
     if (!mounted) return;
-    Navigator.of(context).pop();
+    if (Navigator.of(context).canPop()) Navigator.of(context).pop();
     messenger.showSnackBar(const SnackBar(content: Text('Logged out')));
   }
 

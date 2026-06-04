@@ -113,6 +113,7 @@ class _MyHomePageState extends State<MyHomePage>
       _pushMsgSub?.cancel();
       _pushMsgSub = null;
       ChatService().disconnect();
+      if (_panelTag != null) _closePanel();
       return;
     }
     if (!_avatarLoadAttempted) {
@@ -599,7 +600,14 @@ class _MyHomePageState extends State<MyHomePage>
                                       ),
                                     ],
                                   ),
-                                  Expanded(child: _panelContent!),
+                                  Expanded(
+                                    child: Navigator(
+                                      onGenerateRoute: (settings) =>
+                                          MaterialPageRoute(
+                                        builder: (_) => _panelContent!,
+                                      ),
+                                    ),
+                                  ),
                                 ],
                               ),
                             ),
