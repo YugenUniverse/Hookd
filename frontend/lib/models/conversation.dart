@@ -30,8 +30,9 @@ class Conversation {
       id: json['id']?.toString() ?? json['_id']?.toString() ?? '',
       type: json['type']?.toString() ?? 'dm',
       participants: (json['participants'] as List?)
-              ?.map((p) => ConversationParticipant.fromJson(
-                  Map<String, dynamic>.from(p as Map)))
+              ?.whereType<Map>()
+              .map((p) => ConversationParticipant.fromJson(
+                  Map<String, dynamic>.from(p)))
               .toList() ??
           [],
       groupId: group is Map

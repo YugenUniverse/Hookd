@@ -152,9 +152,12 @@ class _POIMapState extends State<POIMap> {
     });
   }
 
+  static const LatLng _defaultCenter = LatLng(46.067, 11.117);
+
   @override
   void initState() {
     super.initState();
+    _fetchPoisForLocation(_defaultCenter.longitude, _defaultCenter.latitude);
     _initLocation();
     _setupMapListener();
     widget.controller?.addListener(_handleControllerCommand);
@@ -542,7 +545,7 @@ class _POIMapState extends State<POIMap> {
             FlutterMap(
               mapController: _mapController,
               options: MapOptions(
-                initialCenter: const LatLng(46.067, 11.117),
+                initialCenter: _defaultCenter,
                 initialZoom: _effectiveDefaultZoom,
                 // Prevents zooming out past the Trentino Alto Adige scale (~220km visible).
                 minZoom: 8,

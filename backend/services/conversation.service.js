@@ -34,7 +34,8 @@ exports.getOrCreateDm = async (userId, targetId) => {
 
     if (existing) return existing;
 
-    return Conversation.create({ type: "dm", participants: [userId, targetId] });
+    const created = await Conversation.create({ type: "dm", participants: [userId, targetId] });
+    return created.populate("participants", "username avatar");
 };
 
 // Create the group conversation (called when a group is created)
