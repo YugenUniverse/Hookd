@@ -88,7 +88,6 @@ class BadgeIcon extends StatelessWidget {
       message: message,
       child: Container(
         padding: const EdgeInsets.all(12),
-        margin: const EdgeInsets.symmetric(horizontal: 4),
         decoration: BoxDecoration(
           color: bgColor,
           shape: BoxShape.circle,

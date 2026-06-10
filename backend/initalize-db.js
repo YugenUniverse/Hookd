@@ -403,6 +403,24 @@ async function seedAdminAndPending() {
         );
     }
     console.log("✅ Pending PublicBody accounts created");
+
+    // 4. Create a static test climber account
+    await Climber.findOneAndUpdate(
+        { email: "test_climber@hookd.test" },
+        {
+            $set: {
+                name: "Test",
+                surname: "Climber",
+                password: seedPasswordHash,
+                authMethods: ["local"],
+            },
+            $setOnInsert: {
+                username: "test_climber",
+            },
+        },
+        { upsert: true },
+    );
+    console.log("✅ Static test_climber account created");
 }
 
 // ==========================================
@@ -646,6 +664,18 @@ async function seedViaApi() {
         }
     }
     console.log("✅ Seeded Custom Events and Badges.");
+
+    // --- ASSIGN ALL BADGES TO TEST CLIMBER ---
+    const allBadges = await Badge.find();
+    const testClimber = await Climber.findOne({ username: "test_climber" });
+    if (testClimber) {
+        testClimber.wallet.badges = allBadges.map((badge) => ({
+            badge: badge._id,
+            earnedAt: new Date()
+        }));
+        await testClimber.save();
+        console.log(`✅ Assigned ${allBadges.length} badges to test_climber.`);
+    }
 
     if (stopPhase === "badges_and_events") {
         console.log("\n🛑 Stopping at phase: badges_and_events");
