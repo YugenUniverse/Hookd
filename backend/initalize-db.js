@@ -10,6 +10,8 @@ const { Wall, IndoorWall, OutdoorWall } = require("./models/Wall");
 const FacilityModel = require("./models/Facility");
 const { FacilityOwner, PublicBody, Climber, Admin } = require("./models/User");
 const Badge = require("./models/Badge");
+const ClimbingSession = require("./models/ClimbingSession");
+const { Issue } = require("./models/Issue");
 
 const BASE_URL = process.env.BASE_URL || "http://localhost:3000";
 
@@ -501,602 +503,418 @@ async function seedSystemBadges() {
 }
 
 // ==========================================
-// PHASE 4: HIGH-VOLUME API SEED
+// PHASE 4: HIGH-VOLUME DIRECT SEED
 // ==========================================
 
 async function seedViaApi() {
     const runId = uuidv4().substring(0, 6);
     console.log(
-        `\n--- 🚀 STARTING PHASE 4: API SEED PROCESS (Run ID: ${runId}) ---`,
+        `\n--- 🚀 STARTING PHASE 4: DIRECT SEED PROCESS (Run ID: ${runId}) ---`,
     );
-    console.log(`Testing against server at: ${BASE_URL}`);
 
-    try {
-        // 1. REGISTER & LOGIN FACILITY
-        console.log("🏢 Registering Facility...");
-        const facilityEmail = `gym_${runId}@test.com`;
-        const facilityPw = "password123";
+    const seedPasswordPlain = "password123";
 
-        const facilityRegRes = await axios.post(`${BASE_URL}/auth/register`, {
-            email: facilityEmail,
-            username: `test_gym_${runId}`,
-            password: facilityPw,
-            userType: "FacilityOwner",
-            name: `API Test Gym ${runId}`,
-            location: { type: "Point", coordinates: [11.12, 46.06] },
-        });
+    // 1. CREATE FACILITY OWNER + FACILITY
+    console.log("🏢 Creating Facility...");
+    const facilityEmail = `gym_test@test.com`;
 
-        const facilityUserId =
-            facilityRegRes.data.user?.id || facilityRegRes.data.user?._id;
+    const facilityOwner = await FacilityOwner.create({
+        email: facilityEmail,
+        username: `test_gym_${runId}`,
+        password: seedPasswordPlain,
+        name: `API Test Gym ${runId}`,
+        location: { type: "Point", coordinates: [11.12, 46.06] },
+        authMethods: ["local"],
+        approvalStatus: "approved",
+    });
 
-        const loginRes = await axios.post(`${BASE_URL}/auth/login`, {
-            email: facilityEmail,
-            password: facilityPw,
-        });
-        const facilityToken = loginRes.data.accessToken;
-        const facilityHeaders = { Authorization: `Bearer ${facilityToken}` };
+    const createdFacility = await FacilityModel.create({
+        name: `API Test Gym ${runId}`,
+        description: "High-volume seeded data for reporting UI.",
+        location: { type: "Point", coordinates: [11.12, 46.06] },
+        ownerAccount: facilityOwner._id,
+    });
+    await FacilityOwner.findByIdAndUpdate(facilityOwner._id, {
+        facility: createdFacility._id,
+    });
+    console.log("✅ Facility profile created");
 
-        const createdFacility = await FacilityModel.create({
-            name: `API Test Gym ${runId}`,
-            description: "High-volume seeded data for reporting UI.",
-            location: { type: "Point", coordinates: [11.12, 46.06] },
-            ownerAccount: facilityUserId,
-        });
-        await FacilityOwner.findByIdAndUpdate(facilityUserId, {
-            facility: createdFacility._id,
-        });
-        console.log("✅ Facility profile created");
+    if (stopPhase === "walls_and_facilities") {
+        console.log("\n🛑 Stopping at phase: walls_and_facilities");
+        return;
+    }
 
-        if (stopPhase === "walls_and_facilities") {
-            console.log("\n🛑 Stopping at phase: walls_and_facilities");
-            return;
-        }
+    // --- ADD CUSTOM EVENTS AND BADGES ---
+    console.log("🏆 Seeding Custom Events and Badges...");
+    const Event = require("./models/Event");
 
-        // --- ADD CUSTOM EVENTS AND BADGES ---
-        console.log("🏆 Seeding Custom Events and Badges...");
-        const Event = require("./models/Event");
-
-        // 1. Create Local Event for the generated facility
-        let localEvent = await Event.findOne({
+    let localEvent = await Event.findOne({ title: `API Gym Comp ${runId}` });
+    if (!localEvent) {
+        localEvent = await Event.create({
             title: `API Gym Comp ${runId}`,
+            description: "Compete at the API Gym to be the best!",
+            startDate: new Date(),
+            endDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
+            createdBy: facilityOwner._id,
+            facility: createdFacility._id,
+            isGlobal: false,
+            status: "active",
         });
-        if (!localEvent) {
-            localEvent = await Event.create({
-                title: `API Gym Comp ${runId}`,
-                description: "Compete at the API Gym to be the best!",
+    }
+    const localBadgeExists = await Badge.findOne({ eventId: localEvent._id });
+    if (!localBadgeExists) {
+        await Badge.create({
+            name: "API Gym Champion",
+            description: "Top 3 at API Gym Comp",
+            icon: "medal",
+            type: "event",
+            eventId: localEvent._id,
+            winningCondition: { metric: "rank", operator: "top", value: 3 },
+            createdBy: facilityOwner._id,
+        });
+    }
+
+    const regioneTrentino = await PublicBody.findOne({ username: "regione_trentino" });
+    if (regioneTrentino) {
+        let pbEvent = await Event.findOne({ title: "Global Summer Ascent Challenge" });
+        if (!pbEvent) {
+            pbEvent = await Event.create({
+                title: "Global Summer Ascent Challenge",
+                description:
+                    "Climb anywhere in the world and accumulate points this week! Earn Bronze, Silver, and Gold tier badges.",
                 startDate: new Date(),
-                endDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
-                createdBy: facilityUserId,
-                facility: createdFacility._id,
-                isGlobal: false,
+                endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+                createdBy: regioneTrentino._id,
+                facility: null,
+                isGlobal: true,
                 status: "active",
             });
         }
-        const localBadgeExists = await Badge.findOne({
-            eventId: localEvent._id,
-        });
-        if (!localBadgeExists) {
-            await Badge.create({
-                name: "API Gym Champion",
-                description: "Top 3 at API Gym Comp",
-                icon: "medal",
-                type: "event",
-                eventId: localEvent._id,
-                winningCondition: {
-                    metric: "rank",
-                    operator: "top",
-                    value: 3,
-                },
-                createdBy: facilityUserId,
-            });
-        }
-
-        // 2. Create Global Challenge for PB (if PB exists)
-        const { PublicBody } = require("./models/User");
-        const regioneTrentino = await PublicBody.findOne({
-            username: "regione_trentino",
-        });
-        if (regioneTrentino) {
-            let pbEvent = await Event.findOne({
-                title: "Global Summer Ascent Challenge",
-            });
-            if (!pbEvent) {
-                pbEvent = await Event.create({
-                    title: "Global Summer Ascent Challenge",
+        const pbBadgeExists = await Badge.findOne({ eventId: pbEvent._id });
+        if (!pbBadgeExists) {
+            await Badge.insertMany([
+                {
+                    name: "Summer Ascender (Bronze)",
                     description:
-                        "Climb anywhere in the world and accumulate points this week! Earn Bronze, Silver, and Gold tier badges.",
-                    startDate: new Date(),
-                    endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+                        "Earned by reaching 1000 points during the Global Summer Ascent Challenge",
+                    icon: "medal",
+                    type: "event",
+                    level: 3,
+                    eventId: pbEvent._id,
+                    winningCondition: { metric: "score", operator: "gte", value: 1000 },
                     createdBy: regioneTrentino._id,
-                    facility: null,
-                    isGlobal: true,
-                    status: "active",
+                },
+                {
+                    name: "Summer Ascender (Silver)",
+                    description:
+                        "Earned by reaching 2500 points during the Global Summer Ascent Challenge",
+                    icon: "medal",
+                    type: "event",
+                    level: 2,
+                    eventId: pbEvent._id,
+                    winningCondition: { metric: "score", operator: "gte", value: 2500 },
+                    createdBy: regioneTrentino._id,
+                },
+                {
+                    name: "Summer Ascender (Gold)",
+                    description:
+                        "Earned by reaching 5000 points during the Global Summer Ascent Challenge",
+                    icon: "trophy",
+                    type: "event",
+                    level: 1,
+                    eventId: pbEvent._id,
+                    winningCondition: { metric: "score", operator: "gte", value: 5000 },
+                    createdBy: regioneTrentino._id,
+                },
+            ]);
+        }
+    }
+    console.log("✅ Seeded Custom Events and Badges.");
+
+    if (stopPhase === "badges_and_events") {
+        console.log("\n🛑 Stopping at phase: badges_and_events");
+        return;
+    }
+
+    // 2. CREATE A WALL
+    console.log("🧱 Creating Wall...");
+    const wall = await IndoorWall.create({
+        name: `The API Gamified Wall (${runId})`,
+        description: "High-volume seeded data for reporting UI.",
+        difficulty: "INTERMEDIATE",
+        location: { type: "Point", coordinates: [11.12, 46.06] },
+        facility: createdFacility._id,
+        status: "OPEN",
+        rating: 0,
+    });
+    await FacilityModel.findByIdAndUpdate(createdFacility._id, {
+        $push: { walls: wall._id },
+    });
+    const wallId = wall._id;
+    console.log(`✅ Wall Created (ID: ${wallId})`);
+
+    // 3. CREATE CLIMBERS
+    console.log(`🧗 Creating ${NUM_CLIMBERS} Climbers...`);
+    const climberIds = [];
+    for (let i = 0; i < NUM_CLIMBERS; i++) {
+        const climber = await Climber.create({
+            email: `climber_${i}_${runId}@test.com`,
+            username: faker.internet.username() + runId,
+            password: seedPasswordPlain,
+            name: faker.person.firstName(),
+            surname: faker.person.lastName(),
+            birthdate: faker.date.birthdate({ min: 16, max: 50, mode: "age" }),
+            authMethods: ["local"],
+        });
+        climberIds.push(climber._id);
+    }
+    console.log(`✅ Created ${climberIds.length} climbers.`);
+
+    // 4. LOG SESSIONS & LEAVE REVIEWS
+    console.log(
+        "📝 Logging climbing sessions and reviews (This will take a moment)...",
+    );
+    let totalSessions = 0;
+    let totalReviews = 0;
+    const now = new Date();
+
+    for (const climberId of climberIds) {
+        const numSessions = faker.number.int({
+            min: MIN_SESSIONS_PER_CLIMBER,
+            max: MAX_SESSIONS_PER_CLIMBER,
+        });
+
+        for (let j = 0; j < numSessions; j++) {
+            const daysAgo =
+                Math.random() > 0.15
+                    ? faker.number.int({ min: 0, max: 29 })
+                    : faker.number.int({ min: 30, max: 90 });
+            const baseDate = new Date(now.getTime() - daysAgo * 24 * 60 * 60 * 1000);
+            const isWeekend = baseDate.getDay() === 0 || baseDate.getDay() === 6;
+
+            const randomHour = isWeekend
+                ? weightedRandom(
+                      [9, 10, 11, 12, 13, 14, 15, 16, 17, 18],
+                      [5, 15, 20, 15, 15, 10, 5, 5, 5, 5],
+                  )
+                : weightedRandom(
+                      [12, 13, 16, 17, 18, 19, 20, 21, 22],
+                      [5, 5, 10, 20, 25, 20, 10, 3, 2],
+                  );
+
+            baseDate.setHours(randomHour, faker.number.int({ min: 0, max: 59 }), 0, 0);
+            const timeTaken = weightedRandom(
+                [
+                    faker.number.int({ min: 15, max: 25 }),
+                    faker.number.int({ min: 45, max: 90 }),
+                    faker.number.int({ min: 90, max: 120 }),
+                ],
+                [10, 80, 10],
+            );
+
+            const session = await ClimbingSession.create({
+                climber_id: climberId,
+                wall_id: wallId,
+                date: baseDate,
+                time: timeTaken,
+                isSend: Math.random() < SEND_PROBABILITY,
+            });
+
+            await Promise.all([
+                Wall.findByIdAndUpdate(wallId, { $push: { sessions: session._id } }),
+                Climber.findByIdAndUpdate(climberId, { $push: { sessions: session._id } }),
+            ]);
+
+            totalSessions++;
+
+            if (Math.random() < REVIEW_PROBABILITY && stopPhase !== "climbers_and_sessions") {
+                const rating =
+                    timeTaken > 90
+                        ? weightedRandom([1, 2, 3, 4, 5], [15, 20, 25, 25, 15])
+                        : weightedRandom([1, 2, 3, 4, 5], [2, 5, 15, 45, 33]);
+                const feedbackText =
+                    rating <= 3
+                        ? faker.helpers.arrayElement(CLIMBING_FEEDBACK.slice(7))
+                        : faker.helpers.arrayElement(CLIMBING_FEEDBACK.slice(0, 7));
+
+                await session.addReview(rating, feedbackText);
+                totalReviews++;
+            }
+        }
+    }
+    console.log(`✅ Logged ${totalSessions} sessions and ${totalReviews} reviews.`);
+
+    // 5. LOG ISSUES
+    console.log("🚩 Generating Wall Issues...");
+    let totalIssues = 0;
+
+    if (stopPhase !== "climbers_and_sessions") {
+        for (let k = 0; k < NUM_ISSUES; k++) {
+            const randomClimberId = faker.helpers.arrayElement(climberIds);
+            const randomIssue = faker.helpers.arrayElement(CLIMBING_ISSUES);
+            const formattedBody = `${randomIssue.title}: ${randomIssue.description}`;
+            try {
+                await Issue.create({
+                    climber_id: randomClimberId,
+                    wall_id: wallId,
+                    body: formattedBody,
                 });
-            }
-            const pbBadgeExists = await Badge.findOne({ eventId: pbEvent._id });
-            if (!pbBadgeExists) {
-                await Badge.insertMany([
-                    {
-                        name: "Summer Ascender (Bronze)",
-                        description:
-                            "Earned by reaching 1000 points during the Global Summer Ascent Challenge",
-                        icon: "medal",
-                        type: "event",
-                        level: 3,
-                        eventId: pbEvent._id,
-                        winningCondition: {
-                            metric: "score",
-                            operator: "gte",
-                            value: 1000,
-                        },
-                        createdBy: regioneTrentino._id,
-                    },
-                    {
-                        name: "Summer Ascender (Silver)",
-                        description:
-                            "Earned by reaching 2500 points during the Global Summer Ascent Challenge",
-                        icon: "medal",
-                        type: "event",
-                        level: 2,
-                        eventId: pbEvent._id,
-                        winningCondition: {
-                            metric: "score",
-                            operator: "gte",
-                            value: 2500,
-                        },
-                        createdBy: regioneTrentino._id,
-                    },
-                    {
-                        name: "Summer Ascender (Gold)",
-                        description:
-                            "Earned by reaching 5000 points during the Global Summer Ascent Challenge",
-                        icon: "trophy",
-                        type: "event",
-                        level: 1,
-                        eventId: pbEvent._id,
-                        winningCondition: {
-                            metric: "score",
-                            operator: "gte",
-                            value: 5000,
-                        },
-                        createdBy: regioneTrentino._id,
-                    },
-                ]);
+                totalIssues++;
+            } catch (err) {
+                console.warn(`⚠️ Failed to create issue. Error: ${err.message}`);
             }
         }
-        console.log("✅ Seeded Custom Events and Badges.");
+        console.log(`✅ Logged ${totalIssues} wall issues.`);
 
-        if (stopPhase === "badges_and_events") {
-            console.log("\n🛑 Stopping at phase: badges_and_events");
-            return;
-        }
+        const publicBodyTrentino = await PublicBody.findOne({ username: "regione_trentino" });
 
-        // 2. CREATE A WALL
-        console.log("🧱 Creating Wall...");
-        const wallRes = await axios.post(
-            `${BASE_URL}/walls`,
-            {
-                name: `The API Gamified Wall (${runId})`,
-                description: "High-volume seeded data for reporting UI.",
-                difficulty: "INTERMEDIATE",
-                location: { type: "Point", coordinates: [11.12, 46.06] },
-            },
-            { headers: facilityHeaders },
-        );
-
-        const wallId = wallRes.data.wall?.id || wallRes.data.wall?._id;
-        console.log(`✅ Wall Created (ID: ${wallId})`);
-
-        // 3. REGISTER & LOGIN CLIMBERS
-        console.log(`🧗 Registering ${NUM_CLIMBERS} Climbers...`);
-        const climberTokens = [];
-
-        for (let i = 0; i < NUM_CLIMBERS; i++) {
-            const email = `climber_${i}_${runId}@test.com`;
-            const birthdate = faker.date
-                .birthdate({ min: 16, max: 50, mode: "age" })
-                .toISOString()
-                .split("T")[0];
-
-            await axios.post(`${BASE_URL}/auth/register`, {
-                email: email,
-                username: faker.internet.username() + runId,
-                password: "password123",
-                userType: "Climber",
-                name: faker.person.firstName(),
-                surname: faker.person.lastName(),
-                birthdate: birthdate,
-            });
-
-            const climberLogin = await axios.post(`${BASE_URL}/auth/login`, {
-                email: email,
-                password: "password123",
-            });
-            climberTokens.push(climberLogin.data.accessToken);
-        }
-        console.log(`✅ Authenticated ${climberTokens.length} climbers.`);
-
-        // 4. LOG SESSIONS & LEAVE REVIEWS
-        console.log(
-            "📝 Logging climbing sessions and reviews (This will take a moment)...",
-        );
-        let totalSessions = 0;
-        let totalReviews = 0;
-        const now = new Date();
-
-        for (const token of climberTokens) {
-            const numSessions = faker.number.int({
-                min: MIN_SESSIONS_PER_CLIMBER,
-                max: MAX_SESSIONS_PER_CLIMBER,
-            });
-            const climberHeaders = { Authorization: `Bearer ${token}` };
-
-            for (let j = 0; j < numSessions; j++) {
-                const daysAgo =
-                    Math.random() > 0.15
-                        ? faker.number.int({ min: 0, max: 29 })
-                        : faker.number.int({ min: 30, max: 90 });
-                const baseDate = new Date(
-                    now.getTime() - daysAgo * 24 * 60 * 60 * 1000,
-                );
-                const isWeekend =
-                    baseDate.getDay() === 0 || baseDate.getDay() === 6;
-
-                const randomHour = isWeekend
-                    ? weightedRandom(
-                          [9, 10, 11, 12, 13, 14, 15, 16, 17, 18],
-                          [5, 15, 20, 15, 15, 10, 5, 5, 5, 5],
-                      )
-                    : weightedRandom(
-                          [12, 13, 16, 17, 18, 19, 20, 21, 22],
-                          [5, 5, 10, 20, 25, 20, 10, 3, 2],
-                      );
-
-                baseDate.setHours(
-                    randomHour,
-                    faker.number.int({ min: 0, max: 59 }),
-                    0,
-                    0,
-                );
-                const timeTaken = weightedRandom(
-                    [
-                        faker.number.int({ min: 15, max: 25 }),
-                        faker.number.int({ min: 45, max: 90 }),
-                        faker.number.int({ min: 90, max: 120 }),
-                    ],
-                    [10, 80, 10],
-                );
-
-                const sessionRes = await axios.post(
-                    `${BASE_URL}/sessions`,
-                    {
-                        wall_id: wallId,
-                        date: baseDate.toISOString(),
-                        time: timeTaken,
-                        isSend: Math.random() < SEND_PROBABILITY,
-                    },
-                    { headers: climberHeaders },
-                );
-
-                totalSessions++;
-                const sessionId =
-                    sessionRes.data?.id ||
-                    sessionRes.data?._id ||
-                    sessionRes.data?.session?.id ||
-                    sessionRes.data?.session?._id;
-
-                if (
-                    sessionId &&
-                    Math.random() < REVIEW_PROBABILITY &&
-                    stopPhase !== "climbers_and_sessions"
-                ) {
-                    const rating =
-                        timeTaken > 90
-                            ? weightedRandom(
-                                  [1, 2, 3, 4, 5],
-                                  [15, 20, 25, 25, 15],
-                              )
-                            : weightedRandom(
-                                  [1, 2, 3, 4, 5],
-                                  [2, 5, 15, 45, 33],
-                              );
-                    const feedbackText =
-                        rating <= 3
-                            ? faker.helpers.arrayElement(
-                                  CLIMBING_FEEDBACK.slice(7),
-                              )
-                            : faker.helpers.arrayElement(
-                                  CLIMBING_FEEDBACK.slice(0, 7),
-                              );
-
-                    await axios.post(
-                        `${BASE_URL}/sessions/${sessionId}/reviews`,
-                        { rating: rating, body: feedbackText },
-                        { headers: climberHeaders },
-                    );
-                    totalReviews++;
-                }
-            }
-        }
-        console.log(
-            `✅ Logged ${totalSessions} sessions and ${totalReviews} reviews.`,
-        );
-
-        // 5. LOG ISSUES
-        console.log("🚩 Generating Wall Issues...");
-        let totalIssues = 0;
-
-        if (stopPhase !== "climbers_and_sessions") {
-            for (let k = 0; k < NUM_ISSUES; k++) {
-                const randomClimberToken =
-                    faker.helpers.arrayElement(climberTokens);
-                const randomIssue = faker.helpers.arrayElement(CLIMBING_ISSUES);
-
-                try {
-                    const formattedBody = `${randomIssue.title}: ${randomIssue.description}`;
-                    await axios.post(
-                        `${BASE_URL}/issues`,
-                        {
-                            wall_id: wallId,
-                            body: formattedBody,
-                        },
-                        {
-                            headers: {
-                                Authorization: `Bearer ${randomClimberToken}`,
-                            },
-                        },
-                    );
-                    totalIssues++;
-                } catch (err) {
-                    console.warn(
-                        `⚠️ Failed to create issue. Error: ${err.response?.status} - ${JSON.stringify(err.response?.data)}`,
-                    );
-                }
-            }
-            console.log(`✅ Logged ${totalIssues} wall issues.`);
-
-            // Keep the original synthetic facility wall seeding, and add
-            // real public-body wall traffic against Regione Trentino data.
-            const regioneTrentino = await PublicBody.findOne({
-                username: "regione_trentino",
-            });
-
-            if (!regioneTrentino) {
-                console.warn(
-                    "⚠️ PublicBody 'regione_trentino' not found. Skipping public-body seeded activity.",
-                );
-            } else {
-                const publicBodyWalls = await OutdoorWall.find({
-                    publicBody: regioneTrentino._id,
-                })
-                    .sort({ name: 1, createdAt: 1 })
-                    .lean();
-
-                if (!publicBodyWalls.length) {
-                    console.warn(
-                        "⚠️ No OutdoorWall documents linked to Regione Trentino. Skipping public-body seeded activity.",
-                    );
-                } else {
-                    const selectedWallCount = Math.min(
-                        25,
-                        Math.ceil(publicBodyWalls.length / 3),
-                    );
-                    const targetWalls = publicBodyWalls.slice(
-                        0,
-                        selectedWallCount,
-                    );
-
-                    console.log(
-                        `🌍 Seeding activity across ${targetWalls.length}/${publicBodyWalls.length} Regione Trentino walls (>= 1/3).`,
-                    );
-
-                    const regionLoginRes = await axios.post(
-                        `${BASE_URL}/auth/login`,
-                        {
-                            email: regioneTrentino.email,
-                            password: "password123",
-                        },
-                    );
-                    const publicBodyToken = regionLoginRes.data.accessToken;
-                    const publicBodyHeaders = {
-                        Authorization: `Bearer ${publicBodyToken}`,
-                    };
-
-                    let regionSessions = 0;
-                    let regionReviews = 0;
-                    let regionIssues = 0;
-
-                    for (const wall of targetWalls) {
-                        const wallId = wall.id || wall._id.toString();
-
-                        const selectedClimbers = faker.helpers.arrayElements(
-                            climberTokens,
-                            faker.number.int({ min: 3, max: 6 }),
-                        );
-
-                        for (const token of selectedClimbers) {
-                            const climberHeaders = {
-                                Authorization: `Bearer ${token}`,
-                            };
-                            const numSessions = faker.number.int({
-                                min: 1,
-                                max: 3,
-                            });
-
-                            for (
-                                let sessionIndex = 0;
-                                sessionIndex < numSessions;
-                                sessionIndex++
-                            ) {
-                                const daysAgo =
-                                    Math.random() > 0.15
-                                        ? faker.number.int({ min: 0, max: 29 })
-                                        : faker.number.int({
-                                              min: 30,
-                                              max: 90,
-                                          });
-                                const baseDate = new Date(
-                                    new Date().getTime() -
-                                        daysAgo * 24 * 60 * 60 * 1000,
-                                );
-                                const isWeekend =
-                                    baseDate.getDay() === 0 ||
-                                    baseDate.getDay() === 6;
-
-                                const randomHour = isWeekend
-                                    ? weightedRandom(
-                                          [
-                                              9, 10, 11, 12, 13, 14, 15, 16, 17,
-                                              18,
-                                          ],
-                                          [5, 15, 20, 15, 15, 10, 5, 5, 5, 5],
-                                      )
-                                    : weightedRandom(
-                                          [12, 13, 16, 17, 18, 19, 20, 21, 22],
-                                          [5, 5, 10, 20, 25, 20, 10, 3, 2],
-                                      );
-
-                                baseDate.setHours(
-                                    randomHour,
-                                    faker.number.int({ min: 0, max: 59 }),
-                                    0,
-                                    0,
-                                );
-                                const timeTaken = weightedRandom(
-                                    [
-                                        faker.number.int({ min: 15, max: 25 }),
-                                        faker.number.int({ min: 45, max: 90 }),
-                                        faker.number.int({ min: 90, max: 120 }),
-                                    ],
-                                    [10, 80, 10],
-                                );
-
-                                const sessionRes = await axios.post(
-                                    `${BASE_URL}/sessions`,
-                                    {
-                                        wall_id: wallId,
-                                        date: baseDate.toISOString(),
-                                        time: timeTaken,
-                                        isSend:
-                                            Math.random() < SEND_PROBABILITY,
-                                    },
-                                    { headers: climberHeaders },
-                                );
-
-                                regionSessions++;
-                                const sessionId =
-                                    sessionRes.data?.id ||
-                                    sessionRes.data?._id ||
-                                    sessionRes.data?.session?.id ||
-                                    sessionRes.data?.session?._id;
-
-                                if (
-                                    sessionId &&
-                                    Math.random() < REVIEW_PROBABILITY
-                                ) {
-                                    const rating =
-                                        timeTaken > 90
-                                            ? weightedRandom(
-                                                  [1, 2, 3, 4, 5],
-                                                  [15, 20, 25, 25, 15],
-                                              )
-                                            : weightedRandom(
-                                                  [1, 2, 3, 4, 5],
-                                                  [2, 5, 15, 45, 33],
-                                              );
-                                    const feedbackText =
-                                        rating <= 3
-                                            ? faker.helpers.arrayElement(
-                                                  CLIMBING_FEEDBACK.slice(7),
-                                              )
-                                            : faker.helpers.arrayElement(
-                                                  CLIMBING_FEEDBACK.slice(0, 7),
-                                              );
-
-                                    await axios.post(
-                                        `${BASE_URL}/sessions/${sessionId}/reviews`,
-                                        {
-                                            rating: rating,
-                                            body: feedbackText,
-                                        },
-                                        { headers: climberHeaders },
-                                    );
-                                    regionReviews++;
-                                }
-                            }
-                        }
-                    }
-
-                    if (stopPhase !== "climbers_and_sessions") {
-                        for (let k = 0; k < NUM_ISSUES; k++) {
-                            const randomWall =
-                                targetWalls[
-                                    Math.floor(
-                                        Math.random() * targetWalls.length,
-                                    )
-                                ];
-                            const issueWallId =
-                                randomWall.id || randomWall._id.toString();
-                            const randomClimberToken =
-                                faker.helpers.arrayElement(climberTokens);
-                            const randomIssue =
-                                faker.helpers.arrayElement(CLIMBING_ISSUES);
-
-                            try {
-                                const formattedBody = `${randomIssue.title}: ${randomIssue.description}`;
-                                await axios.post(
-                                    `${BASE_URL}/issues`,
-                                    {
-                                        wall_id: issueWallId,
-                                        body: formattedBody,
-                                    },
-                                    {
-                                        headers: {
-                                            Authorization: `Bearer ${randomClimberToken}`,
-                                        },
-                                    },
-                                );
-                                regionIssues++;
-                            } catch (err) {
-                                console.warn(
-                                    `⚠️ Failed to create Regione Trentino issue. Error: ${err.response?.status} - ${JSON.stringify(err.response?.data)}`,
-                                );
-                            }
-                        }
-                    } // end if stopPhase !== climbers_and_sessions
-
-                    console.log(
-                        `✅ Logged ${regionSessions} Regione Trentino sessions, ${regionReviews} reviews, and ${regionIssues} issues across ${targetWalls.length} walls.`,
-                    );
-                    if (stopPhase === "climbers_and_sessions") {
-                        console.log(
-                            "\\n🛑 Stopping at phase: climbers_and_sessions",
-                        );
-                        return;
-                    }
-                    if (stopPhase === "reviews_and_issues") {
-                        console.log(
-                            "\n🛑 Stopping at phase: reviews_and_issues",
-                        );
-                        return;
-                    }
-                }
-            }
-        }
-    } catch (error) {
-        console.error("❌ API Seeding Failed:");
-        if (error.response) {
-            console.error(`Status: ${error.response.status}`);
-            console.error(`Data:`, error.response.data);
-        } else if (error.code === "ECONNREFUSED") {
-            console.error(`❌ Could not connect to ${BASE_URL}`);
-            console.error(
-                "Make sure the Express server is running on port 3000",
+        if (!publicBodyTrentino) {
+            console.warn(
+                "⚠️ PublicBody 'regione_trentino' not found. Skipping public-body seeded activity.",
             );
         } else {
-            console.error(error.message);
+            const publicBodyWalls = await OutdoorWall.find({
+                publicBody: publicBodyTrentino._id,
+            })
+                .sort({ name: 1, createdAt: 1 })
+                .lean();
+
+            if (!publicBodyWalls.length) {
+                console.warn(
+                    "⚠️ No OutdoorWall documents linked to Regione Trentino. Skipping public-body seeded activity.",
+                );
+            } else {
+                const selectedWallCount = Math.min(25, Math.ceil(publicBodyWalls.length / 3));
+                const targetWalls = publicBodyWalls.slice(0, selectedWallCount);
+
+                console.log(
+                    `🌍 Seeding activity across ${targetWalls.length}/${publicBodyWalls.length} Regione Trentino walls (>= 1/3).`,
+                );
+
+                let regionSessions = 0;
+                let regionReviews = 0;
+                let regionIssues = 0;
+
+                for (const outdoorWall of targetWalls) {
+                    const outdoorWallId = outdoorWall._id;
+
+                    const selectedClimbers = faker.helpers.arrayElements(
+                        climberIds,
+                        faker.number.int({ min: 3, max: 6 }),
+                    );
+
+                    for (const climberId of selectedClimbers) {
+                        const numSessions = faker.number.int({ min: 1, max: 3 });
+
+                        for (let sessionIndex = 0; sessionIndex < numSessions; sessionIndex++) {
+                            const daysAgo =
+                                Math.random() > 0.15
+                                    ? faker.number.int({ min: 0, max: 29 })
+                                    : faker.number.int({ min: 30, max: 90 });
+                            const baseDate = new Date(
+                                new Date().getTime() - daysAgo * 24 * 60 * 60 * 1000,
+                            );
+                            const isWeekend =
+                                baseDate.getDay() === 0 || baseDate.getDay() === 6;
+
+                            const randomHour = isWeekend
+                                ? weightedRandom(
+                                      [9, 10, 11, 12, 13, 14, 15, 16, 17, 18],
+                                      [5, 15, 20, 15, 15, 10, 5, 5, 5, 5],
+                                  )
+                                : weightedRandom(
+                                      [12, 13, 16, 17, 18, 19, 20, 21, 22],
+                                      [5, 5, 10, 20, 25, 20, 10, 3, 2],
+                                  );
+
+                            baseDate.setHours(
+                                randomHour,
+                                faker.number.int({ min: 0, max: 59 }),
+                                0,
+                                0,
+                            );
+                            const timeTaken = weightedRandom(
+                                [
+                                    faker.number.int({ min: 15, max: 25 }),
+                                    faker.number.int({ min: 45, max: 90 }),
+                                    faker.number.int({ min: 90, max: 120 }),
+                                ],
+                                [10, 80, 10],
+                            );
+
+                            const session = await ClimbingSession.create({
+                                climber_id: climberId,
+                                wall_id: outdoorWallId,
+                                date: baseDate,
+                                time: timeTaken,
+                                isSend: Math.random() < SEND_PROBABILITY,
+                            });
+
+                            await Promise.all([
+                                Wall.findByIdAndUpdate(outdoorWallId, {
+                                    $push: { sessions: session._id },
+                                }),
+                                Climber.findByIdAndUpdate(climberId, {
+                                    $push: { sessions: session._id },
+                                }),
+                            ]);
+
+                            regionSessions++;
+
+                            if (Math.random() < REVIEW_PROBABILITY) {
+                                const rating =
+                                    timeTaken > 90
+                                        ? weightedRandom([1, 2, 3, 4, 5], [15, 20, 25, 25, 15])
+                                        : weightedRandom([1, 2, 3, 4, 5], [2, 5, 15, 45, 33]);
+                                const feedbackText =
+                                    rating <= 3
+                                        ? faker.helpers.arrayElement(CLIMBING_FEEDBACK.slice(7))
+                                        : faker.helpers.arrayElement(CLIMBING_FEEDBACK.slice(0, 7));
+
+                                await session.addReview(rating, feedbackText);
+                                regionReviews++;
+                            }
+                        }
+                    }
+                }
+
+                if (stopPhase !== "climbers_and_sessions") {
+                    for (let k = 0; k < NUM_ISSUES; k++) {
+                        const randomWall =
+                            targetWalls[Math.floor(Math.random() * targetWalls.length)];
+                        const issueWallId = randomWall._id;
+                        const randomClimberId = faker.helpers.arrayElement(climberIds);
+                        const randomIssue = faker.helpers.arrayElement(CLIMBING_ISSUES);
+
+                        try {
+                            const formattedBody = `${randomIssue.title}: ${randomIssue.description}`;
+                            await Issue.create({
+                                climber_id: randomClimberId,
+                                wall_id: issueWallId,
+                                body: formattedBody,
+                            });
+                            regionIssues++;
+                        } catch (err) {
+                            console.warn(
+                                `⚠️ Failed to create Regione Trentino issue. Error: ${err.message}`,
+                            );
+                        }
+                    }
+                }
+
+                console.log(
+                    `✅ Logged ${regionSessions} Regione Trentino sessions, ${regionReviews} reviews, and ${regionIssues} issues across ${targetWalls.length} walls.`,
+                );
+                if (stopPhase === "climbers_and_sessions") {
+                    console.log("\n🛑 Stopping at phase: climbers_and_sessions");
+                    return;
+                }
+                if (stopPhase === "reviews_and_issues") {
+                    console.log("\n🛑 Stopping at phase: reviews_and_issues");
+                    return;
+                }
+            }
         }
-        throw error;
     }
 }
 
@@ -1105,6 +923,10 @@ async function runAll() {
         await mongoose.connect(
             process.env.MONGO_URI || "mongodb://localhost:27017/hookd",
         );
+
+        console.log("\n--- 🧹 DROPPING DATABASE ---");
+        await mongoose.connection.dropDatabase();
+        console.log("✅ Database dropped");
 
         console.log("\n--- PHASE 1: walls_and_facilities ---");
         await seedOverpass();

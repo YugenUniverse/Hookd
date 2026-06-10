@@ -69,6 +69,9 @@ app.use(
                 "http://127.0.0.1:8080",
                 "http://localhost",
                 "http://127.0.0.1",
+                ...(process.env.ALLOWED_ORIGINS
+                    ? process.env.ALLOWED_ORIGINS.split(",").map((o) => o.trim()).filter(Boolean)
+                    : []),
             ];
 
             if (
