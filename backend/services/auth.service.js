@@ -172,7 +172,8 @@ exports.register = async ({
     if (normalizedUserType === "Climber") {
         user = await Climber.create(baseUserData);
     } else if (normalizedUserType === "FacilityOwner") {
-        user = await FacilityOwner.create({ email, password, username, authMethods: ["local"], userType: "FacilityOwner" });
+        const approvalStatus = restData.facility ? "pending" : "approved";
+        user = await FacilityOwner.create({ ...baseUserData, approvalStatus });
     } else if (normalizedUserType === "PublicBody") {
         user = await PublicBody.create(baseUserData);
     } else {

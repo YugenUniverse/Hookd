@@ -185,6 +185,7 @@ async function seedOverpass() {
                 email: "regione.trentino@hookd.internal",
                 password: seedPasswordHash,
                 authMethods: ["local"],
+                approvalStatus: "approved",
             },
             $setOnInsert: {
                 username: "regione_trentino",
@@ -235,42 +236,57 @@ async function seedOverpass() {
         const wallFilter = { name, "location.coordinates": [lon, lat] };
 
         if (wallType === "IndoorWall") {
-            const facilitySlug = name
-                .toLowerCase()
-                .replace(/[^a-z0-9]+/g, "_")
-                .replace(/^_+|_+$/g, "")
-                .slice(0, 30);
-            const facilityUsername = `${facilitySlug || "facility"}_${Math.round(lat * 10000)}_${Math.round(lon * 10000)}`;
-            const facilityEmail = `${facilityUsername}@hookd.internal`;
+            const facilityFilter = { name, "location.coordinates": [lon, lat] };
+            const isUnclaimed = Math.random() < 0.1; // 10% are unclaimed
 
-            const userResult = await FacilityOwner.findOneAndUpdate(
-                { username: facilityUsername },
-                {
-                    $set: {
-                        name,
-                        description,
-                        location,
-                        email: facilityEmail,
-                        password: seedPasswordHash,
-                        authMethods: ["local"],
+            let ownerId = undefined;
+
+            if (!isUnclaimed) {
+                const facilitySlug = name
+                    .toLowerCase()
+                    .replace(/[^a-z0-9]+/g, "_")
+                    .replace(/^_+|_+$/g, "")
+                    .slice(0, 30);
+                const facilityUsername = `${facilitySlug || "facility"}_${Math.round(lat * 10000)}_${Math.round(lon * 10000)}`;
+                const facilityEmail = `${facilityUsername}@hookd.internal`;
+
+                const userResult = await FacilityOwner.findOneAndUpdate(
+                    { username: facilityUsername },
+                    {
+                        $set: {
+                            name,
+                            description,
+                            location,
+                            email: facilityEmail,
+                            password: seedPasswordHash,
+                            authMethods: ["local"],
+                            approvalStatus: "approved",
+                        },
+                        $setOnInsert: { username: facilityUsername },
                     },
-                    $setOnInsert: { username: facilityUsername },
-                },
-                { upsert: true, returnDocument: "after" },
-            );
+                    { upsert: true, returnDocument: "after" },
+                );
+                ownerId = userResult._id;
+            }
+
+            const updatePayload = { $set: { name, description, location } };
+            if (ownerId) {
+                updatePayload.$set.ownerAccount = ownerId;
+            } else {
+                updatePayload.$unset = { ownerAccount: "" };
+            }
 
             const facilityResult = await FacilityModel.findOneAndUpdate(
-                { ownerAccount: userResult._id },
-                {
-                    $set: { name, description, location },
-                    $setOnInsert: { ownerAccount: userResult._id },
-                },
+                facilityFilter,
+                updatePayload,
                 { upsert: true, returnDocument: "after" },
             );
 
-            await FacilityOwner.findByIdAndUpdate(userResult._id, {
-                facility: facilityResult._id,
-            });
+            if (ownerId) {
+                await FacilityOwner.findByIdAndUpdate(ownerId, {
+                    facility: facilityResult._id,
+                });
+            }
 
             const wallResult = await IndoorWall.findOneAndUpdate(
                 wallFilter,

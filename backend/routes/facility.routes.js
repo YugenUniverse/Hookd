@@ -55,12 +55,12 @@ router.post("/:id/claim", authenticateJwt, restrictTo("FacilityOwner"), async (r
             });
         }
 
-        facility.ownerAccount = userId;
-        await facility.save();
+        await FacilityOwner.findByIdAndUpdate(userId, { 
+            facility: facility._id,
+            approvalStatus: "pending" 
+        });
 
-        await FacilityOwner.findByIdAndUpdate(userId, { facility: facility._id });
-
-        res.json({ message: "Facility claimed successfully", facility });
+        res.json({ message: "Facility claim requested successfully. Waiting for admin approval.", facility });
     } catch (err) {
         next(err);
     }
