@@ -800,27 +800,33 @@ async function seedViaApi() {
                     "⚠️ No OutdoorWall documents linked to Regione Trentino. Skipping public-body seeded activity.",
                 );
             } else {
-                const selectedWallCount = Math.min(25, Math.ceil(publicBodyWalls.length / 3));
+                const selectedWallCount = Math.min(100, Math.ceil(publicBodyWalls.length / 2));
                 const targetWalls = publicBodyWalls.slice(0, selectedWallCount);
 
                 console.log(
-                    `🌍 Seeding activity across ${targetWalls.length}/${publicBodyWalls.length} Regione Trentino walls (>= 1/3).`,
+                    `🌍 Seeding activity across ${targetWalls.length}/${publicBodyWalls.length} Regione Trentino walls... this might take a minute!`,
                 );
 
                 let regionSessions = 0;
                 let regionReviews = 0;
                 let regionIssues = 0;
+                let wallCounter = 0;
 
                 for (const outdoorWall of targetWalls) {
+                    wallCounter++;
+                    if (wallCounter % 10 === 0) {
+                        console.log(`   ... processed ${wallCounter}/${targetWalls.length} walls`);
+                    }
+                    
                     const outdoorWallId = outdoorWall._id;
 
                     const selectedClimbers = faker.helpers.arrayElements(
                         climberIds,
-                        faker.number.int({ min: 3, max: 6 }),
+                        faker.number.int({ min: 10, max: 25 }),
                     );
 
                     for (const climberId of selectedClimbers) {
-                        const numSessions = faker.number.int({ min: 1, max: 3 });
+                        const numSessions = faker.number.int({ min: 2, max: 5 });
 
                         for (let sessionIndex = 0; sessionIndex < numSessions; sessionIndex++) {
                             const daysAgo =
@@ -1092,7 +1098,8 @@ async function seedReports() {
         for (const pb of pbs) {
             const pbWalls = await OutdoorWall.find({
                 publicBody: pb._id,
-            }).limit(5);
+                "sessions.0": { $exists: true }
+            }).limit(25);
             if (pbWalls.length >= 2) {
                 const wallIds = pbWalls.map((w) => w._id.toString());
                 await reportService.saveGroupReport(
