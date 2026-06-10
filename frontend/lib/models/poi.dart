@@ -138,7 +138,37 @@ class FacilityPoi extends Poi {
       description: (json['description'] ?? '').toString(),
       walls: walls,
       address: json['address']?.toString(),
-      ownerAccountId: json['ownerAccountId']?.toString(),
+      ownerAccountId: (json['ownerAccountId'] ?? json['ownerAccount'])?.toString(),
+    );
+  }
+}
+
+
+class WallAdminSummary {
+  final String id;
+  final String name;
+  final String description;
+  final String difficulty;
+  final String status;
+  final String wallType;
+
+  const WallAdminSummary({
+    required this.id,
+    required this.name,
+    required this.description,
+    required this.difficulty,
+    required this.status,
+    required this.wallType,
+  });
+
+  factory WallAdminSummary.fromJson(Map<String, dynamic> json) {
+    return WallAdminSummary(
+      id: (json['id'] ?? json['_id'] ?? '').toString(),
+      name: (json['name'] ?? 'Unknown Wall').toString(),
+      description: (json['description'] ?? '').toString(),
+      difficulty: (json['difficulty'] ?? 'UNKNOWN').toString(),
+      status: (json['status'] ?? 'OPEN').toString(),
+      wallType: (json['wallType'] ?? 'OutdoorWall').toString(),
     );
   }
 }

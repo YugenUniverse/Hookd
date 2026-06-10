@@ -124,13 +124,13 @@ describe("User model suite", () => {
                 surname: "Doe",
                 birthdate: new Date("1990-01-01"),
                 bio: "Passionate climber",
-                wallet: 100,
+                wallet: { score: 100, badges: [] },
             });
 
             const found = await User.findById(climber.id);
             expect(found.userType).toBe("Climber");
             expect(found.name).toBe("John");
-            expect(found.wallet).toBe(100);
+            expect(found.wallet.score).toBe(100);
         });
 
         it("allows missing name/surname/birthdate for climber (fields now optional)", async () => {
@@ -193,6 +193,27 @@ describe("User model suite", () => {
             });
             await pb.save();
             expect(pb.walls.length).toBe(1);
+        });
+    });
+
+    describe("fcmTokens field", () => {
+        it("defaults to an empty array", async () => {
+            const user = await User.create({ email: "fcm@example.com", username: "fcmtest" });
+            const reloaded = await User.findById(user._id).select("+fcmTokens");
+            expect(reloaded.fcmTokens).toEqual([]);
+        });
+
+        it("is not returned by default queries (select: false)", async () => {
+            await User.create({ email: "fcmhidden@example.com", username: "fcmhidden" });
+            const found = await User.findOne({ email: "fcmhidden@example.com" });
+            expect(found.fcmTokens).toBeUndefined();
+        });
+
+        it("can store string tokens when explicitly selected", async () => {
+            const user = await User.create({ email: "fcmstore@example.com", username: "fcmstore" });
+            await User.findByIdAndUpdate(user._id, { $addToSet: { fcmTokens: "token-abc" } });
+            const reloaded = await User.findById(user._id).select("+fcmTokens");
+            expect(reloaded.fcmTokens).toContain("token-abc");
         });
     });
 

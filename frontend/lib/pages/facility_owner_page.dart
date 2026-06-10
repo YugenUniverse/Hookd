@@ -1,16 +1,23 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import '../pages/notifications_page.dart';
+import '../providers/notification_provider.dart';
+import 'package:provider/provider.dart';
+
 
 import '../models/poi.dart' show IndoorWallSummary;
 import '../models/user.dart';
 import '../pages/all_walls_page.dart';
+import '../pages/edit_profile_page.dart';
+import '../pages/events_list_page.dart';
 import '../pages/report_list_page.dart';
 import '../pages/wall_issues_page.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
 import '../dialogs/login_dialog.dart';
 import '../services/report_service.dart';
+import '../utils/image_helpers.dart';
 
 const _kMaxPreviewWalls = 5;
 
@@ -37,7 +44,12 @@ class _FacilityOwnerPageState extends State<FacilityOwnerPage> {
         throw StateError('Not authenticated');
       }
     }
-    return ApiService().fetchCurrentUserProfile(bearerToken: AuthService().jwt);
+    final user = await ApiService().fetchCurrentUserProfile(bearerToken: AuthService().jwt);
+    AuthService().setCurrentUserProfile(
+      avatar: user.profilePictureUrl ?? '',
+      username: user.username,
+    );
+    return user;
   }
 
   void _refresh() {
@@ -68,19 +80,53 @@ class _FacilityOwnerPageState extends State<FacilityOwnerPage> {
     if (confirmed != true) return;
     await AuthService().logout();
     if (!mounted) return;
-    Navigator.of(context).pop();
+    if (Navigator.of(context).canPop()) Navigator.of(context).pop();
     messenger.showSnackBar(const SnackBar(content: Text('Logged out')));
   }
 
   @override
   Widget build(BuildContext context) {
+    final unreadCount = context.watch<NotificationProvider>().unreadCount;
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Your profile'),
+        centerTitle: true,
         actions: [
+          IconButton(
+            icon: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                const Icon(Icons.notifications_outlined),
+                if (unreadCount > 0)
+                  Positioned(
+                    right: -2,
+                    top: -2,
+                    child: Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.error,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                      child: Text(
+                        '$unreadCount',
+                        style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  )
+              ],
+            ),
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const NotificationsPage()),
+              );
+            },
+          ),
+
           IconButton(
             tooltip: 'Log out',
             onPressed: _logout,
@@ -141,6 +187,38 @@ class _FacilityOwnerPageState extends State<FacilityOwnerPage> {
                 return const Center(child: Text('No profile data available.'));
               }
 
+              if (user.approvalStatus == 'pending') {
+                return Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(32.0),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.hourglass_empty_outlined, size: 64, color: colorScheme.primary),
+                        const SizedBox(height: 24),
+                        Text(
+                          'Account Pending Approval',
+                          style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Your account is currently under review by our administration team. You will be able to access your dashboard and manage your facility once approved.',
+                          style: theme.textTheme.bodyLarge?.copyWith(color: colorScheme.onSurfaceVariant),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 32),
+                        FilledButton.icon(
+                          onPressed: _refresh,
+                          icon: const Icon(Icons.refresh),
+                          label: const Text('Check Status'),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }
+
               final username = user.username.isNotEmpty ? user.username : 'User';
               final initial = username[0].toUpperCase();
               final memberSince = user.createdAt != null
@@ -168,6 +246,14 @@ class _FacilityOwnerPageState extends State<FacilityOwnerPage> {
                               isAdmin: user.isAdmin,
                               profilePictureUrl: user.profilePictureUrl,
                               memberSince: memberSince,
+                              onEditProfile: () async {
+                                final updated = await Navigator.of(context).push<User>(
+                                  MaterialPageRoute(
+                                    builder: (_) => EditProfilePage(user: user),
+                                  ),
+                                );
+                                if (updated != null) _refresh();
+                              },
                             ),
                             const SizedBox(height: 20),
                             if (user.facilityData != null)
@@ -203,6 +289,7 @@ class _AccountCard extends StatelessWidget {
     required this.isAdmin,
     required this.memberSince,
     this.profilePictureUrl,
+    this.onEditProfile,
   });
 
   final String username;
@@ -211,6 +298,7 @@ class _AccountCard extends StatelessWidget {
   final bool isAdmin;
   final String memberSince;
   final String? profilePictureUrl;
+  final VoidCallback? onEditProfile;
 
   @override
   Widget build(BuildContext context) {
@@ -233,10 +321,8 @@ class _AccountCard extends StatelessWidget {
               CircleAvatar(
                 radius: 36,
                 backgroundColor: colorScheme.primaryContainer,
-                backgroundImage: profilePictureUrl != null && profilePictureUrl!.isNotEmpty
-                    ? NetworkImage(profilePictureUrl!)
-                    : null,
-                child: profilePictureUrl == null || profilePictureUrl!.isEmpty
+                backgroundImage: avatarImageProvider(profilePictureUrl),
+                child: avatarImageProvider(profilePictureUrl) == null
                     ? Text(
                         initial,
                         style: theme.textTheme.headlineMedium?.copyWith(
@@ -276,6 +362,11 @@ class _AccountCard extends StatelessWidget {
                     ),
                   ],
                 ),
+              ),
+              IconButton(
+                tooltip: 'Edit profile',
+                icon: const Icon(Icons.edit_outlined),
+                onPressed: onEditProfile,
               ),
             ],
           ),
@@ -467,6 +558,26 @@ class _FacilityCard extends StatelessWidget {
                   },
                   icon: const Icon(Icons.report_problem_outlined),
                   label: const Text('Wall issues'),
+                ),
+              ),
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => EventsListPage(
+                          facilityId: facility.id,
+                          facilityName: facility.name,
+                          availableWalls: facility.walls,
+                          canCreate: true,
+                        ),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.event),
+                  label: const Text('Events'),
                 ),
               ),
             ],
@@ -1214,6 +1325,7 @@ class _ClaimFacilityCardState extends State<_ClaimFacilityCard> {
   Timer? _debounce;
   bool _searching = false;
   bool _claiming = false;
+  String? _searchError;
 
   @override
   void initState() {
@@ -1236,20 +1348,33 @@ class _ClaimFacilityCardState extends State<_ClaimFacilityCard> {
       setState(() {
         _results = [];
         _selected = null;
+        _searchError = null;
       });
       return;
     }
-    setState(() => _searching = true);
+    setState(() {
+      _searching = true;
+      _searchError = null;
+    });
     _debounce = Timer(const Duration(milliseconds: 400), () async {
-      final res = await ApiService().searchFacilities(q);
-      if (!mounted) return;
-      setState(() {
-        _results = res;
-        _searching = false;
-        if (_selected != null && !res.any((r) => r['_id'] == _selected!['_id'])) {
-          _selected = null;
-        }
-      });
+      try {
+        final res = await ApiService().searchFacilities(q);
+        if (!mounted) return;
+        setState(() {
+          _results = res;
+          _searching = false;
+          if (_selected != null && !res.any((r) => (r['id'] ?? r['_id']) == (_selected!['id'] ?? _selected!['_id']))) {
+            _selected = null;
+          }
+        });
+      } catch (e) {
+        if (!mounted) return;
+        setState(() {
+          _results = [];
+          _searching = false;
+          _searchError = 'Search failed. Check your connection and try again.';
+        });
+      }
     });
   }
 
@@ -1427,7 +1552,16 @@ class _ClaimFacilityCardState extends State<_ClaimFacilityCard> {
                 ),
               ],
 
-              if (_results.isEmpty &&
+              if (_searchError != null) ...[
+                const SizedBox(height: 12),
+                Text(
+                  _searchError!,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: colorScheme.error,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ] else if (_results.isEmpty &&
                   _searchCtrl.text.trim().length >= 2 &&
                   !_searching &&
                   _selected == null) ...[

@@ -2,6 +2,7 @@ const mongoose = require("mongoose");
 const { Issue } = require("../models/Issue");
 const { Wall, IndoorWall, OutdoorWall } = require("../models/Wall");
 const { User } = require("../models/User");
+const notificationService = require("./notification.service");
 
 const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
 
@@ -17,7 +18,7 @@ const getFacilityOwnerContext = async (userId) => {
     };
 };
 
-exports.createIssue = async (userId, userType, { wall_id, body }) => {
+exports.createIssue = async (userId, userType, { wall_id, body, severity, description, location }) => {
     if (userType !== "Climber") {
         const error = new Error("Only climbers can create issues");
         error.statusCode = 403;
@@ -46,11 +47,39 @@ exports.createIssue = async (userId, userType, { wall_id, body }) => {
         climber_id: userId,
         wall_id,
         body,
+        severity: severity || "MEDIUM",
+        description: description || "",
+        location: location || "",
     });
 
-    await Wall.findByIdAndUpdate(wall_id, {
-        $push: { issues: issue._id },
-    });
+    // Fetch wall to get owner and check type
+    const wall = await Wall.findById(wall_id).select("publicBody facility name");
+    if (wall) {
+        // Link issue to wall
+        await Wall.findByIdAndUpdate(wall_id, {
+            $push: { issues: issue._id },
+        });
+
+        // Trigger notification for HIGH severity issues on outdoor walls (those with publicBody)
+        if (issue.severity === "HIGH" && wall.publicBody) {
+            try {
+                await notificationService.createBulk([wall.publicBody], "new_issue", {
+                    issueId: issue._id.toString(),
+                    wallId: wall._id.toString(),
+                    wallName: wall.name || "Unknown Wall",
+                    severity: issue.severity,
+                    body: issue.body,
+                    description: issue.description,
+                    location: issue.location,
+                    climberId: userId.toString(),
+                    submittedAt: new Date(issue.submitted_at).toISOString(),
+                });
+            } catch (notificationError) {
+                console.error("Failed to create notification:", notificationError);
+                // Don't throw - notification failure shouldn't prevent issue creation
+            }
+        }
+    }
 
     return issue;
 };
@@ -178,6 +207,73 @@ exports.getIssuesByPublicBody = async (userId) => {
     return await Issue.find({ wall_id: { $in: ownedWallIds } });
 };
 
+exports.getIssuesForPublicBodyDashboard = async (userId, filters = {}) => {
+    if (!isValidObjectId(userId)) {
+        const error = new Error("userId must be a valid ObjectId");
+        error.statusCode = 400;
+        throw error;
+    }
+
+    const ownedWallIds = await getOwnedWallIds(userId, "publicBody");
+    if (ownedWallIds.length === 0) {
+        return [];
+    }
+
+    const query = { wall_id: { $in: ownedWallIds } };
+
+    // Apply status filter if provided
+    if (filters.status && Array.isArray(filters.status) && filters.status.length > 0) {
+        query.status = { $in: filters.status };
+    }
+
+    // Apply severity filter if provided
+    if (filters.severity && Array.isArray(filters.severity) && filters.severity.length > 0) {
+        query.severity = { $in: filters.severity };
+    }
+
+    const issues = await Issue.find(query)
+        .populate({ path: "climber_id", select: "username" })
+        .populate({ path: "wall_id", select: "name location" })
+        .sort({ submitted_at: -1 });
+
+    return issues;
+};
+
+exports.getIssuesSummaryForPublicBody = async (userId) => {
+    if (!isValidObjectId(userId)) {
+        const error = new Error("userId must be a valid ObjectId");
+        error.statusCode = 400;
+        throw error;
+    }
+
+    const ownedWallIds = await getOwnedWallIds(userId, "publicBody");
+    if (ownedWallIds.length === 0) {
+        return {
+            totalOpen: 0,
+            highSeverity: 0,
+            mediumSeverity: 0,
+            byStatus: {},
+        };
+    }
+
+    const issues = await Issue.find({ wall_id: { $in: ownedWallIds } });
+
+    const activeStatuses = ["OPEN", "IN_PROGRESS"];
+    const summary = {
+        totalOpen: issues.filter((i) => i.status === "OPEN").length,
+        highSeverity: issues.filter((i) => i.severity === "HIGH" && activeStatuses.includes(i.status)).length,
+        mediumSeverity: issues.filter((i) => i.severity === "MEDIUM" && activeStatuses.includes(i.status)).length,
+        byStatus: {
+            OPEN: issues.filter((i) => i.status === "OPEN").length,
+            IN_PROGRESS: issues.filter((i) => i.status === "IN_PROGRESS").length,
+            RESOLVED: issues.filter((i) => i.status === "RESOLVED").length,
+            CLOSED: issues.filter((i) => i.status === "CLOSED").length,
+        },
+    };
+
+    return summary;
+};
+
 exports.updateIssueStatus = async (issueId, newStatus, userId, userType) => {
     if (!isValidObjectId(issueId)) {
         const error = new Error("issueId must be a valid ObjectId");
@@ -216,7 +312,21 @@ exports.updateIssueStatus = async (issueId, newStatus, userId, userType) => {
         throw error;
     }
 
-    return await issue.updateStatus(newStatus);
+    const updated = await issue.updateStatus(newStatus);
+
+    // Notify the climber who filed the issue — fire-and-forget
+    Wall.findById(issue.wall_id, "name")
+        .then((wall) =>
+            notificationService.createBulk([issue.climber_id], "issue_status_changed", {
+                issueId: issueId.toString(),
+                wallId: issue.wall_id.toString(),
+                wallName: wall?.name || "a wall",
+                newStatus,
+            })
+        )
+        .catch((err) => console.error("issue.service: issue_status_changed notification error:", err.message));
+
+    return updated;
 };
 
 exports.deleteIssue = async (issueId, userId) => {

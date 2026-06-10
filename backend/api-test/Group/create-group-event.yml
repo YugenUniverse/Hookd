@@ -1,0 +1,28 @@
+info:
+    name: create-group-event
+    type: http
+    seq: 18
+
+http:
+    method: POST
+    url: http://localhost:3000/groups/GROUP_ID_HERE/events
+    body:
+        type: json
+        data: |-
+            {
+              "title": "Private Group Challenge",
+              "description": "Exclusive event for group members!",
+              "startDate": "2026-08-01T00:00:00.000Z",
+              "endDate": "2026-08-15T00:00:00.000Z",
+              "facilityId": "FACILITY_ID_HERE",
+              "walls": ["WALL_ID_1"]
+            }
+    auth:
+        type: bearer
+        token:
+
+settings:
+    encodeUrl: true
+    timeout: 0
+    followRedirects: true
+    maxRedirects: 5

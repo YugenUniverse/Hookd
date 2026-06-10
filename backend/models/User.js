@@ -12,7 +12,7 @@ const baseUserTransform = (doc, ret) => {
 const userSchema = new mongoose.Schema(
     {
         email: { type: String, required: true, unique: true, lowercase: true },
-        username: { type: String, required: true },
+        username: { type: String, required: true, unique: true, lowercase: true, trim: true },
 
         avatar: {
             type: String,
@@ -22,6 +22,7 @@ const userSchema = new mongoose.Schema(
         password: { type: String, select: false },
         googleId: { type: String, unique: true, sparse: true },
         authMethods: [{ type: String, enum: ["local", "google"] }],
+        fcmTokens: { type: [String], select: false },
     },
     {
         timestamps: true,
@@ -61,9 +62,27 @@ const climberSchema = new mongoose.Schema(
             maxlength: [200, "Bio cannot exceed 200 characters"],
         },
         wallet: {
-            type: Number,
-            default: 0,
-            min: [0, "Wallet balance cannot be negative"],
+            type: {
+                score: {
+                    type: Number,
+                    default: 0,
+                    min: [0, "Score cannot be negative"],
+                },
+                badges: [
+                    {
+                        badge: {
+                            type: mongoose.Schema.Types.ObjectId,
+                            ref: "Badge",
+                        },
+                        earnedAt: {
+                            type: Date,
+                            default: Date.now,
+                        },
+                    },
+                ],
+            },
+            default: () => ({ score: 0, badges: [] }),
+            _id: false,
         },
         sessions: [
             {
@@ -71,6 +90,17 @@ const climberSchema = new mongoose.Schema(
                 ref: "ClimbingSession",
             },
         ],
+        stats: {
+            maxStreak: {
+                type: Number,
+                default: 0,
+            },
+        },
+        allowDmsFrom: {
+            type: String,
+            enum: ["everyone", "followers", "nobody"],
+            default: "everyone",
+        },
     },
     {
         toJSON: {
@@ -91,9 +121,22 @@ const Climber = User.discriminator("Climber", climberSchema);
 // lives in the standalone Facility model; this holds only the account link.
 const facilityOwnerSchema = new mongoose.Schema(
     {
+        name: { type: String, trim: true },
+        surname: { type: String, trim: true },
+        bio: {
+            type: String,
+            default: "",
+            trim: true,
+            maxlength: [200, "Bio cannot exceed 200 characters"],
+        },
         facility: {
             type: mongoose.Schema.Types.ObjectId,
             ref: "Facility",
+        },
+        approvalStatus: {
+            type: String,
+            enum: ["pending", "approved", "rejected"],
+            default: "pending",
         },
     },
     {
@@ -117,6 +160,12 @@ const publicBodySchema = new mongoose.Schema(
             type: String,
             required: true,
             trim: true,
+        },
+        bio: {
+            type: String,
+            default: "",
+            trim: true,
+            maxlength: [200, "Bio cannot exceed 200 characters"],
         },
         description: {
             type: String,
@@ -148,6 +197,11 @@ const publicBodySchema = new mongoose.Schema(
                 ref: "OutdoorWall",
             },
         ],
+        approvalStatus: {
+            type: String,
+            enum: ["pending", "approved", "rejected"],
+            default: "pending",
+        },
     },
     {
         toJSON: {
@@ -163,9 +217,27 @@ publicBodySchema.methods.editUser = function (updates) {};
 
 const PublicBody = User.discriminator("PublicBody", publicBodySchema);
 
+// --- ADMIN ---
+const adminSchema = new mongoose.Schema(
+    {},
+    {
+        toJSON: {
+            transform: function (doc, ret) {
+                baseUserTransform(doc, ret);
+                return ret;
+            },
+        },
+    },
+);
+
+adminSchema.methods.editUser = function (updates) {};
+
+const Admin = User.discriminator("Admin", adminSchema);
+
 module.exports = {
     User,
     Climber,
     FacilityOwner,
     PublicBody,
+    Admin,
 };

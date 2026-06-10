@@ -1,0 +1,30 @@
+info:
+    name: create-planned-climb
+    type: http
+    seq: 12
+
+http:
+    method: POST
+    url: http://localhost:3000/groups/:id/climbs
+    params:
+        - name: id
+          value: 6a021092a362ceb8f7bd15fd
+          type: path
+    body:
+        type: json
+        data: |-
+            {
+                "date": "2026-08-15T09:00:00Z",
+                "venueId": "6a021092a362ceb8f7bd15fe",
+                "venueType": "Facility",
+                "notes": "Meet at the entrance at 9am"
+            }
+    auth:
+        type: bearer
+        token:
+
+settings:
+    encodeUrl: true
+    timeout: 0
+    followRedirects: true
+    maxRedirects: 5

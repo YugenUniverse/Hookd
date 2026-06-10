@@ -26,6 +26,11 @@ const reviewSchema = new mongoose.Schema(
             trim: true,
             maxlength: [500, "Review body cannot exceed 500 characters"],
         },
+        flagged: { type: Boolean, default: false },
+        flagReason: { type: String, default: "" },
+        status: { type: String, enum: ["active", "removed"], default: "active" },
+        moderatedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+        moderatedAt: { type: Date, default: null },
     },
     {
         timestamps: true,
@@ -34,6 +39,8 @@ const reviewSchema = new mongoose.Schema(
         },
     },
 );
+
+reviewSchema.index({ climbing_session_id: 1 });
 
 reviewSchema.methods.editReview = async function (newRating, newBody) {
     this.rating = newRating;

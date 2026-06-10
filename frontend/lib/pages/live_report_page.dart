@@ -2,25 +2,29 @@ import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../services/report_service.dart';
 import '../models/report.dart';
+import 'report_detail_page.dart';
 
 class LiveReportPage extends StatefulWidget {
-  final String wallId;
+  final String? wallId;
+  final List<String>? wallIds;
   final String wallName;
   final ReportService reportService;
 
   const LiveReportPage({
     super.key,
-    required this.wallId,
+    this.wallId,
+    this.wallIds,
     required this.wallName,
     required this.reportService,
-  });
+  }) : assert(wallId != null || wallIds != null);
 
   @override
-  _LiveReportPageState createState() => _LiveReportPageState();
+  LiveReportPageState createState() => LiveReportPageState();
 }
 
-class _LiveReportPageState extends State<LiveReportPage> {
+class LiveReportPageState extends State<LiveReportPage> {
   late Future<ReportData> futureLiveReport;
+  late bool _isGrouped;
   int _selectedChartIndex = 0;
 
   String _percentageLabel(num part, num total) {
@@ -31,10 +35,16 @@ class _LiveReportPageState extends State<LiveReportPage> {
   @override
   void initState() {
     super.initState();
-    futureLiveReport = widget.reportService.getLiveReport(widget.wallId);
+    _isGrouped = widget.wallIds != null && widget.wallIds!.isNotEmpty;
+    futureLiveReport = _isGrouped
+        ? widget.reportService.getLiveGroupReport(widget.wallIds!)
+        : widget.reportService.getLiveReport(widget.wallId!);
   }
 
-  // --- TRIGGER ACTION DIALOG TO CONCLUDE SNAPSHOT ---
+  String _formatMetric(num value, {int decimals = 2}) {
+    return value.toStringAsFixed(decimals);
+  }
+
   Future<void> _showSaveDialog() async {
     final titleController = TextEditingController();
     final notesController = TextEditingController();
@@ -47,13 +57,17 @@ class _LiveReportPageState extends State<LiveReportPage> {
         return StatefulBuilder(
           builder: (context, setState) {
             return AlertDialog(
-              title: const Text('Freeze Live Snapshot'),
+              title: Text(
+                _isGrouped ? 'Save Group Report' : 'Freeze Live Snapshot',
+              ),
               content: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Text(
-                      'Save data metrics permanently to historical records.',
+                    Text(
+                      _isGrouped
+                          ? 'Archive the grouped live metrics to the report history.'
+                          : 'Save data metrics permanently to historical records.',
                     ),
                     const SizedBox(height: 16),
                     TextField(
@@ -89,24 +103,64 @@ class _LiveReportPageState extends State<LiveReportPage> {
                           if (titleController.text.trim().isEmpty) return;
                           setState(() => isSaving = true);
                           try {
-                            await widget.reportService.saveReportSnapshot(
-                              widget.wallId,
-                              titleController.text.trim(),
-                              notesController.text.trim(),
-                            );
-                            if (context.mounted) {
-                              Navigator.pop(context);
-                              Navigator.pop(context);
+                            if (_isGrouped) {
+                              final savedReport = await widget.reportService
+                                  .saveGroupReport(
+                                    widget.wallIds!,
+                                    titleController.text.trim(),
+                                    notesController.text.trim(),
+                                  );
+                              if (!mounted) return;
+                              WidgetsBinding.instance.addPostFrameCallback((_) {
+                                if (!mounted) return;
+                                Navigator.pop(context);
+                                Navigator.pushReplacement(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => ReportDetailPage(
+                                      reportId: savedReport.id,
+                                      reportService: widget.reportService,
+                                    ),
+                                  ),
+                                );
+                              });
+                            } else {
+                              final savedReport = await widget.reportService
+                                  .saveReportSnapshot(
+                                    widget.wallId!,
+                                    titleController.text.trim(),
+                                    notesController.text.trim(),
+                                  );
+                              if (!mounted) return;
+                              WidgetsBinding.instance.addPostFrameCallback((_) {
+                                if (!mounted) return;
+                                Navigator.pop(context);
+                                Navigator.pushReplacement(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => ReportDetailPage(
+                                      reportId: savedReport.id,
+                                      reportService: widget.reportService,
+                                    ),
+                                  ),
+                                );
+                              });
                             }
                           } catch (e) {
+                            if (!mounted) return;
                             setState(() => isSaving = false);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text(
-                                  'Failed to cache performance log.',
+                            WidgetsBinding.instance.addPostFrameCallback((_) {
+                              if (!mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    _isGrouped
+                                        ? 'Failed to save grouped report.'
+                                        : 'Failed to cache performance log.',
+                                  ),
                                 ),
-                              ),
-                            );
+                              );
+                            });
                           }
                         },
                   child: isSaving
@@ -115,7 +169,7 @@ class _LiveReportPageState extends State<LiveReportPage> {
                           height: 20,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : const Text('Archive Snap'),
+                      : Text(_isGrouped ? 'Archive Group' : 'Archive Snap'),
                 ),
               ],
             );
@@ -132,7 +186,7 @@ class _LiveReportPageState extends State<LiveReportPage> {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Live Diagnostics'),
+            Text(_isGrouped ? 'Group Diagnostics' : 'Live Diagnostics'),
             Text(
               widget.wallName,
               style: const TextStyle(
@@ -198,13 +252,13 @@ class _LiveReportPageState extends State<LiveReportPage> {
                     _buildKpiCard(
                       context,
                       'Retention',
-                      '${data.engagement['retentionRate']}x',
+                      '${_formatMetric((data.engagement['retentionRate'] ?? 0) as num)}x',
                       Icons.repeat,
                     ),
                     _buildKpiCard(
                       context,
                       'Avg Time',
-                      '${data.engagement['avgTimeMins']}m',
+                      '${_formatMetric((data.engagement['avgTimeMins'] ?? 0) as num)}m',
                       Icons.timer,
                     ),
                   ],
@@ -245,6 +299,90 @@ class _LiveReportPageState extends State<LiveReportPage> {
                   ),
                 ),
                 const SizedBox(height: 32),
+
+                const Text(
+                  'Recent Feedback',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 12),
+                if (data.recentFeedback.isEmpty)
+                  const Text(
+                    'No written feedback for this period.',
+                    style: TextStyle(
+                      color: Colors.grey,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  )
+                else
+                  ...data.recentFeedback.map(
+                    (f) => Card(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      child: ListTile(
+                        leading: Text(
+                          '${f['rating']}★',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 18,
+                            color: Colors.amber,
+                          ),
+                        ),
+                        title: Text(f['body']),
+                        subtitle: Text(f['date']),
+                      ),
+                    ),
+                  ),
+                const SizedBox(height: 32),
+
+                if (_isGrouped && data.wallComparisons.isNotEmpty) ...[
+                  const Text(
+                    'Wall Comparison (Sessions)',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    height: 220,
+                    child: _buildWallComparisonChart(
+                      context,
+                      data.wallComparisons,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  const Text(
+                    'Average Rating Comparison',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    height: 220,
+                    child: _buildRatingComparisonChart(
+                      context,
+                      data.wallComparisons,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: data.wallComparisons.asMap().entries.map((entry) {
+                      final comparison = entry.value;
+                      final wallName = _wallComparisonLabel(
+                        comparison,
+                        entry.key,
+                      );
+                      final totalSessions =
+                          (comparison['engagement']['totalSessions'] ?? 0)
+                              as num;
+                      final avgRating =
+                          (comparison['quality']['avgRating'] ?? 0) as num;
+                      return Chip(
+                        label: Text(
+                          '$wallName • ${totalSessions.toInt()} sessions • ${_formatMetric(avgRating)}★',
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 32),
+                ],
 
                 const Text(
                   'Recent Issues',
@@ -322,7 +460,6 @@ class _LiveReportPageState extends State<LiveReportPage> {
     );
   }
 
-  // --- UI ARCHITECTURE GRAPH CHARTS MAPS ---
   Widget _buildDynamicChart(BuildContext context, ReportData data) {
     if (_selectedChartIndex == 0) {
       return _buildTrafficLineChart(context, data.trends);
@@ -331,6 +468,209 @@ class _LiveReportPageState extends State<LiveReportPage> {
       return _buildHourBarChart(context, data.byHourOfDay);
     }
     return _buildDayBarChart(context, data.byDayOfWeek);
+  }
+
+  String _wallComparisonLabel(Map<String, dynamic> comparison, int index) {
+    final storedName = comparison['wallName']?.toString();
+    if (storedName != null && storedName.isNotEmpty) {
+      return storedName;
+    }
+
+    final nestedName =
+        (comparison['wall'] as Map?)?['name']?.toString() ??
+        (comparison['wall'] as Map?)?['wallName']?.toString();
+    if (nestedName != null && nestedName.isNotEmpty) {
+      return nestedName;
+    }
+
+    return '  ${index + 1}';
+  }
+
+  Widget _buildWallComparisonChart(
+    BuildContext context,
+    List<Map<String, dynamic>> wallComparisons,
+  ) {
+    final textColor = Theme.of(context).colorScheme.onSurfaceVariant;
+    final maxSessions = wallComparisons
+        .map(
+          (comparison) =>
+              (comparison['engagement']['totalSessions'] ?? 0) as num,
+        )
+        .fold<num>(
+          0,
+          (previousValue, element) =>
+              previousValue > element ? previousValue : element,
+        )
+        .toDouble();
+
+    return ClipRect(
+      child: BarChart(
+        BarChartData(
+          alignment: BarChartAlignment.spaceAround,
+          maxY: maxSessions == 0 ? 5 : maxSessions + (maxSessions * 0.2),
+          barTouchData: BarTouchData(enabled: false),
+          titlesData: FlTitlesData(
+            show: true,
+            bottomTitles: AxisTitles(
+              sideTitles: SideTitles(
+                showTitles: true,
+                reservedSize: 40,
+                getTitlesWidget: (value, meta) {
+                  final index = value.toInt();
+                  if (index < 0 || index >= wallComparisons.length) {
+                    return const SizedBox.shrink();
+                  }
+                  final label = _wallComparisonLabel(
+                    wallComparisons[index],
+                    index,
+                  );
+                  return SideTitleWidget(
+                    meta: meta,
+                    child: Text(
+                      label.length > 14 ? '${label.substring(0, 12)}…' : label,
+                      style: TextStyle(color: textColor, fontSize: 10),
+                      textAlign: TextAlign.center,
+                    ),
+                  );
+                },
+              ),
+            ),
+            leftTitles: AxisTitles(
+              sideTitles: SideTitles(
+                showTitles: true,
+                reservedSize: 32,
+                getTitlesWidget: (value, meta) => Text(
+                  value.toInt().toString(),
+                  style: TextStyle(fontSize: 10, color: textColor),
+                ),
+              ),
+            ),
+            topTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false),
+            ),
+            rightTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false),
+            ),
+          ),
+          gridData: FlGridData(
+            show: true,
+            drawVerticalLine: false,
+            getDrawingHorizontalLine: (value) => FlLine(
+              color: Colors.grey.withValues(alpha: 0.2),
+              strokeWidth: 1,
+            ),
+          ),
+          borderData: FlBorderData(show: false),
+          barGroups: List.generate(wallComparisons.length, (index) {
+            final comparison = wallComparisons[index];
+            final totalSessions =
+                ((comparison['engagement']['totalSessions'] ?? 0) as num)
+                    .toDouble();
+            return BarChartGroupData(
+              x: index,
+              barRods: [
+                BarChartRodData(
+                  toY: totalSessions,
+                  color: Colors.deepPurpleAccent,
+                  width: 20,
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(4),
+                  ),
+                ),
+              ],
+            );
+          }),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRatingComparisonChart(
+    BuildContext context,
+    List<Map<String, dynamic>> wallComparisons,
+  ) {
+    final textColor = Theme.of(context).colorScheme.onSurfaceVariant;
+
+    return ClipRect(
+      child: BarChart(
+        BarChartData(
+          alignment: BarChartAlignment.spaceAround,
+          maxY: 5,
+          barTouchData: BarTouchData(enabled: false),
+          titlesData: FlTitlesData(
+            show: true,
+            bottomTitles: AxisTitles(
+              sideTitles: SideTitles(
+                showTitles: true,
+                reservedSize: 40,
+                getTitlesWidget: (value, meta) {
+                  final index = value.toInt();
+                  if (index < 0 || index >= wallComparisons.length) {
+                    return const SizedBox.shrink();
+                  }
+                  final label = _wallComparisonLabel(
+                    wallComparisons[index],
+                    index,
+                  );
+                  return SideTitleWidget(
+                    meta: meta,
+                    child: Text(
+                      label.length > 14 ? '${label.substring(0, 12)}…' : label,
+                      style: TextStyle(color: textColor, fontSize: 10),
+                      textAlign: TextAlign.center,
+                    ),
+                  );
+                },
+              ),
+            ),
+            leftTitles: AxisTitles(
+              sideTitles: SideTitles(
+                showTitles: true,
+                interval: 1,
+                reservedSize: 32,
+                getTitlesWidget: (value, meta) => Text(
+                  value.toInt().toString(),
+                  style: TextStyle(fontSize: 10, color: textColor),
+                ),
+              ),
+            ),
+            topTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false),
+            ),
+            rightTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false),
+            ),
+          ),
+          gridData: FlGridData(
+            show: true,
+            drawVerticalLine: false,
+            getDrawingHorizontalLine: (value) => FlLine(
+              color: Colors.grey.withValues(alpha: 0.2),
+              strokeWidth: 1,
+            ),
+          ),
+          borderData: FlBorderData(show: false),
+          barGroups: List.generate(wallComparisons.length, (index) {
+            final comparison = wallComparisons[index];
+            final avgRating = ((comparison['quality']['avgRating'] ?? 0) as num)
+                .toDouble();
+            return BarChartGroupData(
+              x: index,
+              barRods: [
+                BarChartRodData(
+                  toY: avgRating.clamp(0.0, 5.0),
+                  color: Colors.amber,
+                  width: 20,
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(4),
+                  ),
+                ),
+              ],
+            );
+          }),
+        ),
+      ),
+    );
   }
 
   Widget _buildLegendItem(Color color, String text, Color textColor) {

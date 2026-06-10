@@ -1,19 +1,28 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../dialogs/login_dialog.dart';
 import '../models/poi.dart';
 import '../models/wall.dart';
 import '../pages/facility_owner_page.dart';
 import '../pages/global_leaderboard_page.dart';
+import '../pages/active_events_page.dart';
 import '../pages/log_session_page.dart';
+import '../pages/public_body_issues_page.dart';
 import '../pages/public_body_page.dart';
 import '../pages/user_page.dart';
+import '../pages/social_page.dart';
+import '../pages/admin_page.dart';
+import '../providers/notification_provider.dart';
 import '../services/api_service.dart';
-import 'package:geolocator/geolocator.dart';
 import '../services/auth_service.dart';
+import '../services/chat_service.dart';
+import '../services/push_notification_service.dart';
+import 'package:geolocator/geolocator.dart';
 import '../widgets/poi_map.dart';
 
 class MyHomePage extends StatefulWidget {
@@ -24,31 +33,227 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   final WallMapController _mapController = WallMapController();
   late final AnimationController _navExpand;
   late final Animation<double> _navAnim;
+  bool _avatarLoadAttempted = false;
+  int? _openIssueCount;
+  String? _worstSeverity; // 'HIGH', 'MEDIUM', 'LOW', or null
+  int _unreadChatCount = 0;
+  final Set<String> _unreadConvIds = {};
+  StreamSubscription? _chatMsgSub;
+  StreamSubscription? _chatReadSub;
+  StreamSubscription? _pushMsgSub;
+  Widget? _panelContent;
+  String? _panelTag;
+  bool _isPanelFullscreen = false;
+  ImageProvider? _cachedAvatarProvider;
+  String? _cachedAvatarUrl;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     AuthService().addListener(_onAuthChanged);
     _navExpand = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 220),
     );
     _navAnim = CurvedAnimation(parent: _navExpand, curve: Curves.easeInOut);
+    if (AuthService().isAuthenticated) {
+      _avatarLoadAttempted = true;
+      _loadAvatar();
+      if (AuthService().userType == 'PublicBody') _loadIssueCount();
+      if (AuthService().userType == 'Climber') {
+        ChatService().connect();
+        _loadUnreadChatCount();
+        _subscribeChatMessages();
+      }
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _refreshNotifCount();
+      });
+      _subscribePushMessages();
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final isClimber = AuthService().userType == 'Climber';
+    if (!isClimber) return;
+    if (state == AppLifecycleState.hidden || state == AppLifecycleState.paused) {
+      ChatService().disconnect();
+    } else if (state == AppLifecycleState.resumed) {
+      if (AuthService().isAuthenticated) ChatService().connect();
+    }
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     AuthService().removeListener(_onAuthChanged);
+    _chatMsgSub?.cancel();
+    _chatReadSub?.cancel();
+    _pushMsgSub?.cancel();
     _navExpand.dispose();
     super.dispose();
   }
 
   void _onAuthChanged() {
     setState(() {});
+    if (!AuthService().isAuthenticated) {
+      _avatarLoadAttempted = false;
+      _openIssueCount = null;
+      _unreadChatCount = 0;
+      _unreadConvIds.clear();
+      _chatMsgSub?.cancel();
+      _chatMsgSub = null;
+      _chatReadSub?.cancel();
+      _chatReadSub = null;
+      _pushMsgSub?.cancel();
+      _pushMsgSub = null;
+      ChatService().disconnect();
+      if (_panelTag != null) _closePanel();
+      return;
+    }
+    if (!_avatarLoadAttempted) {
+      _avatarLoadAttempted = true;
+      _loadAvatar();
+      if (AuthService().userType == 'PublicBody') _loadIssueCount();
+      if (AuthService().userType == 'Climber') {
+        ChatService().connect();
+        _loadUnreadChatCount();
+        _subscribeChatMessages();
+      }
+    }
+    _refreshNotifCount();
+    _subscribePushMessages();
+  }
+
+  void _subscribePushMessages() {
+    _pushMsgSub?.cancel();
+    _pushMsgSub = PushNotificationService().onForegroundMessage.listen((message) {
+      if (!mounted) return;
+      if (message.data['type'] == 'new_message') {
+        _loadUnreadChatCount();
+      } else {
+        _refreshNotifCount();
+      }
+    });
+  }
+
+  Future<void> _refreshNotifCount() async {
+    if (!mounted) return;
+    try {
+      final provider = context.read<NotificationProvider>();
+      await provider.loadNotifications();
+    } catch (_) {}
+  }
+
+
+  void _subscribeChatMessages() {
+    _chatMsgSub?.cancel();
+    _chatMsgSub = ChatService().onNewMessage.listen((msg) {
+      if (!mounted) return;
+      setState(() {
+        _unreadConvIds.add(msg.conversationId);
+        _unreadChatCount = _unreadConvIds.length;
+      });
+    });
+    _chatReadSub?.cancel();
+    _chatReadSub = ChatService().onConversationJoined.listen((convId) {
+      if (!mounted) return;
+      setState(() {
+        _unreadConvIds.remove(convId);
+        _unreadChatCount = _unreadConvIds.length;
+      });
+    });
+  }
+
+  Future<void> _loadAvatar() => ApiService().loadAndCacheAvatar();
+
+  Future<void> _loadUnreadChatCount() async {
+    try {
+      final convs = await ApiService().getConversations();
+      if (mounted) {
+        setState(() {
+          _unreadConvIds
+            ..clear()
+            ..addAll(convs.where((c) => c.hasUnread).map((c) => c.id));
+          _unreadChatCount = _unreadConvIds.length;
+        });
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _loadIssueCount() async {
+    try {
+      final summary = await ApiService().fetchPublicBodyIssueSummary();
+      if (mounted) {
+        setState(() {
+          _openIssueCount = (summary['totalOpen'] as num?)?.toInt() ?? 0;
+          final high = ((summary['highSeverity'] as num?)?.toInt() ?? 0);
+          final medium = ((summary['mediumSeverity'] as num?)?.toInt() ?? 0);
+          _worstSeverity = high > 0 ? 'HIGH' : medium > 0 ? 'MEDIUM' : (_openIssueCount! > 0 ? 'LOW' : null);
+        });
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _openIssuesPage() async {
+    if (_usePanelNav) {
+      _showPanel(
+        PublicBodyIssuesPage(
+          onWallTapped: (wallId, wallName, lat, lng) {
+            _closePanel();
+            _mapController.focusOnWall(Wall(
+              id: wallId,
+              name: wallName,
+              latitude: lat,
+              longitude: lng,
+              description: '',
+              difficulty: 'UNKNOWN',
+              wallType: 'OutdoorWall',
+              sessions: [],
+              issues: [],
+            ));
+          },
+        ),
+        'issues',
+      );
+      return;
+    }
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => PublicBodyIssuesPage(
+          onWallTapped: (wallId, wallName, lat, lng) {
+            Navigator.of(context).pop();
+            _mapController.focusOnWall(Wall(
+              id: wallId,
+              name: wallName,
+              latitude: lat,
+              longitude: lng,
+              description: '',
+              difficulty: 'UNKNOWN',
+              wallType: 'OutdoorWall',
+              sessions: [],
+              issues: [],
+            ));
+          },
+        ),
+      ),
+    );
+    _loadIssueCount();
+  }
+
+  Future<void> _openAdminPage() async {
+    if (_usePanelNav) {
+      _showPanel(const AdminPage(), 'admin');
+      return;
+    }
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const AdminPage()),
+    );
   }
 
   Future<bool> _ensureAuthenticated() async {
@@ -68,6 +273,17 @@ class _MyHomePageState extends State<MyHomePage>
   }
 
   Future<void> _openWallSearch() async {
+    if (_usePanelNav) {
+      _showPanel(
+        _WallSearchSheet(
+          mapController: _mapController,
+          onLogWall: _openLogSessionSheetWithWall,
+          onClose: _closePanel,
+        ),
+        'search',
+      );
+      return;
+    }
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -81,34 +297,96 @@ class _MyHomePageState extends State<MyHomePage>
   }
 
   Future<void> _openLogSessionSheet() async {
-    await _runProtectedAction(
-      () => showModalBottomSheet(
+    await _runProtectedAction(() async {
+      if (_usePanelNav) {
+        _showPanel(const LogSessionPage(inPanel: true), 'log');
+        return;
+      }
+      await showModalBottomSheet(
         context: context,
         isScrollControlled: true,
         useSafeArea: true,
         showDragHandle: true,
         builder: (_) => const LogSessionPage(),
-      ),
-    );
+      );
+    });
   }
 
   Future<void> _openLogSessionSheetWithWall(Wall wall) async {
-    await _runProtectedAction(
-      () => showModalBottomSheet(
+    await _runProtectedAction(() async {
+      if (_usePanelNav) {
+        _showPanel(LogSessionPage(initialWall: wall, inPanel: true), 'log');
+        return;
+      }
+      await showModalBottomSheet(
         context: context,
         isScrollControlled: true,
         useSafeArea: true,
         showDragHandle: true,
         builder: (_) => LogSessionPage(initialWall: wall),
-      ),
+      );
+    });
+  }
+
+  Future<void> _openSocial() async {
+    await _runProtectedAction(() async {
+      if (!mounted) return;
+      if (_usePanelNav) {
+        _showPanel(const SocialPage(), 'social');
+        return;
+      }
+      await Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const SocialPage()),
+      );
+      if (mounted) _loadUnreadChatCount();
+    });
+  }
+
+  void _openEvents() {
+    if (_usePanelNav) {
+      _showPanel(const ActiveEventsPage(), 'events');
+      return;
+    }
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const ActiveEventsPage()),
     );
   }
 
   void _openGlobalLeaderboard() {
+    if (_usePanelNav) {
+      _showPanel(const GlobalLeaderboardPage(), 'leaderboard');
+      return;
+    }
     Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const GlobalLeaderboardPage()),
     );
+  }
+
+  Widget? _buildAvatarWidget({double radius = 14}) {
+    final avatarUrl = AuthService().avatar;
+    if (avatarUrl == null || avatarUrl.isEmpty) {
+      _cachedAvatarProvider = null;
+      _cachedAvatarUrl = null;
+      return null;
+    }
+    if (avatarUrl != _cachedAvatarUrl) {
+      _cachedAvatarUrl = avatarUrl;
+      if (avatarUrl.startsWith('data:image')) {
+        try {
+          _cachedAvatarProvider = MemoryImage(base64Decode(avatarUrl.split(',').last));
+        } catch (_) {
+          _cachedAvatarProvider = null;
+        }
+      } else if (avatarUrl.startsWith('http')) {
+        _cachedAvatarProvider = NetworkImage(avatarUrl);
+      } else {
+        _cachedAvatarProvider = null;
+      }
+    }
+    if (_cachedAvatarProvider == null) return null;
+    return CircleAvatar(radius: radius, backgroundImage: _cachedAvatarProvider!);
   }
 
   void _openAccountPage() async {
@@ -121,11 +399,57 @@ class _MyHomePageState extends State<MyHomePage>
     final Widget page = switch (userType) {
       'FacilityOwner' => const FacilityOwnerPage(),
       'PublicBody' => const PublicBodyPage(),
+      'Admin' => const AdminPage(),
       _ => const UserPage(),
     };
 
+    if (_usePanelNav) {
+      _showPanel(page, 'account');
+      return;
+    }
+
     if (!mounted) return;
     await Navigator.of(context).push(MaterialPageRoute(builder: (_) => page));
+  }
+
+  Color? get _badgeSeverityColor => switch (_worstSeverity) {
+    'HIGH' => Colors.red,
+    'MEDIUM' => Colors.orange,
+    'LOW' => Colors.amber,
+    _ => null,
+  };
+
+  bool get _usePanelNav => _isDesktopLike;
+
+  void _showPanel(Widget child, String tag) {
+    if (_panelTag == tag) {
+      _closePanel();
+      return;
+    }
+    setState(() {
+      _panelContent = child;
+      _panelTag = tag;
+    });
+    _navExpand.forward();
+  }
+
+  
+  void _togglePanelFullscreen() {
+    setState(() {
+      _isPanelFullscreen = !_isPanelFullscreen;
+    });
+  }
+
+  void _closePanel() {
+    final closingTag = _panelTag;
+    setState(() {
+      _panelContent = null;
+      _panelTag = null;
+      _isPanelFullscreen = false;
+    });
+    if (closingTag == 'issues') _loadIssueCount();
+    if (closingTag == 'social') _loadUnreadChatCount();
+    _navExpand.reverse();
   }
 
   bool get _isDesktopLike {
@@ -143,20 +467,26 @@ class _MyHomePageState extends State<MyHomePage>
   Widget build(BuildContext context) {
     final isAuthenticated = AuthService().isAuthenticated;
     final userType = AuthService().userType;
+    final unreadGroupInviteCount =
+        context.watch<NotificationProvider>().unreadGroupInviteCount;
     final isOwnerType = userType == 'FacilityOwner' || userType == 'PublicBody';
+    final isAdmin = userType == 'Admin';
     if (_isDesktopLike) {
       final cs = Theme.of(context).colorScheme;
 
       // Builds one nav button. Width math: 8px outer-h + 40px icon + 128*t label + 8px outer-h = 56+128*t total.
       Widget navBtn({
         required IconData icon,
+        Widget? iconWidget,
         required String label,
         required VoidCallback onTap,
         bool selected = false,
         Widget? lockBadge,
+        Widget? customIcon,
         required double t,
       }) {
         final color = selected ? cs.primary : cs.onSurfaceVariant;
+        final iconChild = iconWidget ?? Icon(icon, size: 24, color: color);
         return Padding(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
           child: InkWell(
@@ -171,15 +501,15 @@ class _MyHomePageState extends State<MyHomePage>
                     width: 40,
                     height: 40,
                     child: Center(
-                      child: lockBadge != null
+                      child: customIcon ?? (lockBadge != null
                           ? Stack(
                               clipBehavior: Clip.none,
                               children: [
-                                Icon(icon, size: 24, color: color),
+                                iconChild,
                                 lockBadge,
                               ],
                             )
-                          : Icon(icon, size: 24, color: color),
+                          : iconChild),
                     ),
                   ),
                   ClipRect(
@@ -210,17 +540,90 @@ class _MyHomePageState extends State<MyHomePage>
         );
       }
 
+      final screenWidth = MediaQuery.of(context).size.width;
+      final maxPanelWidth = screenWidth - 224 - 16;
+      final panelWidth = _isPanelFullscreen ? maxPanelWidth : maxPanelWidth.clamp(0.0, 560.0);
+
       return Scaffold(
         body: SafeArea(
           child: Stack(
             children: [
               POIMap(controller: _mapController),
               Positioned(
+                left: 208,
+                top: 16,
+                bottom: 16,
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 220),
+                  switchInCurve: Curves.easeOutCubic,
+                  switchOutCurve: Curves.easeInCubic,
+                  transitionBuilder: (child, animation) => SlideTransition(
+                    position: Tween<Offset>(
+                      begin: const Offset(-0.12, 0),
+                      end: Offset.zero,
+                    ).animate(animation),
+                    child: FadeTransition(opacity: animation, child: child),
+                  ),
+                  child: _panelContent != null
+                      ? KeyedSubtree(
+                          key: ValueKey(_panelTag),
+                          child: SizedBox(
+                            width: panelWidth,
+                            child: Material(
+                              elevation: 10,
+                              borderRadius: BorderRadius.circular(24),
+                              color: cs.surface,
+                              clipBehavior: Clip.antiAlias,
+                              child: Column(
+                                mainAxisSize: MainAxisSize.max,
+                                children: [
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.end,
+                                    children: [
+                                      IconButton(
+                                        icon: Icon(_isPanelFullscreen ? Icons.fullscreen_exit : Icons.fullscreen, size: 18),
+                                        style: IconButton.styleFrom(
+                                          foregroundColor: cs.onSurfaceVariant,
+                                          minimumSize: const Size(40, 40),
+                                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                        ),
+                                        onPressed: _togglePanelFullscreen,
+                                      ),
+                                      IconButton(
+                                        icon: const Icon(Icons.close, size: 18),
+                                        style: IconButton.styleFrom(
+                                          foregroundColor: cs.onSurfaceVariant,
+                                          minimumSize: const Size(40, 40),
+                                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                        ),
+                                        onPressed: _closePanel,
+                                      ),
+                                    ],
+                                  ),
+                                  Expanded(
+                                    child: Navigator(
+                                      onGenerateRoute: (settings) =>
+                                          MaterialPageRoute(
+                                        builder: (_) => _panelContent!,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        )
+                      : const SizedBox.shrink(),
+                ),
+              ),
+              Positioned(
                 left: 16,
                 top: 16,
                 child: MouseRegion(
                   onEnter: (_) => _navExpand.forward(),
-                  onExit: (_) => _navExpand.reverse(),
+                  onExit: (_) {
+                    if (_panelTag == null) _navExpand.reverse();
+                  },
                   child: AnimatedBuilder(
                     animation: _navAnim,
                     builder: (context, _) {
@@ -240,27 +643,39 @@ class _MyHomePageState extends State<MyHomePage>
                               navBtn(
                                 icon: Icons.map_outlined,
                                 label: 'Map',
-                                onTap: () {},
-                                selected: true,
+                                onTap: _closePanel,
+                                selected: _panelTag == null,
                                 t: t,
                               ),
                               navBtn(
                                 icon: Icons.search,
                                 label: 'Search',
                                 onTap: _openWallSearch,
+                                selected: _panelTag == 'search',
                                 t: t,
                               ),
-                              navBtn(
-                                icon: Icons.leaderboard_outlined,
-                                label: 'Rank',
-                                onTap: _openGlobalLeaderboard,
-                                t: t,
-                              ),
-                              if (!isOwnerType)
+                              if (!isAdmin) ...[
+                                navBtn(
+                                  icon: Icons.event,
+                                  label: 'Events',
+                                  onTap: _openEvents,
+                                  selected: _panelTag == 'events',
+                                  t: t,
+                                ),
+                                navBtn(
+                                  icon: Icons.leaderboard_outlined,
+                                  label: 'Rank',
+                                  onTap: _openGlobalLeaderboard,
+                                  selected: _panelTag == 'leaderboard',
+                                  t: t,
+                                ),
+                              ],
+                              if (!isOwnerType && !isAdmin)
                                 navBtn(
                                   icon: Icons.edit_calendar_outlined,
                                   label: 'Log climb',
                                   onTap: _openLogSessionSheet,
+                                  selected: _panelTag == 'log',
                                   lockBadge: !isAuthenticated
                                       ? Positioned(
                                           right: -2,
@@ -274,14 +689,68 @@ class _MyHomePageState extends State<MyHomePage>
                                       : null,
                                   t: t,
                                 ),
-                              navBtn(
-                                icon: isAuthenticated
-                                    ? Icons.person_outline
-                                    : Icons.login,
-                                label: isAuthenticated ? 'Me' : 'Login',
-                                onTap: _openAccountPage,
-                                t: t,
-                              ),
+                              if (!isOwnerType && !isAdmin)
+                                navBtn(
+                                  icon: Icons.people_outlined,
+                                  label: 'Social',
+                                  onTap: _openSocial,
+                                  selected: _panelTag == 'social',
+                                  customIcon: (_unreadChatCount + unreadGroupInviteCount) > 0
+                                      ? Badge(
+                                          label: Text('${_unreadChatCount + unreadGroupInviteCount}'),
+                                          child: Icon(Icons.people_outlined,
+                                              size: 24,
+                                              color: cs.onSurfaceVariant),
+                                        )
+                                      : null,
+                                  t: t,
+                                ),
+                              if (userType == 'PublicBody')
+                                navBtn(
+                                  icon: Icons.warning_outlined,
+                                  label: 'Issues',
+                                  onTap: _openIssuesPage,
+                                  selected: _panelTag == 'issues',
+                                  customIcon: Badge(
+                                    isLabelVisible: _openIssueCount != null && _openIssueCount! > 0,
+                                    label: Text('${_openIssueCount ?? 0}'),
+                                    backgroundColor: _badgeSeverityColor,
+                                    child: Icon(Icons.warning_outlined, size: 24, color: cs.onSurfaceVariant),
+                                  ),
+                                  t: t,
+                                ),
+                              if (userType == 'Admin')
+                                navBtn(
+                                  icon: Icons.admin_panel_settings_outlined,
+                                  label: 'Admin',
+                                  onTap: _openAdminPage,
+                                  selected: _panelTag == 'admin',
+                                  t: t,
+                                ),
+                              if (isAdmin)
+                                navBtn(
+                                  icon: Icons.logout,
+                                  label: 'Logout',
+                                  onTap: () async {
+                                    await AuthService().logout();
+                                    _closePanel();
+                                  },
+                                  selected: false,
+                                  t: t,
+                                )
+                              else
+                                navBtn(
+                                  icon: isAuthenticated
+                                      ? Icons.person_outline
+                                      : Icons.login,
+                                  label: isAuthenticated ? 'Me' : 'Login',
+                                  onTap: _openAccountPage,
+                                  selected: _panelTag == 'account',
+                                  customIcon: isAuthenticated
+                                      ? _buildAvatarWidget(radius: 12)
+                                      : null,
+                                  t: t,
+                                ),
                               const SizedBox(height: 8),
                             ],
                           ),
@@ -323,13 +792,14 @@ class _MyHomePageState extends State<MyHomePage>
                   label: 'Search',
                   onTap: _openWallSearch,
                 ),
-                _NavItem(
-                  tooltip: 'Global Rankings',
-                  icon: Icons.leaderboard_outlined,
-                  label: 'Rank',
-                  onTap: _openGlobalLeaderboard,
-                ),
-                if (!isOwnerType)
+                if (!isAdmin)
+                  _NavItem(
+                    tooltip: 'Global Rankings',
+                    icon: Icons.leaderboard_outlined,
+                    label: 'Rank',
+                    onTap: _openGlobalLeaderboard,
+                  ),
+                if (!isOwnerType && !isAdmin)
                   _NavItem(
                     tooltip: 'Log session',
                     icon: Icons.edit_calendar_outlined,
@@ -337,12 +807,56 @@ class _MyHomePageState extends State<MyHomePage>
                     hint: isAuthenticated ? null : 'Login',
                     onTap: _openLogSessionSheet,
                   ),
-                _NavItem(
-                  tooltip: isAuthenticated ? 'Account' : 'Login',
-                  icon: isAuthenticated ? Icons.person_outline : Icons.login,
-                  label: isAuthenticated ? 'Me' : 'Login',
-                  onPressed: _openAccountPage,
-                ),
+                if (!isOwnerType && !isAdmin)
+                  _NavItem(
+                    tooltip: 'Social',
+                    icon: Icons.people_outlined,
+                    label: 'Social',
+                    onTap: _openSocial,
+                    customIcon: (_unreadChatCount + unreadGroupInviteCount) > 0
+                        ? Badge(
+                            label: Text('${_unreadChatCount + unreadGroupInviteCount}'),
+                            child: const Icon(Icons.people_outlined, size: 24),
+                          )
+                        : null,
+                  ),
+                if (userType == 'PublicBody')
+                  _NavItem(
+                    tooltip: 'Issues',
+                    icon: Icons.warning_outlined,
+                    label: 'Issues',
+                    onTap: _openIssuesPage,
+                    customIcon: Badge(
+                      isLabelVisible: _openIssueCount != null && _openIssueCount! > 0,
+                      label: Text('${_openIssueCount ?? 0}'),
+                      backgroundColor: _badgeSeverityColor,
+                      child: const Icon(Icons.warning_outlined),
+                    ),
+                  ),
+                  if (userType == 'Admin')
+                    _NavItem(
+                      tooltip: 'Admin Dashboard',
+                      icon: Icons.admin_panel_settings_outlined,
+                      label: 'Admin',
+                      onTap: _openAdminPage,
+                    ),
+                if (isAdmin)
+                  _NavItem(
+                    tooltip: 'Logout',
+                    icon: Icons.logout,
+                    label: 'Logout',
+                    onTap: () async {
+                      await AuthService().logout();
+                    },
+                  )
+                else
+                  _NavItem(
+                    tooltip: isAuthenticated ? 'Account' : 'Login',
+                    icon: isAuthenticated ? Icons.person_outline : Icons.login,
+                    label: isAuthenticated ? 'Me' : 'Login',
+                    onPressed: _openAccountPage,
+                    customIcon: isAuthenticated ? _buildAvatarWidget() : null,
+                  ),
               ],
             ),
           ),
@@ -359,10 +873,12 @@ class _WallSearchSheet extends StatefulWidget {
   const _WallSearchSheet({
     required this.mapController,
     required this.onLogWall,
+    this.onClose,
   });
 
   final WallMapController mapController;
   final Future<void> Function(Wall wall) onLogWall;
+  final VoidCallback? onClose;
 
   @override
   State<_WallSearchSheet> createState() => _WallSearchSheetState();
@@ -377,6 +893,7 @@ class _WallSearchSheetState extends State<_WallSearchSheet> {
   Timer? _debounce;
   String _selectedPoiType = 'all';
   String _selectedDifficulty = 'all';
+  final Set<String> _followingIds = {};
 
   @override
   void initState() {
@@ -385,7 +902,45 @@ class _WallSearchSheetState extends State<_WallSearchSheet> {
       if (_controller.text.trim().isEmpty) {
         _fetchNearby();
       }
+      if (AuthService().isAuthenticated) _loadFollowing();
     });
+  }
+
+  Future<void> _loadFollowing() async {
+    final following = await ApiService().getFollowing();
+    if (!mounted) return;
+    setState(() {
+      _followingIds
+        ..clear()
+        ..addAll(following.map((u) => (u['id'] ?? u['_id'] ?? '').toString()));
+    });
+  }
+
+  Future<void> _toggleFollow(String userId) async {
+    final was = _followingIds.contains(userId);
+    setState(() {
+      if (was) {
+        _followingIds.remove(userId);
+      } else {
+        _followingIds.add(userId);
+      }
+    });
+    try {
+      if (was) {
+        await ApiService().unfollowUser(userId);
+      } else {
+        await ApiService().followUser(userId);
+      }
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        if (was) {
+          _followingIds.add(userId);
+        } else {
+          _followingIds.remove(userId);
+        }
+      });
+    }
   }
 
   Future<void> _fetchNearby() async {
@@ -459,7 +1014,11 @@ class _WallSearchSheetState extends State<_WallSearchSheet> {
     );
 
     final rootContext = Navigator.of(context, rootNavigator: true).context;
-    Navigator.of(context).pop();
+    if (widget.onClose != null) {
+      widget.onClose!();
+    } else {
+      Navigator.of(context).pop();
+    }
 
     if (!AuthService().isAuthenticated) {
       final loggedIn = await showLoginDialog(rootContext);
@@ -480,6 +1039,7 @@ class _WallSearchSheetState extends State<_WallSearchSheet> {
   void _onQueryChanged(String value) {
     _debounce?.cancel();
     _debounce = Timer(const Duration(milliseconds: 300), _search);
+    setState(() {});
   }
 
   void _setPoiType(String value) {
@@ -531,7 +1091,11 @@ class _WallSearchSheetState extends State<_WallSearchSheet> {
   }
 
   void _selectPoi(Poi poi) {
-    Navigator.of(context).pop();
+    if (widget.onClose != null) {
+      widget.onClose!();
+    } else {
+      Navigator.of(context).pop();
+    }
     if (poi is FacilityPoi) {
       widget.mapController.focusOnFacility(poi);
     } else if (poi is OutdoorWallPoi) {
@@ -556,35 +1120,45 @@ class _WallSearchSheetState extends State<_WallSearchSheet> {
   @override
   Widget build(BuildContext context) {
     final isAuthenticated = AuthService().isAuthenticated;
+    final cs = Theme.of(context).colorScheme;
 
-    return SizedBox(
-      height: MediaQuery.of(context).size.height * 0.85,
+    final body = Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [cs.surface, cs.surfaceContainerHighest.withValues(alpha: 0.85)],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+        ),
+      ),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
               'Search climbing spots',
+              textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.titleLarge,
             ),
-            const SizedBox(height: 12),
-            TextField(
+            const SizedBox(height: 20),
+            SearchBar(
               controller: _controller,
-              autofocus: true,
-              textInputAction: TextInputAction.search,
+              autoFocus: true,
+              hintText: 'Search facilities and outdoor walls',
+              leading: const Icon(Icons.search),
               onChanged: _onQueryChanged,
               onSubmitted: (_) => _search(),
-              decoration: InputDecoration(
-                hintText: 'Search facilities and outdoor walls',
-                prefixIcon: const Icon(Icons.search),
-                suffixIcon: IconButton(
-                  tooltip: 'Search',
-                  icon: const Icon(Icons.arrow_forward),
-                  onPressed: _search,
-                ),
-                border: const OutlineInputBorder(),
-              ),
+              trailing: [
+                if (_controller.text.isNotEmpty)
+                  IconButton(
+                    icon: const Icon(Icons.clear),
+                    tooltip: 'Clear',
+                    onPressed: () {
+                      _controller.clear();
+                      _onQueryChanged('');
+                    },
+                  ),
+              ],
             ),
             const SizedBox(height: 12),
             SingleChildScrollView(
@@ -739,7 +1313,25 @@ class _WallSearchSheetState extends State<_WallSearchSheet> {
                                       onPressed: () =>
                                           _handleLogOutdoorWall(outdoorPoi),
                                     )
-                                  : null,
+                                  : (AuthService().isAuthenticated &&
+                                          facilityPoi!.ownerAccountId != null &&
+                                          facilityPoi.ownerAccountId !=
+                                              AuthService().currentUserId)
+                                      ? IconButton(
+                                          tooltip: _followingIds.contains(
+                                                  facilityPoi.ownerAccountId)
+                                              ? 'Unfollow gym'
+                                              : 'Follow gym',
+                                          icon: Icon(
+                                            _followingIds.contains(
+                                                    facilityPoi.ownerAccountId)
+                                                ? Icons.notifications_active
+                                                : Icons.notifications_none,
+                                          ),
+                                          onPressed: () => _toggleFollow(
+                                              facilityPoi.ownerAccountId!),
+                                        )
+                                      : null,
                               onTap: () => _selectPoi(poi),
                             ),
                           );
@@ -753,6 +1345,11 @@ class _WallSearchSheetState extends State<_WallSearchSheet> {
         ),
       ),
     );
+    if (widget.onClose != null) return body;
+    return SizedBox(
+      height: MediaQuery.of(context).size.height * 0.85,
+      child: body,
+    );
   }
 }
 
@@ -765,6 +1362,7 @@ class _NavItem extends StatelessWidget {
     this.onTap,
     this.tooltip,
     this.onPressed,
+    this.customIcon,
   });
 
   final IconData? icon;
@@ -774,6 +1372,7 @@ class _NavItem extends StatelessWidget {
   final VoidCallback? onTap;
   final String? tooltip;
   final VoidCallback? onPressed;
+  final Widget? customIcon;
 
   @override
   Widget build(BuildContext context) {
@@ -800,7 +1399,7 @@ class _NavItem extends StatelessWidget {
             children: [
               Tooltip(
                 message: tooltip ?? '',
-                child: Icon(
+                child: customIcon ?? Icon(
                   icon,
                   color: color,
                   size: isDesktopLike ? 24.0 : 28.0,

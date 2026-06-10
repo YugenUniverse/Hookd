@@ -1,5 +1,5 @@
 const mongoose = require("mongoose");
-const Report = require("../../models/Report");
+const { BaseReport } = require("../../models/Report");
 const { Wall, IndoorWall } = require("../../models/Wall");
 const Facility = require("../../models/Facility");
 const { FacilityOwner } = require("../../models/User");
@@ -12,7 +12,7 @@ describe("Report model", () => {
     });
 
     afterEach(async () => {
-        await Report.deleteMany({});
+        await BaseReport.deleteMany({});
         await Wall.deleteMany({});
         await Facility.deleteMany({});
         await FacilityOwner.deleteMany({});
@@ -42,8 +42,8 @@ describe("Report model", () => {
             facility: facility._id,
         });
 
-        const report = await Report.create({
-            facility_id: owner._id, // Reports are linked to the User (FacilityOwner)
+        const report = await BaseReport.create({
+            owner_id: owner._id, // Reports are linked to the User (FacilityOwner)
             wall_id: wall._id,
             title: "Monthly Report",
             notes: "Snapshot for the month",
@@ -51,7 +51,7 @@ describe("Report model", () => {
 
         expect(report.title).toBe("Monthly Report");
         expect(report.notes).toBe("Snapshot for the month");
-        expect(report.facility_id.toString()).toBe(owner._id.toString());
+        expect(report.owner_id.toString()).toBe(owner._id.toString());
         expect(report.wall_id.toString()).toBe(wall._id.toString());
         expect(report.toJSON().id).toBeDefined();
         expect(report.toJSON()._id).toBeUndefined();
@@ -79,8 +79,8 @@ describe("Report model", () => {
         });
 
         await expect(
-            Report.create({
-                facility_id: owner._id,
+            BaseReport.create({
+                owner_id: owner._id,
                 wall_id: wall._id,
                 notes: "Missing title",
             }),
@@ -114,8 +114,8 @@ describe("Report model", () => {
 
         // Test long title
         await expect(
-            Report.create({
-                facility_id: owner._id,
+            BaseReport.create({
+                owner_id: owner._id,
                 wall_id: wall._id,
                 title: longTitle,
             }),
@@ -123,8 +123,8 @@ describe("Report model", () => {
 
         // Test long notes
         await expect(
-            Report.create({
-                facility_id: owner._id,
+            BaseReport.create({
+                owner_id: owner._id,
                 wall_id: wall._id,
                 title: "Valid Title",
                 notes: longNotes,

@@ -29,6 +29,7 @@ class _WallDetailsDialogState extends State<WallDetailsDialog> {
   late Wall _wall;
 
   int _leaderboardOffset = 0;
+  final Set<String> _reportedReviewIds = {};
 
   @override
   void initState() {
@@ -325,27 +326,99 @@ class _WallDetailsDialogState extends State<WallDetailsDialog> {
                           onPressed: () {
                             final TextEditingController issueController =
                                 TextEditingController();
+                            final TextEditingController descriptionController =
+                                TextEditingController();
+                            final TextEditingController locationController =
+                                TextEditingController();
+                            String selectedSeverity = 'MEDIUM';
                             showDialog(
                               context: context,
                               builder: (context) => StatefulBuilder(
                                 builder: (context, setState) => AlertDialog(
                                   title: const Text('Report an issue'),
-                                  content: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text('Report an issue for ${wall.name}.'),
-                                      const SizedBox(height: 12),
-                                      TextField(
-                                        controller: issueController,
-                                        maxLines: 5,
-                                        decoration: const InputDecoration(
-                                          hintText: 'Describe the issue...',
-                                          border: OutlineInputBorder(),
+                                  content: SingleChildScrollView(
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text('Report an issue for ${wall.name}.'),
+                                        const SizedBox(height: 12),
+                                        const Text('Severity *',
+                                            style: TextStyle(
+                                                fontWeight: FontWeight.bold)),
+                                        const SizedBox(height: 8),
+                                        DropdownButton<String>(
+                                          value: selectedSeverity,
+                                          isExpanded: true,
+                                          onChanged: (String? newValue) {
+                                            if (newValue != null) {
+                                              setState(() {
+                                                selectedSeverity = newValue;
+                                              });
+                                            }
+                                          },
+                                          items: const [
+                                            DropdownMenuItem(
+                                              value: 'LOW',
+                                              child: Text('🟡 Low'),
+                                            ),
+                                            DropdownMenuItem(
+                                              value: 'MEDIUM',
+                                              child: Text('🟠 Medium'),
+                                            ),
+                                            DropdownMenuItem(
+                                              value: 'HIGH',
+                                              child: Text('🔴 High'),
+                                            ),
+                                          ],
                                         ),
-                                      ),
-                                    ],
+                                        const SizedBox(height: 16),
+                                        const Text('Description *',
+                                            style: TextStyle(
+                                                fontWeight: FontWeight.bold)),
+                                        const SizedBox(height: 8),
+                                        TextField(
+                                          controller: issueController,
+                                          maxLines: 4,
+                                          maxLength: 500,
+                                          decoration: const InputDecoration(
+                                            hintText:
+                                                'Brief description of the issue...',
+                                            border: OutlineInputBorder(),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 12),
+                                        const Text('Location',
+                                            style: TextStyle(
+                                                fontWeight: FontWeight.bold)),
+                                        const SizedBox(height: 8),
+                                        TextField(
+                                          controller: locationController,
+                                          maxLength: 200,
+                                          decoration: const InputDecoration(
+                                            hintText:
+                                                'e.g., Upper left section, Area 3...',
+                                            border: OutlineInputBorder(),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 12),
+                                        const Text('Additional Details',
+                                            style: TextStyle(
+                                                fontWeight: FontWeight.bold)),
+                                        const SizedBox(height: 8),
+                                        TextField(
+                                          controller: descriptionController,
+                                          maxLines: 3,
+                                          maxLength: 1000,
+                                          decoration: const InputDecoration(
+                                            hintText:
+                                                'Additional context or details (optional)...',
+                                            border: OutlineInputBorder(),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                   actions: [
                                     TextButton(
@@ -357,21 +430,45 @@ class _WallDetailsDialogState extends State<WallDetailsDialog> {
                                       onPressed: () async {
                                         final issueBody = issueController.text
                                             .trim();
-                                        if (issueBody.isNotEmpty) {
-                                          final apiService = ApiService();
-                                          final navigator = Navigator.of(
-                                            context,
+                                        if (issueBody.isEmpty) {
+                                          ScaffoldMessenger.of(context)
+                                              .showSnackBar(
+                                            const SnackBar(
+                                              content: Text(
+                                                  'Description is required'),
+                                            ),
                                           );
-                                          final messenger =
-                                              ScaffoldMessenger.of(context);
+                                          return;
+                                        }
+                                        final apiService = ApiService();
+                                        final navigator = Navigator.of(
+                                          context,
+                                        );
+                                        final messenger =
+                                            ScaffoldMessenger.of(context);
+                                        try {
                                           await apiService.createIssue(
                                             wallId: wall.id,
                                             body: issueBody,
+                                            severity: selectedSeverity,
+                                            description:
+                                                descriptionController.text
+                                                    .trim(),
+                                            location: locationController.text
+                                                .trim(),
                                           );
                                           navigator.pop();
                                           messenger.showSnackBar(
                                             const SnackBar(
-                                              content: Text('Issue submitted.'),
+                                              content:
+                                                  Text('Issue submitted.'),
+                                            ),
+                                          );
+                                        } catch (e) {
+                                          messenger.showSnackBar(
+                                            SnackBar(
+                                              content: Text(
+                                                  'Failed to submit: $e'),
                                             ),
                                           );
                                         }
@@ -488,6 +585,85 @@ class _WallDetailsDialogState extends State<WallDetailsDialog> {
         ),
       ),
     );
+  }
+
+  Future<void> _reportReview(Review review) async {
+    final currentUserId = AuthService().currentUserId;
+    if (currentUserId == review.reviewerId) return;
+    if (_reportedReviewIds.contains(review.id)) return;
+
+    String? selectedReason;
+    final customController = TextEditingController();
+
+    final submitted = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) {
+        return StatefulBuilder(builder: (ctx, setModalState) {
+          const reasons = ['Spam', 'Offensive language', 'Misleading', 'Other'];
+          return Padding(
+            padding: EdgeInsets.only(
+              left: 16, right: 16, top: 24,
+              bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Report review', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                const SizedBox(height: 16),
+                Wrap(
+                  spacing: 8,
+                  children: reasons.map((r) => ChoiceChip(
+                    label: Text(r),
+                    selected: selectedReason == r,
+                    onSelected: (_) => setModalState(() => selectedReason = r),
+                  )).toList(),
+                ),
+                if (selectedReason == 'Other') ...[
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: customController,
+                    maxLength: 200,
+                    decoration: const InputDecoration(
+                      hintText: 'Describe the issue...',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: selectedReason == null ? null : () => Navigator.pop(ctx, true),
+                    child: const Text('Submit'),
+                  ),
+                ),
+              ],
+            ),
+          );
+        });
+      },
+    );
+
+    if (submitted != true || selectedReason == null) return;
+
+    final reason = selectedReason == 'Other' && customController.text.trim().isNotEmpty
+        ? customController.text.trim()
+        : selectedReason!;
+
+    try {
+      await ApiService().flagReview(review.id, reason);
+      if (!mounted) return;
+      setState(() => _reportedReviewIds.add(review.id));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Review reported. Thank you.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      final msg = e.toString().contains('409') ? 'Already reported' : 'Failed to report review';
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    }
   }
 
   Widget _buildReviewsTab(BuildContext context) {
@@ -615,6 +791,28 @@ class _WallDetailsDialogState extends State<WallDetailsDialog> {
                                 );
                               }),
                             ),
+                            if (AuthService().isAuthenticated &&
+                                review.reviewerId != AuthService().currentUserId &&
+                                !_reportedReviewIds.contains(review.id))
+                              PopupMenuButton<String>(
+                                iconSize: 18,
+                                padding: EdgeInsets.zero,
+                                itemBuilder: (_) => [
+                                  const PopupMenuItem(
+                                    value: 'report',
+                                    child: Row(
+                                      children: [
+                                        Icon(Icons.flag_outlined, size: 16),
+                                        SizedBox(width: 8),
+                                        Text('Report'),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                                onSelected: (v) {
+                                  if (v == 'report') _reportReview(review);
+                                },
+                              ),
                           ],
                         ),
                         if (review.sessionIsPrivate) ...[

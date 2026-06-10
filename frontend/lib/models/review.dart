@@ -9,6 +9,8 @@ class Review {
   final DateTime? sessionDate;
   final int sessionTimeMinutes;
   final bool sessionIsPrivate;
+  final bool flagged;
+  final String flagReason;
 
   Review({
     required this.id,
@@ -21,6 +23,8 @@ class Review {
     required this.sessionDate,
     required this.sessionTimeMinutes,
     required this.sessionIsPrivate,
+    this.flagged = false,
+    this.flagReason = '',
   });
 
   factory Review.fromJson(Map<String, dynamic> json) {
@@ -39,6 +43,8 @@ class Review {
       sessionDate: _parseDate(session?['date']),
       sessionTimeMinutes: _toInt(session?['time']),
       sessionIsPrivate: _toBool(session?['is_private']),
+      flagged: _toBool(json['flagged']),
+      flagReason: (json['flagReason'] ?? '').toString(),
     );
   }
 

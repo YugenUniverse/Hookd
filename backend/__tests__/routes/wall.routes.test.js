@@ -7,11 +7,13 @@ const { Wall, IndoorWall, OutdoorWall } = require("../../models/Wall");
 const { User, PublicBody } = require("../../models/User");
 const Facility = require("../../models/Facility");
 const ClimbingSession = require("../../models/ClimbingSession");
+const Notification = require("../../models/Notification");
 
 jest.setTimeout(30000);
 
 const MOCK_FACILITY_OWNER_ID = "60d5ecdec021f13528e01369";
 const MOCK_PUBLIC_BODY_ID = "60d5ecdec021f13528e01370";
+const MOCK_ADMIN_ID = "60d5ecdec021f13528e01371";
 
 // var (not const) so the jest.mock closure can read mutations set in beforeEach
 var mockUserId = MOCK_FACILITY_OWNER_ID;
@@ -58,6 +60,7 @@ describe("Wall Routes", () => {
         await Facility.deleteMany({});
         await User.deleteMany({});
         await ClimbingSession.deleteMany({});
+        await Notification.deleteMany({});
     });
 
     afterAll(async () => {
@@ -372,6 +375,78 @@ describe("Wall Routes", () => {
 
             const updatedPb = await PublicBody.findById(MOCK_PUBLIC_BODY_ID);
             expect(updatedPb.walls.length).toBe(0);
+        });
+    });
+
+    // ── Admin operations ─────────────────────────────────────────────────────
+
+    describe("Admin wall operations", () => {
+        let publicBody;
+
+        beforeEach(async () => {
+            mockUserId = MOCK_ADMIN_ID;
+            mockUserType = "Admin";
+
+            publicBody = await PublicBody.create({
+                _id: MOCK_PUBLIC_BODY_ID,
+                email: "parks_admin@gov.example",
+                username: "parks_dept_admin",
+                name: "Department of Parks Admin",
+                location: { coordinates: [11.12, 46.06] },
+                authMethods: ["local"],
+            });
+        });
+
+        it("updates an outdoor wall and generates a notification", async () => {
+            const wall = await OutdoorWall.create({
+                name: "Admin Rock",
+                description: "Old",
+                difficulty: "BEGINNER",
+                location: { coordinates: [11.12, 46.06] },
+                publicBody: MOCK_PUBLIC_BODY_ID,
+            });
+
+            const res = await request(app).put(`/walls/${wall._id}`).send({
+                name: "New Admin Rock",
+                description: "New",
+                difficulty: "EXPERT",
+            });
+
+            expect(res.status).toBe(200);
+            expect(res.body.wall.name).toBe("New Admin Rock");
+
+            // Check notification
+            const notifs = await Notification.find({ recipient: MOCK_PUBLIC_BODY_ID, type: "wall_updated_by_admin" });
+            expect(notifs.length).toBe(1);
+            expect(notifs[0].payload.wallId.toString()).toBe(wall._id.toString());
+            expect(notifs[0].payload.changes.name.old).toBe("Admin Rock");
+            expect(notifs[0].payload.changes.name.new).toBe("New Admin Rock");
+        });
+
+        it("deletes an outdoor wall but not an indoor wall", async () => {
+            const outdoorWall = await OutdoorWall.create({
+                name: "Delete Outdoor",
+                difficulty: "BEGINNER",
+                location: { coordinates: [0, 0] },
+                publicBody: MOCK_PUBLIC_BODY_ID,
+            });
+
+            const indoorWall = await IndoorWall.create({
+                name: "Keep Indoor",
+                difficulty: "BEGINNER",
+                location: { coordinates: [0, 0] },
+                facility: testFacility._id,
+            });
+
+            const resIndoor = await request(app).delete(`/walls/${indoorWall._id}`);
+            expect(resIndoor.status).toBe(403);
+            expect(resIndoor.body.error).toBe("Admins can only delete OutdoorWalls.");
+
+            const resOutdoor = await request(app).delete(`/walls/${outdoorWall._id}`);
+            expect(resOutdoor.status).toBe(200);
+
+            expect(await Wall.findById(outdoorWall._id)).toBeNull();
+            expect(await Wall.findById(indoorWall._id)).not.toBeNull();
         });
     });
 });

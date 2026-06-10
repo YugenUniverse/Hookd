@@ -2,6 +2,7 @@ const express = require("express");
 const mongoose = require("mongoose");
 const { authenticateJwt } = require("../middleware/auth.middleware");
 const issueController = require("../controllers/issue.controllers");
+const { SEVERITY_ENUM } = require("../models/Issue");
 
 const router = express.Router();
 
@@ -9,7 +10,7 @@ const VALID_ISSUE_STATUSES = ["OPEN", "IN_PROGRESS", "RESOLVED", "CLOSED"];
 
 // Validation middleware
 const validateCreateIssueInput = (req, res, next) => {
-    const { wall_id, body } = req.body;
+    const { wall_id, body, severity, description, location } = req.body;
 
     // Check required fields
     if (!wall_id || !body) {
@@ -45,6 +46,39 @@ const validateCreateIssueInput = (req, res, next) => {
         });
     }
 
+    // Validate severity if provided
+    if (severity && !SEVERITY_ENUM.includes(severity)) {
+        return res.status(400).json({
+            error: `Invalid severity. Valid values are: ${SEVERITY_ENUM.join(", ")}`,
+        });
+    }
+
+    // Validate description if provided
+    if (description && typeof description !== "string") {
+        return res.status(400).json({
+            error: "description must be a string",
+        });
+    }
+
+    if (description && description.length > 1000) {
+        return res.status(400).json({
+            error: "description cannot exceed 1000 characters",
+        });
+    }
+
+    // Validate location if provided
+    if (location && typeof location !== "string") {
+        return res.status(400).json({
+            error: "location must be a string",
+        });
+    }
+
+    if (location && location.length > 200) {
+        return res.status(400).json({
+            error: "location cannot exceed 200 characters",
+        });
+    }
+
     next();
 };
 
@@ -70,6 +104,8 @@ router.use(authenticateJwt);
 router.post("/", validateCreateIssueInput, issueController.createIssue);
 router.get("/walls/:wallId", issueController.getIssuesForWall);
 router.get("/my-issues", issueController.getIssuesByUser);
+router.get("/public-body/dashboard/summary", issueController.getPublicBodyIssueSummary);
+router.get("/public-body/dashboard", issueController.getPublicBodyIssuesDashboard);
 router.put(
     "/:issueId/status",
     validateUpdateIssueStatusInput,

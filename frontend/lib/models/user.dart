@@ -1,4 +1,5 @@
 import 'poi.dart' show IndoorWallSummary;
+import 'badge.dart' show Wallet;
 
 class PublicBodyData {
   final String name;
@@ -120,6 +121,15 @@ class User {
   final String? userType;
   final FacilityProfile? facilityData;
   final PublicBodyData? publicBodyData;
+  final String? name;
+  final String? surname;
+  final String? bio;
+  final DateTime? birthdate;
+  final Wallet? wallet;
+  final int maxStreak;
+  final int sessionCount;
+  final String allowDmsFrom;
+  final String? approvalStatus;
 
   User({
     required this.id,
@@ -132,6 +142,15 @@ class User {
     this.userType,
     this.facilityData,
     this.publicBodyData,
+    this.name,
+    this.surname,
+    this.bio,
+    this.birthdate,
+    this.wallet,
+    this.maxStreak = 0,
+    this.sessionCount = 0,
+    this.allowDmsFrom = 'everyone',
+    this.approvalStatus,
   });
 
   factory User.fromJson(Map<String, dynamic> json) {
@@ -189,6 +208,35 @@ class User {
       publicBodyData = PublicBodyData.fromJson(json);
     }
 
+    final name = json['name']?.toString();
+    final surname = json['surname']?.toString();
+    final bio = json['bio']?.toString();
+
+    DateTime? birthdate;
+    final bd = json['birthdate'];
+    if (bd != null) {
+      if (bd is String) {
+        birthdate = DateTime.tryParse(bd);
+      } else if (bd is int) {
+        birthdate = DateTime.fromMillisecondsSinceEpoch(bd);
+      }
+    }
+    
+    Wallet? wallet;
+    if (json['wallet'] is Map) {
+      wallet = Wallet.fromJson(Map<String, dynamic>.from(json['wallet']));
+    }
+
+    int maxStreak = 0;
+    if (json['stats'] is Map && json['stats']['maxStreak'] != null) {
+      maxStreak = (json['stats']['maxStreak'] as num).toInt();
+    }
+
+    int sessionCount = 0;
+    if (json['sessions'] is List) {
+      sessionCount = (json['sessions'] as List).length;
+    }
+
     return User(
       id: id,
       username: username,
@@ -200,6 +248,15 @@ class User {
       userType: userType,
       facilityData: facilityData,
       publicBodyData: publicBodyData,
+      name: name,
+      surname: surname,
+      bio: bio,
+      birthdate: birthdate,
+      wallet: wallet,
+      maxStreak: maxStreak,
+      sessionCount: sessionCount,
+      allowDmsFrom: json['allowDmsFrom']?.toString() ?? 'everyone',
+      approvalStatus: json['approvalStatus']?.toString(),
     );
   }
 

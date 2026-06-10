@@ -1,0 +1,49 @@
+class Event {
+  final String id;
+  final String title;
+  final String? description;
+  final String? facilityId;
+  final String? groupId;
+  final bool isGlobal;
+  final DateTime startDate;
+  final DateTime? endDate;
+  final DateTime? createdAt;
+  final String status;
+  final List<String> walls;
+
+  const Event({
+    required this.id,
+    required this.title,
+    this.description,
+    this.facilityId,
+    this.groupId,
+    this.isGlobal = false,
+    required this.startDate,
+    this.endDate,
+    this.createdAt,
+    this.status = 'active',
+    this.walls = const [],
+  });
+
+  factory Event.fromJson(Map<String, dynamic> json) {
+    DateTime? parseDate(dynamic v) {
+      if (v == null) return null;
+      if (v is String) return DateTime.tryParse(v);
+      return null;
+    }
+
+    return Event(
+      id: (json['id'] ?? json['_id'] ?? '').toString(),
+      title: (json['title'] ?? '').toString(),
+      description: json['description']?.toString(),
+      facilityId: json['facility'] != null ? json['facility'].toString() : null,
+      groupId: json['groupId']?.toString(),
+      isGlobal: json['isGlobal'] ?? false,
+      startDate: parseDate(json['startDate']) ?? DateTime.now(),
+      endDate: parseDate(json['endDate']),
+      createdAt: parseDate(json['createdAt']),
+      status: json['status']?.toString() ?? 'active',
+      walls: (json['walls'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? [],
+    );
+  }
+}

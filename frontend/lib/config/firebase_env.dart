@@ -11,6 +11,7 @@ class FirebaseEnv {
   static String get webClientId => dotenv.env['FIREBASE_WEB_CLIENT_ID'] ?? '';
   static String get androidApiKey => dotenv.env['FIREBASE_ANDROID_API_KEY'] ?? '';
   static String get androidAppId => dotenv.env['FIREBASE_ANDROID_APP_ID'] ?? '';
+  static String get vapidKey => dotenv.env['FIREBASE_VAPID_KEY'] ?? '';
 
   static String require(String name, String value) {
     if (value.isEmpty) {

@@ -1,0 +1,25 @@
+info:
+    name: create-group
+    type: http
+    seq: 1
+
+http:
+    method: POST
+    url: http://localhost:3000/groups
+    body:
+        type: json
+        data: |-
+            {
+                "name": "Weekend Crew",
+                "description": "Planning climbs every weekend",
+                "visibility": "public"
+            }
+    auth:
+        type: bearer
+        token:
+
+settings:
+    encodeUrl: true
+    timeout: 0
+    followRedirects: true
+    maxRedirects: 5

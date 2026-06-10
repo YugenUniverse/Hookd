@@ -1,12 +1,20 @@
 import 'package:flutter/material.dart';
+import '../pages/notifications_page.dart';
+import '../providers/notification_provider.dart';
+import 'package:provider/provider.dart';
+
 
 import '../models/poi.dart' show IndoorWallSummary;
 import '../models/user.dart';
 import '../pages/all_walls_page.dart';
-import '../pages/wall_issues_page.dart';
+import '../pages/edit_profile_page.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
 import '../dialogs/login_dialog.dart';
+import '../pages/report_list_page.dart';
+import '../pages/statistics_page.dart';
+import '../services/report_service.dart';
+import '../pages/events_list_page.dart';
 
 const _kMaxPreviewWalls = 5;
 
@@ -33,7 +41,12 @@ class _PublicBodyPageState extends State<PublicBodyPage> {
         throw StateError('Not authenticated');
       }
     }
-    return ApiService().fetchCurrentUserProfile(bearerToken: AuthService().jwt);
+    final user = await ApiService().fetchCurrentUserProfile(bearerToken: AuthService().jwt);
+    AuthService().setCurrentUserProfile(
+      avatar: user.profilePictureUrl ?? '',
+      username: user.username,
+    );
+    return user;
   }
 
   void _refresh() {
@@ -64,19 +77,53 @@ class _PublicBodyPageState extends State<PublicBodyPage> {
     if (confirmed != true) return;
     await AuthService().logout();
     if (!mounted) return;
-    Navigator.of(context).pop();
+    if (Navigator.of(context).canPop()) Navigator.of(context).pop();
     messenger.showSnackBar(const SnackBar(content: Text('Logged out')));
   }
 
   @override
   Widget build(BuildContext context) {
+    final unreadCount = context.watch<NotificationProvider>().unreadCount;
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Your profile'),
+        centerTitle: true,
         actions: [
+          IconButton(
+            icon: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                const Icon(Icons.notifications_outlined),
+                if (unreadCount > 0)
+                  Positioned(
+                    right: -2,
+                    top: -2,
+                    child: Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.error,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                      child: Text(
+                        '$unreadCount',
+                        style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  )
+              ],
+            ),
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const NotificationsPage()),
+              );
+            },
+          ),
+
           IconButton(
             tooltip: 'Log out',
             onPressed: _logout,
@@ -109,9 +156,16 @@ class _PublicBodyPageState extends State<PublicBodyPage> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.error_outline, size: 44, color: colorScheme.error),
+                        Icon(
+                          Icons.error_outline,
+                          size: 44,
+                          color: colorScheme.error,
+                        ),
                         const SizedBox(height: 12),
-                        Text('Unable to load profile', style: theme.textTheme.titleLarge),
+                        Text(
+                          'Unable to load profile',
+                          style: theme.textTheme.titleLarge,
+                        ),
                         const SizedBox(height: 8),
                         Text(
                           snapshot.error.toString(),
@@ -137,10 +191,46 @@ class _PublicBodyPageState extends State<PublicBodyPage> {
                 return const Center(child: Text('No profile data available.'));
               }
 
-              final username = user.username.isNotEmpty ? user.username : 'User';
+              if (user.approvalStatus == 'pending') {
+                return Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(32.0),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.hourglass_empty_outlined, size: 64, color: colorScheme.primary),
+                        const SizedBox(height: 24),
+                        Text(
+                          'Account Pending Approval',
+                          style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Your account is currently under review by our administration team. You will be able to access your dashboard and manage your region once approved.',
+                          style: theme.textTheme.bodyLarge?.copyWith(color: colorScheme.onSurfaceVariant),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 32),
+                        FilledButton.icon(
+                          onPressed: _refresh,
+                          icon: const Icon(Icons.refresh),
+                          label: const Text('Check Status'),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }
+
+              final username = user.username.isNotEmpty
+                  ? user.username
+                  : 'User';
               final initial = username[0].toUpperCase();
               final memberSince = user.createdAt != null
-                  ? MaterialLocalizations.of(context).formatShortDate(user.createdAt!)
+                  ? MaterialLocalizations.of(
+                      context,
+                    ).formatShortDate(user.createdAt!)
                   : 'Unknown';
 
               return RefreshIndicator(
@@ -148,44 +238,93 @@ class _PublicBodyPageState extends State<PublicBodyPage> {
                 child: ListView(
                   padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
                   children: [
-                    Builder(builder: (ctx) {
-                      final screenWidth = MediaQuery.of(ctx).size.width;
-                      final dialogMaxWidth = screenWidth < 600 ? screenWidth * 0.96 : 560.0;
-                      return Center(
-                        child: ConstrainedBox(
-                          constraints: BoxConstraints(maxWidth: dialogMaxWidth),
-                          child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            _AccountCard(
-                              username: username,
-                              initial: initial,
-                              email: user.email,
-                              isAdmin: user.isAdmin,
-                              profilePictureUrl: user.profilePictureUrl,
-                              memberSince: memberSince,
-                              publicBodyData: user.publicBodyData,
+                    Builder(
+                      builder: (ctx) {
+                        final screenWidth = MediaQuery.of(ctx).size.width;
+                        final dialogMaxWidth = screenWidth < 600
+                            ? screenWidth * 0.96
+                            : 560.0;
+                        return Center(
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(
+                              maxWidth: dialogMaxWidth,
                             ),
-                            const SizedBox(height: 20),
-                            _NavButton(
-                              icon: Icons.report_problem_outlined,
-                              label: 'Wall issues',
-                              onTap: () => Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) => const WallIssuesPage(),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                _AccountCard(
+                                  username: username,
+                                  initial: initial,
+                                  email: user.email,
+                                  isAdmin: user.isAdmin,
+                                  profilePictureUrl: user.profilePictureUrl,
+                                  memberSince: memberSince,
+                                  publicBodyData: user.publicBodyData,
+                                  onEditProfile: () async {
+                                    final updated = await Navigator.of(context).push<User>(
+                                      MaterialPageRoute(
+                                        builder: (_) => EditProfilePage(user: user),
+                                      ),
+                                    );
+                                    if (updated != null) _refresh();
+                                  },
                                 ),
-                              ),
+                                const SizedBox(height: 20),
+                                _NavButton(
+                                  icon: Icons.analytics_outlined,
+                                  label: 'Performance analytics',
+                                  onTap: () {
+                                    final token = AuthService().jwt ?? '';
+                                    Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder: (_) => ReportListPage(
+                                          reportService: ReportService(
+                                            token: token,
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
+                                const SizedBox(height: 12),
+                                _NavButton(
+                                  icon: Icons.map_outlined,
+                                  label: 'Geographic analytics',
+                                  onTap: () {
+                                    Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder: (_) => const StatisticsPage(),
+                                      ),
+                                    );
+                                  },
+                                ),
+                                const SizedBox(height: 20),
+                                _NavButton(
+                                  icon: Icons.public,
+                                  label: 'Global Challenges',
+                                  onTap: () {
+                                    Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder: (_) => EventsListPage(
+                                          facilityId: 'global',
+                                          facilityName: 'Global Challenges',
+                                          canCreate: true,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
+                                const SizedBox(height: 20),
+                                _WallsSection(
+                                  walls: user.publicBodyData?.walls ?? [],
+                                  onRefresh: _refresh,
+                                ),
+                              ],
                             ),
-                            const SizedBox(height: 20),
-                            _WallsSection(
-                              walls: user.publicBodyData?.walls ?? [],
-                              onRefresh: _refresh,
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                    }),
+                          ),
+                        );
+                      },
+                    ),
                   ],
                 ),
               );
@@ -208,6 +347,7 @@ class _AccountCard extends StatelessWidget {
     required this.memberSince,
     this.profilePictureUrl,
     this.publicBodyData,
+    this.onEditProfile,
   });
 
   final String username;
@@ -217,6 +357,7 @@ class _AccountCard extends StatelessWidget {
   final String memberSince;
   final String? profilePictureUrl;
   final PublicBodyData? publicBodyData;
+  final VoidCallback? onEditProfile;
 
   @override
   Widget build(BuildContext context) {
@@ -228,7 +369,9 @@ class _AccountCard extends StatelessWidget {
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(28),
         color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.85),
-        border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.35)),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.35),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -239,7 +382,8 @@ class _AccountCard extends StatelessWidget {
               CircleAvatar(
                 radius: 36,
                 backgroundColor: colorScheme.secondaryContainer,
-                backgroundImage: profilePictureUrl != null && profilePictureUrl!.isNotEmpty
+                backgroundImage:
+                    profilePictureUrl != null && profilePictureUrl!.isNotEmpty
                     ? NetworkImage(profilePictureUrl!)
                     : null,
                 child: profilePictureUrl == null || profilePictureUrl!.isEmpty
@@ -277,11 +421,19 @@ class _AccountCard extends StatelessWidget {
                       children: [
                         if (isAdmin)
                           _StatusChip(label: 'Admin', icon: Icons.shield),
-                        _StatusChip(label: 'Public Body', icon: Icons.account_balance),
+                        _StatusChip(
+                          label: 'Public Body',
+                          icon: Icons.account_balance,
+                        ),
                       ],
                     ),
                   ],
                 ),
+              ),
+              IconButton(
+                tooltip: 'Edit profile',
+                icon: const Icon(Icons.edit_outlined),
+                onPressed: onEditProfile,
               ),
             ],
           ),
@@ -294,7 +446,8 @@ class _AccountCard extends StatelessWidget {
             ),
             const SizedBox(height: 8),
           ],
-          if (publicBodyData != null && publicBodyData!.description.isNotEmpty) ...[
+          if (publicBodyData != null &&
+              publicBodyData!.description.isNotEmpty) ...[
             _InfoTile(
               icon: Icons.info_outline,
               title: 'About',
@@ -302,7 +455,8 @@ class _AccountCard extends StatelessWidget {
             ),
             const SizedBox(height: 8),
           ],
-          if (publicBodyData?.address != null && publicBodyData!.address!.isNotEmpty) ...[
+          if (publicBodyData?.address != null &&
+              publicBodyData!.address!.isNotEmpty) ...[
             _InfoTile(
               icon: Icons.location_on_outlined,
               title: 'Location',
@@ -346,8 +500,8 @@ class _WallsSectionState extends State<_WallsSection> {
   List<IndoorWallSummary> get _filtered => _query.isEmpty
       ? widget.walls
       : widget.walls
-          .where((w) => w.name.toLowerCase().contains(_query.toLowerCase()))
-          .toList();
+            .where((w) => w.name.toLowerCase().contains(_query.toLowerCase()))
+            .toList();
 
   Future<void> _showCreateDialog(BuildContext context) async {
     final confirmed = await showDialog<bool>(
@@ -382,7 +536,9 @@ class _WallsSectionState extends State<_WallsSection> {
             Expanded(
               child: Text(
                 'Walls (${widget.walls.length})',
-                style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ),
             FilledButton.tonal(
@@ -425,7 +581,9 @@ class _WallsSectionState extends State<_WallsSection> {
           Container(
             padding: const EdgeInsets.all(18),
             decoration: BoxDecoration(
-              color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.55),
+              color: colorScheme.surfaceContainerHighest.withValues(
+                alpha: 0.55,
+              ),
               borderRadius: BorderRadius.circular(20),
             ),
             child: Text(
@@ -439,7 +597,9 @@ class _WallsSectionState extends State<_WallsSection> {
           Container(
             padding: const EdgeInsets.all(18),
             decoration: BoxDecoration(
-              color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.55),
+              color: colorScheme.surfaceContainerHighest.withValues(
+                alpha: 0.55,
+              ),
               borderRadius: BorderRadius.circular(20),
             ),
             child: Text(
@@ -457,7 +617,9 @@ class _WallsSectionState extends State<_WallsSection> {
             ),
           ),
         ] else ...[
-          ...widget.walls.take(_kMaxPreviewWalls).map(
+          ...widget.walls
+              .take(_kMaxPreviewWalls)
+              .map(
                 (wall) => Padding(
                   padding: const EdgeInsets.only(bottom: 10),
                   child: _WallTile(wall: wall, onRefresh: widget.onRefresh),
@@ -498,12 +660,12 @@ class _WallTile extends StatelessWidget {
   final VoidCallback onRefresh;
 
   Color _difficultyColor(String d) => switch (d.toUpperCase()) {
-        'BEGINNER' => Colors.green,
-        'INTERMEDIATE' => Colors.amber.shade700,
-        'ADVANCED' => Colors.orange,
-        'EXPERT' => Colors.red.shade700,
-        _ => Colors.grey,
-      };
+    'BEGINNER' => Colors.green,
+    'INTERMEDIATE' => Colors.amber.shade700,
+    'ADVANCED' => Colors.orange,
+    'EXPERT' => Colors.red.shade700,
+    _ => Colors.grey,
+  };
 
   Future<void> _showEditDialog(BuildContext context) async {
     final confirmed = await showDialog<bool>(
@@ -528,7 +690,9 @@ class _WallTile extends StatelessWidget {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Delete wall?'),
-        content: Text('This will permanently delete "${wall.name}". This cannot be undone.'),
+        content: Text(
+          'This will permanently delete "${wall.name}". This cannot be undone.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
@@ -553,7 +717,9 @@ class _WallTile extends StatelessWidget {
       onRefresh();
       messenger.showSnackBar(const SnackBar(content: Text('Wall deleted')));
     } else {
-      messenger.showSnackBar(const SnackBar(content: Text('Failed to delete wall')));
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Failed to delete wall')),
+      );
     }
   }
 
@@ -568,7 +734,9 @@ class _WallTile extends StatelessWidget {
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.7),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.25)),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.25),
+        ),
       ),
       child: Row(
         children: [
@@ -584,7 +752,9 @@ class _WallTile extends StatelessWidget {
               children: [
                 Text(
                   wall.name,
-                  style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
+                  style: theme.textTheme.bodyLarge?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
                 const SizedBox(height: 2),
                 Row(
@@ -598,7 +768,10 @@ class _WallTile extends StatelessWidget {
                     if (!isOpen) ...[
                       const SizedBox(width: 8),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 2,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.orange.shade100,
                           borderRadius: BorderRadius.circular(999),
@@ -619,7 +792,9 @@ class _WallTile extends StatelessWidget {
             const SizedBox(width: 2),
             Text(
               wall.rating.toStringAsFixed(1),
-              style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
+              style: theme.textTheme.bodySmall?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
             ),
             const SizedBox(width: 4),
           ],
@@ -683,8 +858,9 @@ class _CreateWallDialogState extends State<_CreateWallDialog> {
     final lat = double.tryParse(_latitudeController.text.trim());
 
     if (name.isEmpty) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Name cannot be empty')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Name cannot be empty')));
       return;
     }
     if (lng == null || lat == null) {
@@ -746,7 +922,9 @@ class _CreateWallDialogState extends State<_CreateWallDialog> {
             const SizedBox(height: 12),
             TextField(
               controller: _addressController,
-              decoration: const InputDecoration(labelText: 'Address (optional)'),
+              decoration: const InputDecoration(
+                labelText: 'Address (optional)',
+              ),
             ),
             const SizedBox(height: 12),
             Row(
@@ -755,7 +933,9 @@ class _CreateWallDialogState extends State<_CreateWallDialog> {
                   child: TextField(
                     controller: _longitudeController,
                     keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true, signed: true),
+                      decimal: true,
+                      signed: true,
+                    ),
                     decoration: const InputDecoration(labelText: 'Longitude'),
                   ),
                 ),
@@ -764,7 +944,9 @@ class _CreateWallDialogState extends State<_CreateWallDialog> {
                   child: TextField(
                     controller: _latitudeController,
                     keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true, signed: true),
+                      decimal: true,
+                      signed: true,
+                    ),
                     decoration: const InputDecoration(labelText: 'Latitude'),
                   ),
                 ),
@@ -791,7 +973,10 @@ class _CreateWallDialogState extends State<_CreateWallDialog> {
               ? const SizedBox(
                   width: 16,
                   height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
                 )
               : const Text('Create'),
         ),
@@ -829,8 +1014,11 @@ class _EditWallDialogState extends State<_EditWallDialog> {
   void initState() {
     super.initState();
     _nameController = TextEditingController(text: widget.wall.name);
-    _descriptionController = TextEditingController(text: widget.wall.description);
-    _difficulty = _difficultyOptions.contains(widget.wall.difficulty.toUpperCase())
+    _descriptionController = TextEditingController(
+      text: widget.wall.description,
+    );
+    _difficulty =
+        _difficultyOptions.contains(widget.wall.difficulty.toUpperCase())
         ? widget.wall.difficulty.toUpperCase()
         : 'UNKNOWN';
   }
@@ -847,8 +1035,9 @@ class _EditWallDialogState extends State<_EditWallDialog> {
     final description = _descriptionController.text.trim();
 
     if (name.isEmpty) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Name cannot be empty')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Name cannot be empty')));
       return;
     }
 
@@ -920,7 +1109,10 @@ class _EditWallDialogState extends State<_EditWallDialog> {
               ? const SizedBox(
                   width: 16,
                   height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
                 )
               : const Text('Apply'),
         ),
@@ -932,7 +1124,11 @@ class _EditWallDialogState extends State<_EditWallDialog> {
 // ─── Nav button ───────────────────────────────────────────────────────────────
 
 class _NavButton extends StatelessWidget {
-  const _NavButton({required this.icon, required this.label, required this.onTap});
+  const _NavButton({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
 
   final IconData icon;
   final String label;
@@ -951,7 +1147,9 @@ class _NavButton extends StatelessWidget {
         decoration: BoxDecoration(
           color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.7),
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.3)),
+          border: Border.all(
+            color: colorScheme.outlineVariant.withValues(alpha: 0.3),
+          ),
         ),
         child: Row(
           children: [
@@ -960,10 +1158,16 @@ class _NavButton extends StatelessWidget {
             Expanded(
               child: Text(
                 label,
-                style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
+                style: theme.textTheme.bodyLarge?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
-            Icon(Icons.chevron_right, size: 20, color: colorScheme.onSurfaceVariant),
+            Icon(
+              Icons.chevron_right,
+              size: 20,
+              color: colorScheme.onSurfaceVariant,
+            ),
           ],
         ),
       ),
@@ -974,7 +1178,11 @@ class _NavButton extends StatelessWidget {
 // ─── Shared sub-widgets ───────────────────────────────────────────────────────
 
 class _InfoTile extends StatelessWidget {
-  const _InfoTile({required this.icon, required this.title, required this.value});
+  const _InfoTile({
+    required this.icon,
+    required this.title,
+    required this.value,
+  });
 
   final IconData icon;
   final String title;
@@ -990,7 +1198,9 @@ class _InfoTile extends StatelessWidget {
       decoration: BoxDecoration(
         color: colorScheme.surface.withValues(alpha: 0.75),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.3)),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.3),
+        ),
       ),
       child: Row(
         children: [
@@ -1009,7 +1219,9 @@ class _InfoTile extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   value,
-                  style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
+                  style: theme.textTheme.bodyLarge?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ],
             ),

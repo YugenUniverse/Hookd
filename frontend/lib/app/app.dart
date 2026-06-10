@@ -4,6 +4,7 @@ import 'package:dynamic_color/dynamic_color.dart';
 
 import '../pages/home_page.dart';
 import '../constants/ui_constants.dart';
+import '../constants/nav_key.dart';
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
@@ -91,6 +92,7 @@ class MyApp extends StatelessWidget {
 
             return MaterialApp(
               title: 'Hookd',
+              navigatorKey: navigatorKey,
               themeMode: ThemeMode.system,
               theme: buildTheme(lightScheme),
               darkTheme: buildTheme(darkScheme),

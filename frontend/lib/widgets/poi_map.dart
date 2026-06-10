@@ -26,13 +26,22 @@ class WallMapController extends ChangeNotifier {
   Wall? _selectedWall;
   FacilityPoi? _selectedFacility;
 
+  double? _bboxMinLat, _bboxMaxLat, _bboxMinLng, _bboxMaxLng;
+
   LatLng? get target => _target;
   Wall? get selectedWall => _selectedWall;
   FacilityPoi? get selectedFacility => _selectedFacility;
 
+  bool get hasBbox => _bboxMinLat != null;
+  double? get bboxMinLat => _bboxMinLat;
+  double? get bboxMaxLat => _bboxMaxLat;
+  double? get bboxMinLng => _bboxMinLng;
+  double? get bboxMaxLng => _bboxMaxLng;
+
   void focusOnWall(Wall wall) {
     _selectedWall = wall;
     _selectedFacility = null;
+    _bboxMinLat = _bboxMaxLat = _bboxMinLng = _bboxMaxLng = null;
     _target = LatLng(wall.latitude, wall.longitude);
     notifyListeners();
   }
@@ -40,7 +49,19 @@ class WallMapController extends ChangeNotifier {
   void focusOnFacility(FacilityPoi facility) {
     _selectedFacility = facility;
     _selectedWall = null;
+    _bboxMinLat = _bboxMaxLat = _bboxMinLng = _bboxMaxLng = null;
     _target = LatLng(facility.latitude, facility.longitude);
+    notifyListeners();
+  }
+
+  void focusBbox(double minLat, double maxLat, double minLng, double maxLng) {
+    _bboxMinLat = minLat;
+    _bboxMaxLat = maxLat;
+    _bboxMinLng = minLng;
+    _bboxMaxLng = maxLng;
+    _target = null;
+    _selectedWall = null;
+    _selectedFacility = null;
     notifyListeners();
   }
 }
@@ -89,8 +110,26 @@ class _POIMapState extends State<POIMap> {
 
   void _handleControllerCommand() {
     final controller = widget.controller;
-    final target = controller?.target;
-    if (controller == null || target == null) return;
+    if (controller == null) return;
+
+    if (controller.hasBbox) {
+      final bounds = LatLngBounds(
+        LatLng(controller.bboxMinLat!, controller.bboxMinLng!),
+        LatLng(controller.bboxMaxLat!, controller.bboxMaxLng!),
+      );
+      _skipNextMoveFetch = true;
+      _mapController.fitCamera(
+        CameraFit.bounds(bounds: bounds, padding: const EdgeInsets.all(24)),
+      );
+      final center = _mapController.camera.center;
+      _currentZoom = _mapController.camera.zoom;
+      _lastMapCenter = center;
+      _fetchPoisForLocation(center.longitude, center.latitude, zoom: _currentZoom);
+      return;
+    }
+
+    final target = controller.target;
+    if (target == null) return;
 
     _skipNextMoveFetch = true;
     _currentZoom = _effectiveFocusZoom;
@@ -113,9 +152,12 @@ class _POIMapState extends State<POIMap> {
     });
   }
 
+  static const LatLng _defaultCenter = LatLng(46.067, 11.117);
+
   @override
   void initState() {
     super.initState();
+    _fetchPoisForLocation(_defaultCenter.longitude, _defaultCenter.latitude);
     _initLocation();
     _setupMapListener();
     widget.controller?.addListener(_handleControllerCommand);
@@ -503,7 +545,7 @@ class _POIMapState extends State<POIMap> {
             FlutterMap(
               mapController: _mapController,
               options: MapOptions(
-                initialCenter: const LatLng(46.067, 11.117),
+                initialCenter: _defaultCenter,
                 initialZoom: _effectiveDefaultZoom,
                 // Prevents zooming out past the Trentino Alto Adige scale (~220km visible).
                 minZoom: 8,

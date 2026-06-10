@@ -71,6 +71,19 @@ exports.deleteSession = async (req, res, next) => {
     }
 };
 
+exports.getPublicSessionsByUser = async (req, res, next) => {
+    try {
+        const limit = Math.min(parseInt(req.query.limit) || 20, 50);
+        const sessions = await sessionService.getPublicSessionsByUser(
+            req.params.userId,
+            { limit },
+        );
+        res.json({ sessions });
+    } catch (err) {
+        next(err);
+    }
+};
+
 exports.addReviewToSession = async (req, res, next) => {
     try {
         const result = await sessionService.addReviewToSession(

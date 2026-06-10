@@ -1,21 +1,21 @@
 info:
-  name: getSavedReport
-  type: http
-  seq: 4
+    name: getSavedReport
+    type: http
+    seq: 5
 
 http:
-  method: GET
-  url: http://localhost:3000/reports/saved/:id
-  params:
-    - name: id
-      value: 6a076cbdc85716e868f3150f
-      type: path
-  auth:
-    type: bearer
-    token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2YTA3NmNiYWM4NTcxNmU4NjhmMzE0ODEiLCJlbWFpbCI6Imd5bV82ZjA2M2VAdGVzdC5jb20iLCJ1c2VyVHlwZSI6IkZhY2lsaXR5IiwiaWF0IjoxNzc4ODcxNjQyLCJleHAiOjE3Nzg4NzUyNDIsImlzcyI6Imhvb2tkIn0.KWXUd-qVbtmRVAJVGaqG3GjGVftJUKWmhP6rwMWCdCE
+    method: GET
+    url: http://localhost:3000/reports/saved/:id
+    params:
+        - name: id
+          value: 6a076cbdc85716e868f3150f
+          type: path
+    auth:
+        type: bearer
+        token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2YTA3NmNiYWM4NTcxNmU4NjhmMzE0ODEiLCJlbWFpbCI6Imd5bV82ZjA2M2VAdGVzdC5jb20iLCJ1c2VyVHlwZSI6IkZhY2lsaXR5IiwiaWF0IjoxNzc4ODcxNjQyLCJleHAiOjE3Nzg4NzUyNDIsImlzcyI6Imhvb2tkIn0.KWXUd-qVbtmRVAJVGaqG3GjGVftJUKWmhP6rwMWCdCE
 
 settings:
-  encodeUrl: true
-  timeout: 0
-  followRedirects: true
-  maxRedirects: 5
+    encodeUrl: true
+    timeout: 0
+    followRedirects: true
+    maxRedirects: 5
