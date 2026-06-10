@@ -125,16 +125,25 @@ class LiveReportPageState extends State<LiveReportPage> {
                                 );
                               });
                             } else {
-                              await widget.reportService.saveReportSnapshot(
-                                widget.wallId!,
-                                titleController.text.trim(),
-                                notesController.text.trim(),
-                              );
+                              final savedReport = await widget.reportService
+                                  .saveReportSnapshot(
+                                    widget.wallId!,
+                                    titleController.text.trim(),
+                                    notesController.text.trim(),
+                                  );
                               if (!mounted) return;
                               WidgetsBinding.instance.addPostFrameCallback((_) {
                                 if (!mounted) return;
                                 Navigator.pop(context);
-                                Navigator.pop(context);
+                                Navigator.pushReplacement(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => ReportDetailPage(
+                                      reportId: savedReport.id,
+                                      reportService: widget.reportService,
+                                    ),
+                                  ),
+                                );
                               });
                             }
                           } catch (e) {
