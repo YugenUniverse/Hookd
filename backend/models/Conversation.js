@@ -22,8 +22,14 @@ const conversationSchema = new Schema(
     },
 );
 
-// One conversation per group
-conversationSchema.index({ group: 1 }, { unique: true, sparse: true });
+// One conversation per group. Use a partial filter (not sparse) so that DM
+// conversations — which all have group: null — are excluded from the unique
+// constraint. A sparse index still indexes documents where group is explicitly
+// null, which collides across DMs.
+conversationSchema.index(
+    { group: 1 },
+    { unique: true, partialFilterExpression: { group: { $type: "objectId" } } },
+);
 conversationSchema.index({ participants: 1, lastActivity: -1 });
 
 module.exports = mongoose.model("Conversation", conversationSchema);

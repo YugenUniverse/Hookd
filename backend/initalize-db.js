@@ -112,7 +112,10 @@ const pickDifficulty = (tags) => {
         tags?.["leisure"] === "sports_centre"
     )
         return "INTERMEDIATE";
-    return "UNKNOWN";
+    // ~25% stay UNKNOWN, rest get a random difficulty
+    if (Math.random() < 0.25) return "UNKNOWN";
+    const difficulties = ["BEGINNER", "INTERMEDIATE", "ADVANCED", "EXPERT"];
+    return difficulties[Math.floor(Math.random() * difficulties.length)];
 };
 
 const pickWallType = (tags) => {
